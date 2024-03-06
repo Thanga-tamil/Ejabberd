@@ -1,18 +1,11 @@
-### Erlang Base Image  ###
-
-#FROM asia.gcr.io/true-digital-256710/erlang21:v1
-#FROM hyd.ocir.io/axvlhlx5qpcs/mirrorfly-preprod/erlang23:sandbox-v1
-FROM nexus-demo.contus.us:8446/mirrorfly-uikit/prod/erlang23:v1
+FROM nexus-demo.contus.us:8446/mirrorfly-uikit/prod/erlang24:v1
 
 ### Expose the ejabberd ports ###
-
 EXPOSE 5222
 EXPOSE 5269
 EXPOSE 5281
-
 ### Maintain same erlang cookie for ejabberd cluster ###
-RUN yum update -y
-RUN useradd ejabberd
+RUN useradd -m ejabberd
 COPY .erlang.cookie /home/ejabberd/
 COPY .erlang.cookie /root
 RUN chmod -R 600 /home/ejabberd/.erlang.cookie /root/.erlang.cookie
@@ -23,11 +16,6 @@ RUN mkdir /opt/ejabberd
 COPY MirrorFly.py /opt/ejabberd/MirrorFly.py
 
 RUN chmod +x /opt/ejabberd/MirrorFly.py
-
-RUN yum install python-requests -y
-
-
-### Move certificate files ###
 
 RUN mkdir -p /opt/ejabberd/certs
 COPY limits.conf /etc/security/limits.conf
@@ -44,15 +32,10 @@ COPY rabbit_common.app  /tmp/ejabberd/deps/rabbit_common/ebin/rabbit_common.app
 RUN cd /tmp/ejabberd; make install
 
 ### install tini
-ENV TINI_VERSION v0.19.0
-ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
-RUN chmod +x /tini
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-RUN yum install -y python-pip python3
-RUN pip3 install requests && pip3 install PyJWT
-RUN yum update -y
 ### Move configs to etc ###
 
 #COPY etc /opt/ejabberd/etc
@@ -64,16 +47,14 @@ RUN chmod -R 755 /opt/ejabberd
 RUN rm -rf /tmp/es.rpm
 #RUN rm -rf /opt/ejabberd/source
 
-### The application's jar file ### 
+### The application's jar file ###
 
 ARG JAR_FILE=ejabberdadmin.jar
 
-###  Add the application's jar to the container ### 
+###  Add the application's jar to the container ###
 
 ADD ${JAR_FILE} ejabberdadmin.jar
 
-###  Run the jar file ### 
+###  Run the jar file ###
 
 ENTRYPOINT ["/tini", "--", "/entrypoint.sh"]
-
-#CMD ["/opt/ejabberd/sbin/ejabberdctl","start"]

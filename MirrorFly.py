@@ -1,66 +1,75 @@
 #!/usr/bin/python
+
 import sys
-from struct import *
+import struct
 import os
 import datetime
 import requests
 import json
-import time 
+import time
 
-#url = 'https://api-uikit-uat.contus.us/api/v1/login'
-
+def read_from_stdin(bytes):
+  if hasattr(sys.stdin, 'buffer'):
+    return sys.stdin.buffer.read(bytes)
+  else:
+    return sys.stdin.read(bytes)
 
 def log(string):
     with open('/opt/ejabberd/sso-auth.log', 'a') as f:
         f.write(str(datetime.datetime.now()) + ': ' + string + '\n')
 
+def read():
+    (pkt_size,) = struct.unpack('>H', read_from_stdin(2))
+    pkt = sys.stdin.read(pkt_size)
+    cmd = pkt.split(':')[0]
+    if cmd == 'auth':
+        log('requested input' + pkt)
+        u, s, p, l = pkt.split(':', 5)[1:]
+        if u == "wrong":
+            write(False)
+        else:
+            rurl = str("https://"+l)
+            #dt = datetime.now()
+            currentTimestamp = int(time.time())
+            obj = {'password': p, 'username': u,'currentTimestamp':currentTimestamp}
+            headers = {'Content-Type': 'application/json'}
+            log('reuted url' + rurl)
+            r = requests.post(rurl, data=json.dumps(obj), headers=headers)
+            if ((r.status_code == 200 or r.status_code == 202 or r.status_code == 201) and (json.loads(r.text)['status'] == 200 or json.loads(r.text)['status'] == 201)):
+                write(True)
+            else:
+                write(False)
+    elif cmd == 'isuser':
+        u, s = pkt.split(':', 2)[1:]
+        if u == "wrong":
+            write(False)
+        else:
+            write(True)
+    elif cmd == 'setpass':
+        u, s, p = pkt.split(':', 3)[1:]
+        write(True)
+    elif cmd == 'tryregister':
+        u, s, p = pkt.split(':', 3)[1:]
+        write(True)
+    elif cmd == 'removeuser':
+        u, s = pkt.split(':', 2)[1:]
+        write(True)
+    elif cmd == 'removeuser3':
+        u, s, p = pkt.split(':', 3)[1:]
+        write(True)
+    else:
+        write(False)
+    read()
 
-
-def from_ejabberd():
-    input_length = sys.stdin.read(2)
-    (size,) = unpack('>h', input_length)
-    input = sys.stdin.read(size)
-    log('requested input' + input)
-    return input.split(':')
-
-def to_ejabberd(bool):
-    answer = 0
-    if bool:
-        answer = 1
-    token = pack('>hh', 2, answer)
-    sys.stdout.write(token)
+def write(result):
+    if result:
+        sys.stdout.write('\x00\x02\x00\x01')
+    else:
+        sys.stdout.write('\x00\x02\x00\x00')
     sys.stdout.flush()
 
-def auth(username, server, password,url):  
-    rurl = str("https://"+url)
-    currentTimestamp = int(time.time())
-    obj = {'password': password, 'username': username,'currentTimestamp':currentTimestamp}
-    headers = {'Content-Type': 'application/json'}
-    r = requests.post(rurl, data=json.dumps(obj), headers=headers)
-    
-    if ((r.status_code == 200 or r.status_code == 202 or r.status_code == 201) and (json.loads(r.text)['status'] == 200 or json.loads(r.text)['status'] == 201)):
-        return True
-    else:
-        return False
-
-def check_password(username, server, password):
-    return False
-
-def isuser(username, server):
-    return True
-
-def setpass(username, server, password):
-    return False
-
-while True:
-    data = from_ejabberd()
-    success = False
-    if data[0] == "auth":
-        success = auth(data[1], data[2], data[3], data[4])
-    elif data[0] == "isuser":
-        success = isuser(data[1], data[2])
-    elif data[0] == "setpass":
-        success = setpass(data[1], data[2], data[3])
-    elif data[0] == "check_password":
-        success = auth(data[1], data[2], data[3])
-    to_ejabberd(success)
+if __name__ == "__main__":
+    try:
+        read()
+    except struct.error:
+        pass
