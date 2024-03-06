@@ -84,7 +84,6 @@
   update_favourite_message/3,
   get_user_resource/1,
   get_user_resource/3,
-  get_user_mobile_resource/2,
   get_message/2,
   get_offline_msg/2,
   update_offline_status/3,

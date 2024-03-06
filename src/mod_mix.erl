@@ -760,28 +760,6 @@ get_message_content(Stanza) ->
 
 										false ->  ok;
 										Nick ->
-											case fxml:get_subtag(Stanza, <<"editmsg">>) of
-
-											false ->
-												 EditMsgid = <<"">>,
-												 case fxml:get_subtag(Stanza, <<"subject">>) of
-
-											false ->  ok;
-											MsgType ->
-											case fxml:get_subtag(Mix, <<"jid">>) of
-
-												false -> ok;
-												JidTag ->
-													Id = fxml:get_tag_cdata(SubmissionID),
-													SentFrom = fxml:get_tag_cdata(JidTag),
-													MSG = fxml:get_tag_cdata(Body),
-													Type = fxml:get_tag_cdata(MsgType),
-													GroupName = fxml:get_tag_cdata(Nick),
-													[Type, Id, SentFrom, GroupName, MSG, EditMsgid]
-											end
-										end;
-											EditMsgId ->
-												EditMsgid = EditMsgId,
 										case fxml:get_subtag(Stanza, <<"subject">>) of
 
 											false ->  ok;
@@ -791,13 +769,20 @@ get_message_content(Stanza) ->
 												false -> ok;
 												JidTag ->
 													Id = fxml:get_tag_cdata(SubmissionID),
+													ContentAcknowledge = xmpp:get_subtag(Stanza, #chatcontent{}),
+													if ContentAcknowledge == false ->
+
+														EditMsgid = Id;
+														true ->
+														{_,_,_,_, _,_, _, EditMsgid,_} = ContentAcknowledge
+														end,
 													SentFrom = fxml:get_tag_cdata(JidTag),
 													MSG = fxml:get_tag_cdata(Body),
 													Type = fxml:get_tag_cdata(MsgType),
 													GroupName = fxml:get_tag_cdata(Nick),
 													[Type, Id, SentFrom, GroupName, MSG, EditMsgid]
 											end
-										end
+
 										end
 									end
 								end
