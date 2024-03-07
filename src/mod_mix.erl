@@ -956,7 +956,7 @@ notify_participant_joined(Mod, LServer, To, From, ID, [Nick, GroupCreate, Publis
 		      #jid{user = FUser, lserver = FServer} = From,
 		      PublisherJID = jid:make(fly_mod_utils:get_user_from_string_jid(Publisher),FServer),
 		      #jid{user = PUser, lserver = PServer} = PublisherJID,
-
+                      ?INFO_MSG("From ~p",[From]),
 		      Vcard = case catch fly_mod_utils:get_vcard(FServer, FUser) of
 			      {selected, [{GVCARD, _GrpCreatedAt}]} ->
 			      xmpp:encode(fxml_stream:parse_element(GVCARD));
@@ -998,7 +998,7 @@ notify_participant_joined(Mod, LServer, To, From, ID, [Nick, GroupCreate, Publis
 			mod_offline:store_packet({RouteJid,xmpp:decode(Msg2)}),
 			Stanza = xmpp:encode(Msg2),
 			Node = ?NS_MIX_NODES_PARTICIPANTS,
-			Content1 = [Chan,Publisher,jid:to_string(PublisherJID),ItemId,Nick,MsgId],
+			Content1 = [Chan,Publisher,jid:to_string(From),ItemId,Nick,MsgId],
 			fly_mod_offline_push:send_bulk_group_push(To,TServer,Content1,ToJid,Node,Stanza,<<"added">>),
 			fly_mix_group_chat:carboncall_message(ToJid ,TServer, Msg2, To)
 		      end, JIDs).

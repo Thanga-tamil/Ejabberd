@@ -2082,6 +2082,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
             {<<"sent_from">>, binary_to_list(MsgFrom)},
             {<<"user_name">>, binary_to_list(UserName)},
             {<<"added_user">>, binary_to_list(ReceiverUserName)},
+            {<<"participant">>, binary_to_list(ParticipantJid)},
             {<<"publisher_profile">>, binary_to_list(PublisherVcard)},
             {<<"custom_attributes">>, binary_to_list(fxml:get_tag_cdata(CustAttr))},
             {<<"title">>, binary_to_list(UserNickName)},

@@ -214,7 +214,7 @@ create_group_service(From, To, SubEl, IQ) ->
   RequestType = <<"create_group">>,
   fly_mod_utils:update_vcard_date(FServer, Channel),
   RouteToJid = jid:make(AdminUser, FServer),
-  mod_mix:notify_participant_joined_api(ServerHost, GroupJid, RouteToJid, [NickName, AdminUser, RouteToJid, AdminUser ],MsgId),
+  mod_mix:notify_participant_joined_api(ServerHost, GroupJid, RouteToJid, [NickName, Adminuser, RouteToJid, [AdminUser] ],MsgId),
   fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify to group members successfully">>}).
 
 update_profile_service(From, To, SubEl, IQ) ->
