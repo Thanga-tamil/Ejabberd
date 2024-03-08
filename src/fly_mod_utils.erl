@@ -673,7 +673,7 @@ get_jid_update_admin(LServer, GroupTo, UserName) ->
 %% &param Jid
 %% @return Update the admin in the group
 get_group_users(LServer, GroupId) ->
-  ejabberd_sql:sql_query(LServer, [<<"select mix_pam.username from mix_pam  inner join mix_participant on mix_pam.channel = mix_participant.channel and mix_pam.username = mix_participant.username where  mix_pam.channel ='">>,GroupId,<<"'  and mix_pam.affiliation != '';">>]).
+  ejabberd_sql:sql_query(LServer, [<<"select mix_pam.username from mix_pam  inner join mix_participant on mix_pam.channel = mix_participant.channel and mix_pam.username = mix_participant.username where  mix_pam.channel ='">>,GroupId,<<"'  and mix_pam.affiliation != '' order by mix_pam.pam_id asc;">>]).
 
 %% Update admin of the group using Jid
 %%
@@ -1296,7 +1296,7 @@ update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
 
   ejabberd_sql:sql_query(
     Server,
-    [<<"update chat_recent set status = '">>,Status,<<"', unread =  0 where  to_user ='">>,TUser,<<"' and message_id='">>,MessageId,<<"' and status < 2 and ;">>]).
+    [<<"update chat_recent set status = '">>,Status,<<"', unread =  0 where  to_user ='">>,TUser,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>]).
 
 %% Update message delivery status
 %%
