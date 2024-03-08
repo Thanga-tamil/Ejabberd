@@ -636,9 +636,9 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 			Pkt = xmpp:set_type(F(normal), normal),
 			Stanza = xmpp:encode(Pkt),
 			if Node =:= <<"urn:xmpp:mix:nodes:messages">>  ->
-				Content = get_message_content(Stanza),
-				[_, _, _, _, _, CEditMsgId ] = Content,
-				if CEditMsgId =:= <<"">> ->
+				Content = get_message_content(Stanza , Pkt),
+				[_, CMessageId, _, _, _, CEditMsgId ] = Content,
+				if (CEditMsgId =:= CMessageId) or (CEditMsgId =:= <<"">>) ->
 				spawn(?MODULE, send_group_push_message, [F,Node,Subscribers,LServer,Chan,Service,Stanza,Content]);
 				true ->
 				 ok
@@ -649,22 +649,27 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 			MsgContent=Content,
 			% Bulk Insert Starts
 			if Node =:= <<"urn:xmpp:mix:nodes:messages">> ->
-				[MessageType, MessageId, MesssageSend, _GroupName, MsgData, EditMsgId ] = MsgContent,
+
+				[MessageType, MessageId, MesssageSend, _GroupName, MsgData, EditmsgId] = MsgContent,
+
 				% fly_mod_offline_push:queryexecfunctions(LServer, <<"group_insert">>, From, MsgContent, Subscribers);
 				TimestampNew = fly_add_timestamp:now_to_microseconds(erlang:now()),
 				FlatTimeStampNew = lists:flatten(io_lib:format("~p", [TimestampNew])),
-				if EditMsgId =:= <<"">> ->
-				InsertStatement = <<"insert into message_status (from_user,to_user,status, recent,message_id,message_type,txt,chat_type,from_notification, message_time,to_notification,message_notification,received_at,seen_at, meta_data) values ">>,
-			   RecentInsert = <<"insert into chat_recent (from_user, to_user,  message_id, message_from, txt, chat_type, message_type,  notification_to, unread, message_time,meta_data) values ">>,
-
 				#jid{luser = FromUser} = From,
-
-
+				SUser = fly_mod_utils:get_user_from_string_jid(MesssageSend),
+				if EditmsgId =:= <<"">> ->
+					EditMsgId = MessageId;
+				true ->
+					EditMsgId = EditmsgId
+				end,
+				if (EditMsgId =:= MessageId) or (EditMsgId =:= <<"">>) ->
+				InsertStatement = <<"insert into message_status (from_user,to_user,status, recent,message_id, edit_message_id, message_type,txt,chat_type,from_notification, message_time,to_notification,message_notification,received_at,seen_at, meta_data) values ">>,
+			   RecentInsert = <<"insert into chat_recent (from_user, to_user,  message_id, message_from, txt, chat_type, message_type,  notification_to, unread, message_time,meta_data) values ">>,
 				ValueStatement = lists:map(fun(Part) ->
 					#jid{luser = ToUser} = Part,
-					string:concat("", ", ('" ++ binary_to_list(FromUser) ++ "', '" ++ binary_to_list(ToUser) ++ "', 0,1, '" ++ binary_to_list(MessageId) ++ "', '" ++ binary_to_list(MessageType) ++ "', '" ++ binary_to_list(MsgData) ++"', 'normal', '" ++ binary_to_list(MesssageSend) ++ "', '" ++ FlatTimeStampNew ++ "','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00','{}')")
+					string:concat("", ", ('" ++ binary_to_list(FromUser) ++ "', '" ++ binary_to_list(ToUser) ++ "', 0,1, '" ++ binary_to_list(MessageId) ++ "', '" ++ binary_to_list(EditMsgId) ++ "','" ++ binary_to_list(MessageType) ++ "', '" ++ binary_to_list(MsgData) ++"', 'normal', '" ++ binary_to_list(MesssageSend) ++ "', '" ++ FlatTimeStampNew ++ "','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00','{}')")
 				end, Subscribers),
-                                SUser = fly_mod_utils:get_user_from_string_jid(MesssageSend),
+
 				RecentValueStatement = lists:map(fun(Part) ->
 					#jid{luser = ToUser} = Part,
 
@@ -686,38 +691,10 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 				ejabberd_sql:sql_query(LServer, [FinalQuery]),
 				ejabberd_sql:sql_query(LServer, [RecentFinalQuery]);
 				true ->
-			   UpdateStatement = <<"update  message_status set edit_status = 1, message_id = '">>, MessageId, <<"', txt = = '">>, MsgData , <<"'where message_id = '">>, EditMsgId, <<"' ;">>,
-
-			   RecentInsert = <<"insert into chat_recent (from_user, to_user,  message_id, message_from, txt, chat_type, message_type,  notification_to, unread, message_time,meta_data) values ">>,
-
-				#jid{luser = FromUser} = From,
-
-
-				SUser = fly_mod_utils:get_user_from_string_jid(MesssageSend),
-
-				RecentValueStatement = lists:map(fun(Part) ->
-					#jid{luser = ToUser} = Part,
-
-					if ToUser =:= SUser ->
-						Unread = <<"0">>;
-					true ->
-						Unread = <<"1">>
-					end,
-					string:concat("", ", ('" ++ binary_to_list(FromUser) ++ "', '" ++ binary_to_list(ToUser) ++ "', '" ++ binary_to_list(MessageId) ++ "', '"  ++ binary_to_list(SUser) ++ "', '"  ++ binary_to_list(MsgData) ++ "', 'normal', '" ++ binary_to_list(MessageType) ++ "', '', '" ++ binary_to_list(Unread) ++ "', '" ++ FlatTimeStampNew ++ "','{}')")
-				end, Subscribers),
-
-
-				RecentDuplicateStatement = " ON DUPLICATE KEY UPDATE message_id = values(message_id), message_from = values(message_from), txt = values(txt), chat_type = values(chat_type), message_type = values(message_type),  notification_to = values(notification_to), unread = unread + values(unread), status = 0, recall_status = 0, favourite_status = 0, message_time= values(message_time), created_at = NOW();",
-
-				[_|RecentNewVal] = re:replace(RecentValueStatement, ",", ""),
-
-				FinalQuery = binary_to_list(UpdateStatement),
-				RecentFinalQuery = binary_to_list(RecentInsert) ++ binary_to_list(RecentNewVal) ++ RecentDuplicateStatement,
-				ejabberd_sql:sql_query( LServer, [<<"insert into fly_message_data (from_user,to_user, message_id,chat_type, msg, edit_msg_id) values ('">>, SUser, <<"', '">>, FromUser,  <<"', '">>, MessageId, <<"', 'normal', '">>, MsgData, <<"' , '">>, EditMsgId, <<"';">>]),
-				ejabberd_sql:sql_query(LServer, [FinalQuery]),
-				ejabberd_sql:sql_query(LServer, [RecentFinalQuery])
-				end;
-
+				ejabberd_sql:sql_query(LServer, [<<"update  message_status set status = 0, edit_status = 1, received_at = '0000-00-00 00:00:00' ,seen_at = '0000-00-00 00:00:00',  edit_message_id = '">>, EditMsgId, <<"', txt  = '">>, MsgData , <<"' where message_id = '">>, MessageId, <<"' ;">>]),
+				ejabberd_sql:sql_query(LServer, [<<"update chat_recent set status = 0,  txt  = '">>, MsgData , <<"'where message_id = '">>, MessageId, <<"';">>])
+				end,
+				ejabberd_sql:sql_query( LServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg) values ('">>, SUser, <<"', '">>, FromUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'normal', '">>, MsgData, <<"');">>]);
 			true ->
 				ok
 			end,
@@ -744,7 +721,9 @@ send_group_push_message(_F,Node,Members,LServer,Chan,Service,Stanza,MessageConte
 	end.
 
 %% Contus Added get_message_content
-get_message_content(Stanza) ->
+get_message_content(Stanza, Pkt) ->
+	ContentAcknowledge = xmpp:get_subtag(Pkt, #chatcontent{}),
+
 	MessageContent = case fxml:get_subtag(Stanza, <<"mix">>) of
 						false -> ok;
 						Mix ->
@@ -769,17 +748,15 @@ get_message_content(Stanza) ->
 												false -> ok;
 												JidTag ->
 													Id = fxml:get_tag_cdata(SubmissionID),
-													ContentAcknowledge = xmpp:get_subtag(Stanza, #chatcontent{}),
-													if ContentAcknowledge == false ->
-
-														EditMsgid = Id;
-														true ->
-														{_,_,_,_, _,_, _, EditMsgid,_} = ContentAcknowledge
-														end,
 													SentFrom = fxml:get_tag_cdata(JidTag),
 													MSG = fxml:get_tag_cdata(Body),
 													Type = fxml:get_tag_cdata(MsgType),
 													GroupName = fxml:get_tag_cdata(Nick),
+													if ContentAcknowledge == false ->
+													EditMsgid = Id;
+													true ->
+													{_,_,_,_,_,_, _,EditMsgid,_} = ContentAcknowledge
+												    end,
 													[Type, Id, SentFrom, GroupName, MSG, EditMsgid]
 											end
 
@@ -832,80 +809,84 @@ save_message(From,TServer,MessageContent,To,Node,Stanza, _MsgTime) ->
 		end
 	end.
 
-    process_group_msg(Subscribers, MsgContent, From, F, Node, Stanza, Pkt, Chan) ->
-	lists:foreach(
-		fun(To) ->
-			Msg1 = xmpp:set_to(F(To), To),
-			Msg = xmpp:set_type(Msg1, normal),
-			Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
-			FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
-			Msg2 = xmpp:set_subtag(Msg, #timestampmsg{time= list_to_binary(FlatTimeStamp)}),
-			#jid{luser = TUser, lserver = LServer, lresource = _LResource} = To,
+	process_group_msg(Subscribers, MsgContent, From, F, Node, Stanza, Pkt, Chan) ->
+		lists:foreach(
+			fun(To) ->
+				Msg1 = xmpp:set_to(F(To), To),
+				Msg = xmpp:set_type(Msg1, normal),
+				Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
+				FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
+				Msg2 = xmpp:set_subtag(Msg, #timestampmsg{time= list_to_binary(FlatTimeStamp)}),
+				#jid{luser = TUser, lserver = LServer, lresource = _LResource} = To,
 
-			if Node =:= <<"urn:xmpp:mix:nodes:participants">>  ->
-				MessageContent = participants,
-				case fxml:get_subtag(Stanza, <<"event">>) of
-					false -> ok;
-					Event ->
-						case fxml:get_subtag(Event, <<"items">>) of
-							false -> ok;
-							Items ->
-							case fxml:get_subtag(Items, <<"item">>) of
+				if Node =:= <<"urn:xmpp:mix:nodes:participants">>  ->
+					MessageContent = participants,
+					case fxml:get_subtag(Stanza, <<"event">>) of
+						false -> ok;
+						Event ->
+							case fxml:get_subtag(Event, <<"items">>) of
 								false -> ok;
-								Item ->
-								case fxml:get_tag_attr_s(<<"publisher">>, Item) of
+								Items ->
+								case fxml:get_subtag(Items, <<"item">>) of
 									false -> ok;
-									Publisher ->
-									case fxml:get_subtag(Item, <<"participant">>) of
-										false ->
-											case fxml:get_subtag(Item, <<"jid">>) of
-										    false ->
+									Item ->
+									case fxml:get_tag_attr_s(<<"publisher">>, Item) of
+										false -> ok;
+										Publisher ->
+										case fxml:get_subtag(Item, <<"participant">>) of
+											false ->
+												case fxml:get_subtag(Item, <<"jid">>) of
+											    false ->
+													ok;
+												RetractId ->
+							 RemovedUser = fxml:get_tag_cdata(RetractId),
+
+													NodeId =  fxml:get_tag_attr_s(<<"id">>, Item),
+													IdValue = xmpp:get_id(Pkt),
+													Content1 = [Chan,Publisher,RemovedUser,NodeId,<<"">>,IdValue],
+
+													Resources = ejabberd_sm:get_user_resources(TUser, LServer),
+							if LServer =/= <<"vezbi-xmpp.mirrorfly.com">> ->
+														fly_mod_offline_push:send_bulk_group_push(From,LServer,Content1,TUser,Node,Stanza,<<"remove">>);
+													true ->
+														ok
+							end
+
+
+												end,
+												fly_mix_group_chat:carboncall_message(TUser ,LServer, Msg2, From),
 												ok;
-											RetractId ->
-                                                                                               RemovedUser = fxml:get_tag_cdata(RetractId),
-
+											Participant ->
+											case fxml:get_tag_attr_s(<<"jid">>, Participant) of
+												false -> ok;
+											Jid ->
 												NodeId =  fxml:get_tag_attr_s(<<"id">>, Item),
+												GroupName = fxml:get_tag_attr_s(<<"nick">>, Participant),
 												IdValue = xmpp:get_id(Pkt),
-												Content1 = [Chan,Publisher,RemovedUser,NodeId,<<"">>,IdValue],
-                                                                                                if LServer =/= <<"xmpp-uikit-dev.contus.us">> ->
-												fly_mod_offline_push:send_bulk_group_push(From,LServer,Content1,TUser,Node,Stanza,<<"remove">>);
-                                                                                                true ->
-												 ok
-									                	end
+												Content1 = [Chan,Publisher,Jid,NodeId,GroupName,IdValue],
+												[U,_] = binary:split(Jid, <<"@">>),
+						    Resources = ejabberd_sm:get_user_resources(TUser, LServer),
+												if LServer =/= <<"vezbi-xmpp.mirrorfly.com">> ->
+												fly_mod_offline_push:send_bulk_group_push(From,LServer,Content1,TUser,Node,Stanza,<<"added">>);
+												true ->
+												ok
+											    end,
 
-											end,
-											fly_mix_group_chat:carboncall_message(TUser ,LServer, Msg2, From),
-											ok;
-										Participant ->
-										case fxml:get_tag_attr_s(<<"jid">>, Participant) of
-											false -> ok;
-										Jid ->
-											NodeId =  fxml:get_tag_attr_s(<<"id">>, Item),
-											GroupName = fxml:get_tag_attr_s(<<"nick">>, Participant),
-											IdValue = xmpp:get_id(Pkt),
-											Content1 = [Chan,Publisher,Jid,NodeId,GroupName,IdValue],
-
-                                                                                        if LServer =/= <<"xmpp-uikit-dev.contus.us">> ->
-											fly_mod_offline_push:send_bulk_group_push(From,LServer,Content1,TUser,Node,Stanza,<<"added">>);
-											true ->
-												 ok
-										end,
-
-											fly_mix_group_chat:carboncall_message(TUser ,LServer, Msg2, From)
+												fly_mix_group_chat:carboncall_message(TUser ,LServer, Msg2, From)
+											end
 										end
 									end
 								end
 							end
-						end
-				end;
-				Node =:= <<"urn:xmpp:mix:nodes:messages">> ->
-					MessageContent = MsgContent;
-				true ->
-					MessageContent = ok
-			end,
-			ejabberd_router:route(Msg2),
-			save_message(From,LServer,MessageContent,To,Node,Stanza, list_to_binary(FlatTimeStamp))
-	end, Subscribers).
+					end;
+					Node =:= <<"urn:xmpp:mix:nodes:messages">> ->
+						MessageContent = MsgContent;
+					true ->
+						MessageContent = ok
+				end,
+				ejabberd_router:route(Msg2),
+				save_message(From,LServer,MessageContent,To,Node,Stanza, list_to_binary(FlatTimeStamp))
+		end, Subscribers).
 
 -spec notify_participant_joined(module(), binary(),
 	jid(), jid(), binary(), binary(), binary()) -> ok.
@@ -999,13 +980,13 @@ notify_participant_joined(Mod, LServer, To, From, ID, [Nick, GroupCreate, Publis
 			Stanza = xmpp:encode(Msg2),
 			Node = ?NS_MIX_NODES_PARTICIPANTS,
 			Content1 = [Chan,Publisher,jid:to_string(From),ItemId,Nick,MsgId],
-			fly_mod_offline_push:send_bulk_group_push(To,TServer,Content1,ToJid,Node,Stanza,<<"added">>),
+			if TServer =/= <<"vezbi-xmpp.mirrorfly.com">> ->
+			fly_mod_offline_push:send_bulk_group_push(To,TServer,Content1,ToJid,Node,Stanza,<<"added">>);
+			true ->
+			ok
+                        end,
 			fly_mix_group_chat:carboncall_message(ToJid ,TServer, Msg2, To)
 		      end, JIDs).
-
-
-
-
 
 	      notify_participant_left_api( _LServer, To, FromJid, BFromJid, RouteToJid, JIDs) ->
 		  {Chan, Host, _} = jid:tolower(To),
@@ -1037,7 +1018,11 @@ notify_participant_joined(Mod, LServer, To, From, ID, [Nick, GroupCreate, Publis
 			  Stanza = xmpp:encode(Msg2),
 			  Node = ?NS_MIX_NODES_PARTICIPANTS,
 			  Content1 = [Chan,Publisher,RemovedUser,ItemId,<<"">>,MsgId],
-			  fly_mod_offline_push:send_bulk_group_push(To,TServer,Content1,ToJid,Node,Stanza,<<"remove">>),
+			  if TServer =/= <<"vezbi-xmpp.mirrorfly.com">> ->
+			  fly_mod_offline_push:send_bulk_group_push(To,TServer,Content1,ToJid,Node,Stanza,<<"remove">>);
+			  true ->
+			  ok
+              end,
 		  fly_mix_group_chat:carboncall_message(ToJid ,TServer, Msg2, To)
 			end, JIDs).
 
