@@ -5642,6 +5642,14 @@
                     #attr{name = <<"uri">>,
                           required = true}]}).
 
+-xml(occupant_id,
+     #elem{name = <<"occupant-id">>,
+	   xmlns = <<"urn:xmpp:occupant-id:0">>,
+	   module = 'xep0421',
+	   result = {occupant_id, '$id'},
+	   attrs = [#attr{name = <<"id">>,
+	                  required = true}]}).
+
 -xml(fasten_apply_to,
      #elem{name = <<"apply-to">>,
 	   xmlns = <<"urn:xmpp:fasten:0">>,
@@ -5708,6 +5716,304 @@
 	   xmlns = <<"urn:xmpp:message-moderate:0">>,
 	   module = 'xep0425',
 	   result = '$cdata'}).
+
+-xml(pep_conference_nick,
+     #elem{name = <<"nick">>,
+           xmlns = <<"urn:xmpp:bookmarks:1">>,
+	   module = 'xep0402',
+           result = '$cdata'}).
+
+-xml(pep_conference_password,
+     #elem{name = <<"password">>,
+           xmlns = <<"urn:xmpp:bookmarks:1">>,
+	   module = 'xep0402',
+           result = '$cdata'}).
+
+-xml(pep_conference_extensions,
+     #elem{name = <<"extensions">>,
+           xmlns = <<"urn:xmpp:bookmarks:1">>,
+	   module = 'xep0402',
+           ignore_els = true,
+           result = '$_els'}).
+
+-xml(pep_bookmarks_conference,
+     #elem{name = <<"conference">>,
+           xmlns = <<"urn:xmpp:bookmarks:1">>,
+	   module = 'xep0402',
+           result = {pep_bookmarks_conference, '$name',
+                     '$autojoin', '$nick', '$password', '$extensions'},
+           attrs = [#attr{name = <<"name">>},
+                    #attr{name = <<"autojoin">>,
+                          default = false,
+                          dec = {dec_bool, []},
+                          enc = {enc_bool, []}}],
+           refs = [#ref{name = pep_conference_nick,
+                        label = '$nick',
+                        min = 0, max = 1},
+                   #ref{name = pep_conference_password,
+                        label = '$password',
+                        min = 0, max = 1},
+                   #ref{name = pep_conference_extensions,
+                        label = '$extensions',
+                        min = 0, max = 1}]}).
+
+-xml(sasl_channel_binding,
+     #elem{name = <<"sasl-channel-binding">>,
+           xmlns = <<"urn:xmpp:sasl-cb:0">>,
+	   module = 'xep0440',
+           result = {sasl_channel_binding, '$bindings'},
+           refs = [#ref{name = sasl_channel_binding_element,
+                        label = '$bindings',
+                        min = 0}]}).
+
+-xml(sasl_channel_binding_element,
+     #elem{name = <<"channel-binding">>,
+           xmlns = <<"urn:xmpp:sasl-cb:0">>,
+	   module = 'xep0440',
+           attrs = [#attr{name = <<"type">>, required = true}],
+           result = '$type'}).
+
+-xml(sasl2_authentication,
+     #elem{name = <<"authentication">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+	   refs = [#ref{name = sasl2_mechanism,
+                        label = '$mechanisms',
+                        min = 0},
+		   #ref{name = sasl2_inline,
+		        label = '$inline',
+		        min = 0, max = 1}],
+           result = {sasl2_authenticaton, '$mechanisms', '$inline'}}).
+
+-xml(sasl2_mechanism,
+     #elem{name = <<"mechanism">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+           result = '$cdata'}).
+
+-xml(sasl2_inline,
+     #elem{name = <<"inline">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+           result = '$_els'}).
+
+-xml(sasl2_authenticate,
+     #elem{name = <<"authenticate">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+           attrs = [#attr{name = <<"mechanism">>, required = true}],
+	   refs = [#ref{name = sasl2_initial_response,
+                        label = '$initial_response',
+                        min = 0, max = 1},
+		   #ref{name = sasl2_user_agent,
+		        label = '$user_agent',
+		        min = 0, max = 1}],
+           result = {sasl2_authenticate, '$mechanism', '$initial_response', '$user_agent', '$_els'}}).
+
+-xml(sasl2_initial_response,
+     #elem{name = <<"initial-response">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+           cdata = #cdata{label = '$text',
+                          dec = {base64, mime_decode, []},
+                          enc = {base64, encode, []}},
+           result = '$text'}).
+
+-xml(sasl2_user_agent,
+     #elem{name = <<"user-agent">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+           attrs = [#attr{name = <<"id">>}],
+	   refs = [#ref{name = sasl2_user_agent_software,
+                        label = '$software',
+                        min = 0, max = 1},
+		   #ref{name = sasl2_user_agent_device,
+		        label = '$device',
+		        min = 0, max = 1}],
+           result = {sasl2_user_agent, '$id', '$software', '$device'}}).
+
+-xml(sasl2_user_agent_software,
+     #elem{name = <<"software">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+           result = '$cdata'}).
+
+-xml(sasl2_user_agent_device,
+     #elem{name = <<"device">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+           result = '$cdata'}).
+
+-xml(sasl2_challenge,
+     #elem{name = <<"challenge">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+           cdata = #cdata{label = '$text',
+                          dec = {base64, mime_decode, []},
+                          enc = {base64, encode, []}},
+           result = {sasl2_challenge, '$text'}}).
+
+-xml(sasl2_response,
+     #elem{name = <<"response">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+           cdata = #cdata{label = '$text',
+                          dec = {base64, mime_decode, []},
+                          enc = {base64, encode, []}},
+           result = {sasl2_response, '$text'}}).
+
+-xml(sasl2_success,
+     #elem{name = <<"success">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+	   refs = [#ref{name = sasl2_additional_data,
+                        label = '$additional_data',
+                        min = 0, max = 1},
+		   #ref{name = sasl2_authorization_identifier,
+		        label = '$jid',
+		        min = 1, max = 1}],
+           result = {sasl2_success, '$jid', '$additional_data', '$_els'}}).
+
+-xml(sasl2_additional_data,
+     #elem{name = <<"additional-data">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+           cdata = #cdata{label = '$text',
+                          dec = {base64, mime_decode, []},
+                          enc = {base64, encode, []}},
+           result = '$text'}).
+
+-xml(sasl2_authorization_identifier,
+     #elem{name = <<"authorization-identifier">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+	   cdata = #cdata{label = '$jid',
+	                  required = true,
+			  dec = {jid, decode, []},
+			  enc = {jid, encode, []}},
+           result = '$jid'}).
+
+-xml(sasl2_failure,
+     #elem{name = <<"failure">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+	   refs = [#ref{name = sasl2_text,
+                        label = '$text',
+                        min = 0, max = 1},
+                   #ref{name = sasl_failure_aborted,
+                        min = 0, max = 1, label = '$reason'},
+                   #ref{name = sasl_failure_account_disabled,
+                        min = 0, max = 1, label = '$reason'},
+                   #ref{name = sasl_failure_credentials_expired,
+                        min = 0, max = 1, label = '$reason'},
+                   #ref{name = sasl_failure_encryption_required,
+                        min = 0, max = 1, label = '$reason'},
+                   #ref{name = sasl_failure_incorrect_encoding,
+                        min = 0, max = 1, label = '$reason'},
+                   #ref{name = sasl_failure_invalid_authzid,
+                        min = 0, max = 1, label = '$reason'},
+                   #ref{name = sasl_failure_invalid_mechanism,
+                        min = 0, max = 1, label = '$reason'},
+                   #ref{name = sasl_failure_malformed_request,
+                        min = 0, max = 1, label = '$reason'},
+                   #ref{name = sasl_failure_mechanism_too_weak,
+                        min = 0, max = 1, label = '$reason'},
+                   #ref{name = sasl_failure_not_authorized,
+                        min = 0, max = 1, label = '$reason'},
+                   #ref{name = sasl_failure_bad_protocol,
+			min = 0, max = 1, label = '$reason'},
+                   #ref{name = sasl_failure_temporary_auth_failure,
+                        min = 0, max = 1, label = '$reason'}],
+           result = {sasl2_failure, '$reason', '$text', '$_els'}}).
+
+-xml(sasl2_text,
+     #elem{name = <<"text">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+           result = '$cdata'}).
+
+-xml(sasl2_continue,
+     #elem{name = <<"continue">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+	   refs = [#ref{name = sasl2_additional_data,
+	                label = '$additional_data',
+	                min = 0, max = 1},
+                   #ref{name = sasl2_text,
+                        label = '$text',
+                        min = 0, max = 1},
+                   #ref{name = sasl2_tasks,
+                        label = '$tasks',
+                        min = 0, max = 1}],
+           result = {sasl2_continue, '$additional_data', '$text', '$tasks', '$_els'}}).
+
+-xml(sasl2_tasks,
+     #elem{name = <<"tasks">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+	   refs = [#ref{name = sasl2_task,
+	                label = '$task',
+	                min = 0}],
+           result = '$task'}).
+
+-xml(sasl2_task,
+     #elem{name = <<"task">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+           cdata = #cdata{label = '$text',
+                          dec = {base64, mime_decode, []},
+                          enc = {base64, encode, []}},
+           result = '$text'}).
+
+-xml(sasl2_abort,
+     #elem{name = <<"abort">>,
+           xmlns = <<"urn:xmpp:sasl:2">>,
+	   module = 'xep0388',
+	   refs = [#ref{name = sasl2_text,
+                        label = '$text',
+                        min = 0, max = 1}],
+           result = {sasl2_abort, '$text', '$_els'}}).
+
+-xml(bind2_bind,
+     #elem{name = <<"bind">>,
+           xmlns = <<"urn:xmpp:bind:0">>,
+	   module = 'xep0386',
+	   refs = [#ref{name = bind2_inline,
+	                label = '$inline',
+	                min = 0, max = 1},
+                   #ref{name = bind2_tag,
+                        label = '$tag',
+                        min = 0, max = 1}],
+           result = {bind2_bind, '$tag', '$inline', '$_els'}}).
+
+-xml(bind2_inline,
+     #elem{name = <<"inline">>,
+           xmlns = <<"urn:xmpp:bind:0">>,
+	   module = 'xep0386',
+           result = '$_els'}).
+
+-xml(bind2_tag,
+     #elem{name = <<"tag">>,
+           xmlns = <<"urn:xmpp:bind:0">>,
+	   module = 'xep0386',
+	   cdata = #cdata{label = '$tag',
+	                  required = true},
+           result = '$tag'}).
+
+-xml(bind2_bound,
+     #elem{name = <<"bound">>,
+           xmlns = <<"urn:xmpp:bind:0">>,
+	   module = 'xep0386',
+           result = {bind2_bound, '$_els'}}).
+
+-xml(bind2_feature,
+     #elem{name = <<"feature">>,
+           xmlns = <<"urn:xmpp:bind:0">>,
+	   module = 'xep0386',
+	   attrs = [#attr{name = <<"var">>,
+	                  label = '$var',
+			  required = true}],
+           result = {bind2_feature, '$var'}}).
 
 -spec dec_tzo(_) -> {integer(), integer()}.
 dec_tzo(Val) ->
