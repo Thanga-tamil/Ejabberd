@@ -255,9 +255,9 @@ update_profile_service(From, To, SubEl, IQ) ->
           mod_offline:store_packet({RouteToJid,xmpp:decode(Packet)});
           false ->
             ok
-        end  end, JIDs)
-  end,
-fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Notify profile update to group members successfully">>}).
+        end  end, JIDs),
+        fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Notify profile update to group members successfully">>})
+  end.
 
 user_delete_group_service(From, To, SubEl, IQ) ->
   #jid{lserver = TServer} = To,
@@ -291,10 +291,9 @@ user_delete_group_service(From, To, SubEl, IQ) ->
             ok
         end
         end, JIDs),
-        fly_mod_utils:delete_group(FServer, Channel)
-  end,
-
-fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Notify to group members successfully">>}).
+        fly_mod_utils:delete_group(FServer, Channel),
+        fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Notify to group members successfully">>})
+  end.
 
 make_admin_service(From, To, SubEl, IQ) ->
   RequestType = <<"make_admin">>,
@@ -310,13 +309,10 @@ make_admin_service(From, To, SubEl, IQ) ->
   ActionDoneBy = list_to_binary(binary_to_list(AdminUser) ++ "@" ++ binary_to_list(FServer)),
   case catch fly_mod_utils:get_group_users(FServer, Channel) of
     {selected, _, []} ->
-      JIDs = <<"">>,
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Group Does Not exists">>});
     {selected, _, GroupMembers} ->
       JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers)
-
-  end,
-  lists:foreach(
+      lists:foreach(
     fun(Participant) ->
       ParticipantData = fxml:get_tag_cdata(Participant),
 
@@ -342,7 +338,9 @@ make_admin_service(From, To, SubEl, IQ) ->
             ok
         end  end, JIDs)
     end, Participants#xmlel.children),
-fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify add member to group members successfully">>}).
+fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify add member to group members successfully">>})
+  end.
+
 
 add_participants_service(From, To, SubEl, IQ) ->
   RequestType = <<"add_participants">>,
@@ -361,26 +359,27 @@ add_participants_service(From, To, SubEl, IQ) ->
   GroupJid = jid:make(Channel, TServer, <<>>),
   case catch fly_mod_utils:get_group_users(FServer, Channel) of
     {selected, _, []} ->
-      JIDs = <<"">>,
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Group Does Not exists">>});
     {selected, _, GroupMembers} ->
-      JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers)
-
-  end,
-  lists:foreach(
+      JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
+      lists:foreach(
     fun(Participant) ->
       ParticipantData = fxml:get_tag_cdata(Participant),
       MsgId = case fxml:get_tag_attr(<<"message_id">>, Participant) of
                     {value, Msgid} ->
                       Msgid;
                     _ ->
-                    p1_rand:get_string()
+                      Msgid = p1_rand:get_string()
                   end,
       ConvertUserstring = fly_mod_utils:get_user_from_string_jid(ParticipantData),
       FromJID = jid:make(ConvertUserstring,FServer),
+      ?INFO_MSG("FromJID participants ~p",[FromJID]),
       mod_mix:notify_participant_joined_api(ServerHost, GroupJid, FromJID, [NickName, AdminUser, FromJID,JIDs ],MsgId)
     end, Participants#xmlel.children),
-fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify add member to group members successfully">>}).
+fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify add member to group members successfully">>})
+
+  end.
+
 
 remove_participant_service(From, To, SubEl, IQ) ->
   RequestType = <<"remove_participant">>,
@@ -396,13 +395,10 @@ remove_participant_service(From, To, SubEl, IQ) ->
   fly_mod_utils:update_vcard_date(FServer, Channel),
   case catch fly_mod_utils:get_group_users(FServer, Channel) of
     {selected, _, []} ->
-      JIDs = <<"">>,
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Group Does Not exists">>});
     {selected, _, GroupMembers} ->
-      JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers)
-
-  end,
-  lists:foreach(
+      JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
+      lists:foreach(
     fun(Participant) ->
       ParticipantData = fxml:get_tag_cdata(Participant),
       ConvertUserstring = fly_mod_utils:get_user_from_string_jid(ParticipantData),
@@ -414,7 +410,9 @@ remove_participant_service(From, To, SubEl, IQ) ->
             mod_mix:notify_participant_left_api(ServerHost, GroupJid, AdminUser, FromJID, RouteToJid, JIDs)
             end, JIDs)
     end, Participants#xmlel.children),
-fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify remove members to group members successfully">>}).
+fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify remove members to group members successfully">>})
+
+  end.
 
 %%%============================================================================================
 %%
