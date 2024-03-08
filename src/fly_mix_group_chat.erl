@@ -341,7 +341,6 @@ make_admin_service(From, To, SubEl, IQ) ->
 fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify add member to group members successfully">>})
   end.
 
-
 add_participants_service(From, To, SubEl, IQ) ->
   RequestType = <<"add_participants">>,
   Participants = fxml:get_subtag(SubEl, <<"participants">>),
@@ -379,7 +378,6 @@ add_participants_service(From, To, SubEl, IQ) ->
 fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify add member to group members successfully">>})
 
   end.
-
 
 remove_participant_service(From, To, SubEl, IQ) ->
   RequestType = <<"remove_participant">>,
@@ -424,7 +422,6 @@ fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = 
 %%</query></iq>
 %%
 %%%============================================================================================
-
 process_send_composing_status(From, To, SubEl, IQ) ->
 
   _RequestType = <<"composing">>,
@@ -928,7 +925,6 @@ process_admin_remove_admin(From, To, SubEl, IQ) ->
 %%         </iq>
 %%
 %%%============================================================================================
-
 
 process_user_exit_group(From, To, SubEl, IQ, RequestFrom) ->
   _RequestType = <<"user_exit_group">>,
