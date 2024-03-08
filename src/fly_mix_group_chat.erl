@@ -311,7 +311,7 @@ make_admin_service(From, To, SubEl, IQ) ->
     {selected, _, []} ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Group Does Not exists">>});
     {selected, _, GroupMembers} ->
-      JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers)
+      JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
       lists:foreach(
     fun(Participant) ->
       ParticipantData = fxml:get_tag_cdata(Participant),
