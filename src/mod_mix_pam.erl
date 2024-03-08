@@ -413,6 +413,14 @@ add_channel(JID, Channel, ID) ->
 	Err -> Err
     end.
 
+%Contus added Affiliation to the channel%%
+add_channel(JID, Channel, ID, Affiliation) ->
+    Mod = gen_mod:db_mod(JID#jid.lserver, ?MODULE),
+    case Mod:add_channel(JID, Channel, ID, Affiliation) of
+	ok -> delete_cache(Mod, JID, Channel);
+	Err -> Err
+    end.
+
 del_channel(JID, Channel) ->
     Mod = gen_mod:db_mod(JID#jid.lserver, ?MODULE),
     case Mod:del_channel(JID, Channel) of
