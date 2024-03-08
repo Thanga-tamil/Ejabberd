@@ -24,11 +24,12 @@ COPY limits.conf /etc/security/limits.conf
 COPY . /tmp/ejabberd/
 RUN chmod -R 755 /opt/
 RUN cd /tmp/ejabberd; ./autogen.sh; ./configure --with-rebar=rebar --enable-user=ejabberd --enable-mysql --prefix=/opt/ejabberd
-RUN cd /tmp/ejabberd; make; exit 0
-RUN cd /tmp/ejabberd; cp xmpp_codec.spec deps/xmpp/specs/xmpp_codec.spec
-RUN cd /tmp/ejabberd/deps/xmpp; make spec; make
-RUN cd /tmp/ejabberd; make
-COPY rabbit_common.app  /tmp/ejabberd/deps/rabbit_common/ebin/rabbit_common.app
+# RUN cd /tmp/ejabberd; make; exit 0
+# RUN cd /tmp/ejabberd; cp xmpp_codec.spec deps/xmpp/specs/xmpp_codec.spec
+# RUN cd /tmp/ejabberd/deps/xmpp; make spec; make
+# RUN cd /tmp/ejabberd; make
+# COPY rabbit_common.app  /tmp/ejabberd/deps/rabbit_common/ebin/rabbit_common.app
+RUN cd /tmp/ejabberd; make;
 RUN cd /tmp/ejabberd; make install
 
 ### install tini
