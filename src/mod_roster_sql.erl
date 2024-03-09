@@ -116,7 +116,7 @@ get_roster(LUser, LServer) ->
     case ejabberd_sql:sql_query(
 	   LServer,
 	   ?SQL("select @(rosterusers.username)s, @(rosterusers.jid)s, @(rosterusers.nick)s, @(rosterusers.subscription)s, "
-    "@(rosterusers.ask)s, @(rosterusers.askmessage)s, @(rosterusers.server)s, @(rosterusers.subscribe)s, "
+    "@(rosterusers.ask)s,  @(rosterusers.server)s,  "
     "@(rosterusers.type)s,@(vcard_search.nickname)s,@(vcard_search.image)s,@(vcard_search.email)s,@(vcard_search.mobilenumber)s,@(vcard_search.thumbimage)s,@(vcard_search.status)s,@(vcard_search.is_block)s from rosterusers JOIN
     vcard_search ON vcard_search.lusername = rosterusers.jid_username"
     " where rosterusers.username=%(LUser)s and %(LServer)H")) of
@@ -296,7 +296,7 @@ roster_subscribe({LUser, LServer, SJID, Name, SSubscription, SAsk, AskMessage}) 
 get_roster_by_jid(LServer, LUser, SJID) ->
     ejabberd_sql:sql_query_t(
 ?SQL("select @(rosterusers.username)s, @(rosterusers.jid)s, @(rosterusers.nick)s, @(rosterusers.subscription)s, "
-"@(rosterusers.ask)s, @(rosterusers.askmessage)s, @(rosterusers.server)s, @(rosterusers.subscribe)s, "
+"@(rosterusers.ask)s,  @(rosterusers.server)s,  "
 "@(rosterusers.type)s,@(vcard_search.nickname)s,@(vcard_search.image)s,@(vcard_search.email)s,@(vcard_search.mobilenumber)s,@(vcard_search.thumbimage)s, "
 "@(vcard_search.status)s from rosterusers JOIN vcard_search ON vcard_search.lusername = rosterusers.jid_username where rosterusers.username=%(LUser)s and %(LServer)H and rosterusers.jid=%(SJID)s")).
 
@@ -341,20 +341,20 @@ update_roster_sql({LUser, LServer, SJID, Name, SSubscription, SAsk, AskMessage},
        || ItemGroup <- ItemGroups].
 
 raw_to_record(LServer,
-	      [User, LServer, SJID, Nick, SSubscription, SAsk, SAskMessage,
-	       _SServer, _SSubscribe, _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked]) ->
+	      [User, LServer, SJID, Nick, SSubscription, SAsk,
+	       _SServer,  _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked]) ->
     raw_to_record(LServer,
-                  {User, LServer, SJID, Nick, SSubscription, SAsk, SAskMessage,
-                   _SServer, _SSubscribe, _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked});
+                  {User, LServer, SJID, Nick, SSubscription, SAsk,
+                   _SServer,  _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked});
 raw_to_record(LServer,
-	      {User, SJID, Nick, SSubscription, SAsk, SAskMessage,
-	       _SServer, _SSubscribe, _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked}) ->
+	      {User, SJID, Nick, SSubscription, SAsk,
+	       _SServer,  _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked}) ->
     raw_to_record(LServer,
-                  {User, LServer, SJID, Nick, SSubscription, SAsk, SAskMessage,
-                   _SServer, _SSubscribe, _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked});
+                  {User, LServer, SJID, Nick, SSubscription, SAsk,
+                   _SServer,  _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked});
 raw_to_record(LServer,
-	      {User, LServer, SJID, Nick, SSubscription, SAsk, SAskMessage,
-	       _SServer, _SSubscribe, _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked}) ->
+	      {User, LServer, SJID, Nick, SSubscription, SAsk,
+	       _SServer,  _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked}) ->
     try jid:decode(SJID) of
       JID ->
 	  LJID = jid:tolower(JID),
@@ -363,7 +363,6 @@ raw_to_record(LServer,
 	  #roster{usj = {User, LServer, LJID},
 		  us = {User, LServer}, jid = LJID, name = Nick,
 		  subscription = Subscription, ask = Ask,
-		  askmessage = SAskMessage,
           nickname = Nickname,
           status = Status,
           email = Email,
