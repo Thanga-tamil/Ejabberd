@@ -379,38 +379,37 @@ fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = 
 
   end.
 
-remove_participant_service(From, To, SubEl, IQ) ->
-  RequestType = <<"remove_participant">>,
-  Participants = fxml:get_subtag(SubEl, <<"participants">>),
-  #jid{lserver = TServer} = To,
-  Host = To#jid.lserver,
-  #jid{ lserver = FServer} = From,
-  ServerHost = ejabberd_router:host_of_route(Host),
-  Channel = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
-  AdminUserF = fxml:get_path_s(SubEl, [{attr, <<"admin_user">>}]),
-  AdminUser = jid:make(fly_mod_utils:get_user_from_string_jid(AdminUserF),FServer,<<"">>),
-  GroupJid = jid:make(Channel, TServer, <<>>),
-  fly_mod_utils:update_vcard_date(FServer, Channel),
-  case catch fly_mod_utils:get_group_users(FServer, Channel) of
-    {selected, _, []} ->
-      fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Group Does Not exists">>});
-    {selected, _, GroupMembers} ->
-      JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
-      lists:foreach(
-    fun(Participant) ->
-      ParticipantData = fxml:get_tag_cdata(Participant),
-      ConvertUserstring = fly_mod_utils:get_user_from_string_jid(ParticipantData),
-      FromJID = jid:make(ConvertUserstring,FServer,<<"">>),
-      mod_mix_sql:del_participant_message(ServerHost,Channel,FromJID),
-      mod_mix:notify_participant_left_api(ServerHost, GroupJid, AdminUser, FromJID, FromJID, ConvertUserstring),
-          lists:foreach(fun(ToJid) ->
-            RouteToJid = jid:make(ToJid, FServer, <<>>),
-            mod_mix:notify_participant_left_api(ServerHost, GroupJid, AdminUser, FromJID, RouteToJid, JIDs)
-            end, JIDs)
-    end, Participants#xmlel.children),
-fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify remove members to group members successfully">>})
-
-  end.
+  remove_participant_service(From, To, SubEl, IQ) ->
+    RequestType = <<"remove_participant">>,
+    Participants = fxml:get_subtag(SubEl, <<"participants">>),
+    #jid{lserver = TServer} = To,
+    Host = To#jid.lserver,
+    #jid{ lserver = FServer} = From,
+    ServerHost = ejabberd_router:host_of_route(Host),
+    Channel = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
+    AdminUserF = fxml:get_path_s(SubEl, [{attr, <<"admin_user">>}]),
+    AdminUser = jid:make(fly_mod_utils:get_user_from_string_jid(AdminUserF),FServer),
+    GroupJid = jid:make(Channel, TServer, <<>>),
+    fly_mod_utils:update_vcard_date(FServer, Channel),
+    case catch fly_mod_utils:get_group_users(FServer, Channel) of
+      {selected, _, []} ->
+        fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Group Does Not exists">>});
+      {selected, _, GroupMembers} ->
+        JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
+        lists:foreach(
+      fun(Participant) ->
+        ParticipantData = fxml:get_tag_cdata(Participant),
+        ConvertUserstring = fly_mod_utils:get_user_from_string_jid(ParticipantData),
+        FromJID = jid:make(ConvertUserstring,FServer,<<"">>),
+        mod_mix_sql:del_participant_message(ServerHost,Channel,FromJID),
+        mod_mix:notify_participant_left_api(ServerHost, GroupJid, AdminUser, FromJID, FromJID, [ConvertUserstring]),
+            lists:foreach(fun(ToJid) ->
+              RouteToJid = jid:make(ToJid, FServer, <<>>),
+              mod_mix:notify_participant_left_api(ServerHost, GroupJid, AdminUser, FromJID, RouteToJid, JIDs)
+              end, JIDs)
+      end, Participants#xmlel.children),
+  fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify remove members to group members successfully">>})
+    end.
 
 %%%============================================================================================
 %%

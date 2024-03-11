@@ -1004,6 +1004,7 @@ notify_participant_joined(Mod, LServer, To, From, ID, [Nick, GroupCreate, Publis
 		  Event = #ps_event{items = Items},
 		  MsgId = p1_rand:get_string(),
 		  Msg = #message{from = jid:remove_resource(To),
+		                 to = jid:remove_resource(RouteToJid),
 				 id = MsgId,
 				 sub_els = [Event]},
 		      Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
