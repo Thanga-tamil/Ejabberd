@@ -163,11 +163,12 @@ get_roster_item(LUser, LServer, LJID) ->
 		error ->
 		    error;
 		R ->
-		    Groups = case get_roster_groups(LServer, LUser, SJID) of
-				 {selected, JGrps} when is_list(JGrps) ->
-				     [JGrp || {JGrp} <- JGrps];
-				 _ -> []
-			     end,
+		     % Groups = case get_roster_groups(LServer, LUser, SJID) of
+			% 	 {selected, JGrps} when is_list(JGrps) ->
+			% 	     [JGrp || {JGrp} <- JGrps];
+			% 	 _ -> []
+			%      end,
+            Groups = [],
 		    {ok, R#roster{groups = Groups}}
 	    end;
 	{selected, []} ->
