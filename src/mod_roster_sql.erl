@@ -117,7 +117,7 @@ get_roster(LUser, LServer) ->
 	   LServer,
 	   ?SQL("select @(rosterusers.username)s, @(rosterusers.jid)s, @(rosterusers.nick)s, @(rosterusers.subscription)s, "
     "@(rosterusers.ask)s,  @(rosterusers.server)s,  "
-    "@(rosterusers.type)s,@(vcard_search.nickname)s,@(vcard_search.image)s,@(vcard_search.email)s,@(vcard_search.mobilenumber)s,@(vcard_search.thumbimage)s,@(vcard_search.status)s,@(vcard_search.is_block)s from rosterusers JOIN
+    "@(rosterusers.type)s,@(vcard_search.nickname)s,@(vcard_search.image)s,@(vcard_search.email)s,@(vcard_search.mobilenumber)s,@(vcard_search.thumbimage)s,@(vcard_search.status)s,@(vcard_search.is_block)d from rosterusers JOIN
     vcard_search ON vcard_search.lusername = rosterusers.jid_username"
     " where rosterusers.username=%(LUser)s and %(LServer)H")) of
         {selected, Items} when is_list(Items) ->
@@ -370,7 +370,7 @@ raw_to_record(LServer,
           email = Email,
           mobile = Mobilenumber,
           thumbimage = Thumbimage,
-          %is_admin_blocked = IsAdminBlocked,
+          is_admin_blocked = IsAdminBlocked,
           image = Image}
     catch _:{bad_jid, _} ->
 	    ?ERROR_MSG("~ts", [format_row_error(User, LServer, {jid, SJID})]),
