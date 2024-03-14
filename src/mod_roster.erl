@@ -280,6 +280,7 @@ process_iq_get(#iq{to = To, from = From,
     % Store that MIX annotation is enabled (for roster pushes)
     set_mix_annotation_enabled(From, MixEnabled),
     % Only include <channel/> element when MIX annotation is enabled
+    ?INFO_MSG("FullItems ~p", [FullItems]),
     Items = case ItemsToSend of
 	false -> false;
 	FullItems -> process_items_mix(FullItems, true)
