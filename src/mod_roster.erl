@@ -282,7 +282,7 @@ process_iq_get(#iq{to = To, from = From,
     % Only include <channel/> element when MIX annotation is enabled
     Items = case ItemsToSend of
 	false -> false;
-	FullItems -> process_items_mix(FullItems, false)
+	FullItems -> process_items_mix(FullItems, true)
     end,
     #jid{user = TUser, lserver = TServer, lresource = TResource} =  From,
 		Substrings =  string:str( binary_to_list(TResource),  binary_to_list(<<"Web">>)),
