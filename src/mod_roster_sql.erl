@@ -121,12 +121,13 @@ get_roster(LUser, LServer) ->
     vcard_search ON vcard_search.lusername = rosterusers.jid_username"
     " where rosterusers.username=%(LUser)s and %(LServer)H")) of
         {selected, Items} when is_list(Items) ->
-            JIDGroups = case get_roster_jid_groups(LServer, LUser) of
-                            {selected, JGrps} when is_list(JGrps) ->
-                                JGrps;
-                            _ ->
-				[]
-                        end,
+             % JIDGroups = case get_roster_jid_groups(LServer, LUser) of
+            %                 {selected, JGrps} when is_list(JGrps) ->
+            %                     JGrps;
+            %                 _ ->
+			% 	[]
+            %             end,
+            JIDGroups = [],
             GroupsDict = lists:foldl(fun({J, G}, Acc) ->
                                              Gs = maps:get(J, Acc, []),
                                              maps:put(J, [G | Gs], Acc)
