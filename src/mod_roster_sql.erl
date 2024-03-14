@@ -365,13 +365,13 @@ raw_to_record(LServer,
 	  #roster{usj = {User, LServer, LJID},
 		  us = {User, LServer}, jid = LJID, name = Nick,
 		  subscription = Subscription, ask = Ask,
-          nickname = Nickname,
-          status = Status,
-          email = Email,
-          mobile = Mobilenumber,
-          thumbimage = Thumbimage,
-          is_admin_blocked = IsAdminBlocked,
-          image = Image}
+          nickname = Nickname}
+        %   status = Status,
+        %   email = Email,
+        %   mobile = Mobilenumber,
+        %   thumbimage = Thumbimage,
+        %   is_admin_blocked = IsAdminBlocked,
+        %   image = Image}
     catch _:{bad_jid, _} ->
 	    ?ERROR_MSG("~ts", [format_row_error(User, LServer, {jid, SJID})]),
 	    error
