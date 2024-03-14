@@ -367,10 +367,10 @@ raw_to_record(LServer,
 		  subscription = Subscription, ask = Ask,
           nickname = Nickname,
           status = Status,
-          email = Email}
-        %   mobile = Mobilenumber,
+          email = Email,
+          mobile = Mobilenumber,
         %   thumbimage = Thumbimage,
-        %   is_admin_blocked = IsAdminBlocked,
+          is_admin_blocked = IsAdminBlocked}
         %   image = Image}
     catch _:{bad_jid, _} ->
 	    ?ERROR_MSG("~ts", [format_row_error(User, LServer, {jid, SJID})]),
