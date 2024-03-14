@@ -359,8 +359,8 @@
      #elem{name = <<"logout">>,
            xmlns = <<"urn:xmpp:receipts">>,
 	   module = 'logout',
-           result = {logout, '$type'},
-           attrs = [#attr{name = <<"type">>,default = <<"">>}]}).
+           result = {logout, '$type','$socket_id'},
+           attrs = [#attr{name = <<"type">>,default = <<"">>},#attr{name = <<"socket_id">>,default = <<"">>}]}).
 
 -xml(recall,
      #elem{name = <<"recall">>,
