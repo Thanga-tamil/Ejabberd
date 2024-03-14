@@ -357,8 +357,6 @@ raw_to_record(LServer,
 raw_to_record(LServer,
 	      {User, LServer, SJID, Nick, SSubscription, SAsk,
 	       _SServer,  _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked}) ->
-    ?INFO_MSG("IsAdminBlocked ~p", [IsAdminBlocked]),
-    ?INFO_MSG("IsAdminBlocked binaery ~p", [list_to_binary(integer_to_list(IsAdminBlocked))]),
     try jid:decode(SJID) of
       JID ->
 	  LJID = jid:tolower(JID),
