@@ -121,12 +121,13 @@ get_roster(LUser, LServer) ->
     vcard_search ON vcard_search.lusername = rosterusers.jid_username"
     " where rosterusers.username=%(LUser)s and %(LServer)H")) of
         {selected, Items} when is_list(Items) ->
-            JIDGroups = case get_roster_jid_groups(LServer, LUser) of
-                            {selected, JGrps} when is_list(JGrps) ->
-                                JGrps;
-                            _ ->
-				[]
-                        end,
+             % JIDGroups = case get_roster_jid_groups(LServer, LUser) of
+            %                 {selected, JGrps} when is_list(JGrps) ->
+            %                     JGrps;
+            %                 _ ->
+			% 	[]
+            %             end,
+            JIDGroups = [],
             GroupsDict = lists:foldl(fun({J, G}, Acc) ->
                                              Gs = maps:get(J, Acc, []),
                                              maps:put(J, [G | Gs], Acc)
@@ -162,11 +163,12 @@ get_roster_item(LUser, LServer, LJID) ->
 		error ->
 		    error;
 		R ->
-		    Groups = case get_roster_groups(LServer, LUser, SJID) of
-				 {selected, JGrps} when is_list(JGrps) ->
-				     [JGrp || {JGrp} <- JGrps];
-				 _ -> []
-			     end,
+		     % Groups = case get_roster_groups(LServer, LUser, SJID) of
+			% 	 {selected, JGrps} when is_list(JGrps) ->
+			% 	     [JGrp || {JGrp} <- JGrps];
+			% 	 _ -> []
+			%      end,
+            Groups = [],
 		    {ok, R#roster{groups = Groups}}
 	    end;
 	{selected, []} ->
@@ -368,7 +370,7 @@ raw_to_record(LServer,
           email = Email,
           mobile = Mobilenumber,
           thumbimage = Thumbimage,
-          is_admin_blocked = IsAdminBlocked,
+          is_admin_blocked = list_to_binary(integer_to_list(IsAdminBlocked)),
           image = Image}
     catch _:{bad_jid, _} ->
 	    ?ERROR_MSG("~ts", [format_row_error(User, LServer, {jid, SJID})]),
