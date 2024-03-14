@@ -365,9 +365,9 @@ raw_to_record(LServer,
 	  #roster{usj = {User, LServer, LJID},
 		  us = {User, LServer}, jid = LJID, name = Nick,
 		  subscription = Subscription, ask = Ask,
-          nickname = Nickname}
-        %   status = Status,
-        %   email = Email,
+          nickname = Nickname,
+          status = Status,
+          email = Email}
         %   mobile = Mobilenumber,
         %   thumbimage = Thumbimage,
         %   is_admin_blocked = IsAdminBlocked,
