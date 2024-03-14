@@ -280,12 +280,10 @@ process_iq_get(#iq{to = To, from = From,
     % Store that MIX annotation is enabled (for roster pushes)
     set_mix_annotation_enabled(From, MixEnabled),
     % Only include <channel/> element when MIX annotation is enabled
-
     Items = case ItemsToSend of
 	false -> false;
-	FullItems -> process_items_mix(FullItems, true)
+	FullItems -> process_items_mix(FullItems, MixEnabled)
     end,
-    ?INFO_MSG("Items ~p", [Items]),
     #jid{user = TUser, lserver = TServer, lresource = TResource} =  From,
 		Substrings =  string:str( binary_to_list(TResource),  binary_to_list(<<"Web">>)),
 
@@ -361,6 +359,8 @@ get_roster(LUser, LServer) ->
 	    false ->
 		Mod:get_roster(LUser, LServer)
 	end,
+
+?INFO_MSG("Rostetr ~p", [R]),
     case R of
 	{ok, Items} -> Items;
 	error -> []

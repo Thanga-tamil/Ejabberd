@@ -218,17 +218,18 @@ get_mix_roster_items(Acc, {LUser, LServer}) ->
     JID = jid:make(LUser, LServer),
     case get_channels(JID) of
         {ok, Channels} ->
-            lists:map(
-                fun({ItemJID, Id}) ->
-                    #roster_item{
-                        jid = ItemJID,
-                        name = <<>>,
-                        subscription = both,
-                        ask = undefined,
-                        groups = [<<"Channels">>],
-                        mix_channel = #mix_roster_channel{participant_id = Id}
-                    }
-                end, Channels);
+            % lists:map(
+            %     fun({ItemJID, Id}) ->
+            %         #roster_item{
+            %             jid = ItemJID,
+            %             name = <<>>,
+            %             subscription = both,
+            %             ask = undefined,
+            %             groups = [<<"Channels">>],
+            %             mix_channel = #mix_roster_channel{participant_id = Id}
+            %         }
+            %     end, Channels);
+            [];
         _ ->
             []
     end ++ Acc.
