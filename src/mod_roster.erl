@@ -359,8 +359,6 @@ get_roster(LUser, LServer) ->
 	    false ->
 		Mod:get_roster(LUser, LServer)
 	end,
-
-?INFO_MSG("Rostetr ~p", [R]),
     case R of
 	{ok, Items} -> Items;
 	error -> []
