@@ -35,7 +35,7 @@
     mobile = <<>>                          :: binary() | '_',
     image = <<>>                           :: binary() | '_',
     thumbimage = <<>>                      :: binary() | '_',
-    is_admin_blocked =  0 :: non_neg_integer()
+    is_admin_blocked = <<>>                :: binary() | '_'
 }).
 
 -record(roster_version,

@@ -117,7 +117,7 @@ get_roster(LUser, LServer) ->
 	   LServer,
 	   ?SQL("select @(rosterusers.username)s, @(rosterusers.jid)s, @(rosterusers.nick)s, @(rosterusers.subscription)s, "
     "@(rosterusers.ask)s,  @(rosterusers.server)s,  "
-    "@(rosterusers.type)s,@(vcard_search.nickname)s,@(vcard_search.image)s,@(vcard_search.email)s,@(vcard_search.mobilenumber)s,@(vcard_search.thumbimage)s,@(vcard_search.status)s,@(vcard_search.is_block)d from rosterusers JOIN
+    "@(rosterusers.type)s,@(vcard_search.nickname)s,@(vcard_search.image)s,@(vcard_search.email)s,@(vcard_search.mobilenumber)s,@(vcard_search.thumbimage)s,@(vcard_search.status)s,@(vcard_search.is_block)s from rosterusers JOIN
     vcard_search ON vcard_search.lusername = rosterusers.jid_username"
     " where rosterusers.username=%(LUser)s and %(LServer)H")) of
         {selected, Items} when is_list(Items) ->
@@ -357,6 +357,8 @@ raw_to_record(LServer,
 raw_to_record(LServer,
 	      {User, LServer, SJID, Nick, SSubscription, SAsk,
 	       _SServer,  _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked}) ->
+    ?INFO_MSG("IsAdminBlocked ~p", [IsAdminBlocked]),
+    ?INFO_MSG("IsAdminBlocked binaery ~p", [list_to_binary(integer_to_list(IsAdminBlocked))]),
     try jid:decode(SJID) of
       JID ->
 	  LJID = jid:tolower(JID),
@@ -370,7 +372,7 @@ raw_to_record(LServer,
           email = Email,
           mobile = Mobilenumber,
           thumbimage = Thumbimage,
-        %   is_admin_blocked = IsAdminBlocked,
+          is_admin_blocked = list_to_binary(integer_to_list(IsAdminBlocked)),
           image = Image}
     catch _:{bad_jid, _} ->
 	    ?ERROR_MSG("~ts", [format_row_error(User, LServer, {jid, SJID})]),
