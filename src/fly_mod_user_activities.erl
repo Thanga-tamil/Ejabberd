@@ -597,7 +597,7 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
   FromJid = jid:from_string(MessageFrom),
 
   #jid{user = FUser, lserver = FServer} = FromJid,
-  if MessageTo =:= <<"">> ->
+  if (MessageTo =:= <<"">>) or (MessageTo =:= <<>>) ->
       case catch fly_mod_utils:get_message_from(FServer,  OldMessageId) of
             {seleced, _, []} ->
               ToJid = #jid{user = TUser, lserver = TServer} = FromJid;
