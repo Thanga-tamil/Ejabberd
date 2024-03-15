@@ -595,9 +595,21 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
   MessageId = fly_mod_utils:get_iq_message_id(16),
   MsgId = fly_mod_utils:get_iq_message_id(16),
   FromJid = jid:from_string(MessageFrom),
-  ToJid = jid:from_string(MessageTo),
+
   #jid{user = FUser, lserver = FServer} = FromJid,
-  #jid{user = TUser, lserver = TServer} = ToJid,
+  if MessageTo =:= <<"">> ->
+      case catch fly_mod_utils:get_message_from(FServer,  OldMessageId) of
+            {seleced, _, []} ->
+              ToJid = #jid{user = TUser, lserver = TServer} = FromJid;
+            {selected, _, [[MsgFrom]]} ->
+              ToJid = jid:from_string(MsgFrom),
+              #jid{user = TUser, lserver = TServer} = ToJid
+      end;
+    true ->
+      ToJid = jid:from_string(MessageTo),
+      #jid{user = TUser, lserver = TServer} = ToJid
+end,
+
   Substring = string:str(binary_to_list(LResource),binary_to_list(<<"Mobile-">>)),
   if Substring =:= 1 ->
     MResource = fly_mod_utils:get_device_from_resource(LResource);
