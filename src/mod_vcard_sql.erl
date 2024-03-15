@@ -158,7 +158,15 @@ set_vcard(LUser, LServer, VCARD,
 			orgname = OrgName,
 			lorgname = LOrgName,
 			orgunit = OrgUnit,
-			lorgunit = LOrgUnit}) ->
+			lorgunit = LOrgUnit,
+            status = Status,
+            lstatus = LStatus,
+            image = Image,
+            limage = LImage,
+            thumbimage = ThumbImage,
+            lthumbimage = LThumbImage,
+            mobilenumber = MobileNumber,
+            lmobilenumber = LMobileNumber}) ->
     SVCARD = fxml:element_to_binary(VCARD),
     ejabberd_sql:sql_transaction(
       LServer,
@@ -192,7 +200,15 @@ set_vcard(LUser, LServer, VCARD,
                            "orgname=%(OrgName)s",
                            "lorgname=%(LOrgName)s",
                            "orgunit=%(OrgUnit)s",
-                           "lorgunit=%(LOrgUnit)s"])
+                           "lorgunit=%(LOrgUnit)s",
+                           "status=%(Status)s",
+                           "lstatus=%(LStatus)s",
+                           "image=%(Image)s",
+                           "limage=%(LImage)s",
+                           "thumbimage=%(ThumbImage)s",
+                           "lthumbimage=%(LThumbImage)s",
+                           "mobilenumber=%(MobileNumber)s",
+                           "lmobilenumber=%(LMobileNumber)s"])
       end).
 
 search(LServer, Data, AllowReturnAll, MaxMatch) ->
@@ -263,7 +279,7 @@ remove_user(LUser, LServer) ->
                      " where lusername=%(LUser)s and %(LServer)H"))
       end).
 
-export(_Server) ->   
+export(_Server) ->
     [{vcard,
       fun(Host, #vcard{us = {LUser, LServer}, vcard = VCARD})
             when LServer == Host ->
