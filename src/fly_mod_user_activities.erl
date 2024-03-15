@@ -602,6 +602,7 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
             {seleced, _, []} ->
               ToJid = #jid{user = TUser, lserver = TServer} = FromJid;
             {selected, _, [[MsgFrom]]} ->
+              ?INFO_MSG("MsgFrom ~p", [MsgFrom]),
               ToJid = jid:from_string(MsgFrom),
               #jid{user = TUser, lserver = TServer} = ToJid
       end;
@@ -609,7 +610,8 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
       ToJid = jid:from_string(MessageTo),
       #jid{user = TUser, lserver = TServer} = ToJid
 end,
-
+  ?INFO_MSG("MessageTo ~p", [MessageTo]),
+  ?INFO_MSG("TUser ~p", [TUser]),
   Substring = string:str(binary_to_list(LResource),binary_to_list(<<"Mobile-">>)),
   if Substring =:= 1 ->
     MResource = fly_mod_utils:get_device_from_resource(LResource);
