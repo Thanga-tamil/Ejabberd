@@ -1701,6 +1701,7 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
       [N, _H] = string:tokens(binary_to_list(MsgFrom), "@"),
       Name = list_to_binary(N),
       {selected, [{UserNickName}]} = fly_mod_utils:get_nickname(Recipient#jid.server, Name),
+
       ChangedMessage = case MessageType of
                           <<"image">> ->
                           Message_Content = <<"">>,
@@ -1744,6 +1745,11 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
                             "@" ++
                             binary_to_list(GroupName)
                         end,
+                        ?INFO_MSG("ChangedMessage ~p", [ChangedMessage]),
+
+                        ?INFO_MSG("Message_Content ~p", [Message_Content]),
+                        ?INFO_MSG("UserNickName ~p", [UserNickName]),
+                        ?INFO_MSG("GroupName ~p", [GroupName]),
       Msg = [{<<"mutable-content">>, integer_to_list(1)},
         {alert, ChangedMessage},  {mode, binary_to_list(Mode)},
         {sound, binary_to_list(<<"default">>)}],
