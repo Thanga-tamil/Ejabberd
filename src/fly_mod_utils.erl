@@ -85,6 +85,7 @@
   get_user_resource/1,
   get_user_resource/3,
   get_message/2,
+  get_message_from/2,
   get_offline_msg/2,
   update_offline_status/3,
   mute_user_notification/3,
@@ -1843,6 +1844,10 @@ get_bot_chat_messages(#jid{luser = FUser, lserver = FServer}, TUser, Position, M
 get_message(FServer,MessageId)->
   ejabberd_sql:sql_query(FServer,
     [<<"SELECT txt as message FROM message_status WHERE message_id IN ('">>, MessageId, <<"') GROUP BY message_id;">>]).
+
+get_message_from(FServer,MessageId)->
+      ejabberd_sql:sql_query(FServer,
+        [<<"SELECT IF(from_notification =  '', from_user,from_notification) as fromuse FROM fly_mf_prod.message_status where message_id = '">>, MessageId, <<"' limit 1 ;">>]).
 
 get_roster_nick(LServer,Username,Contact)->
   Jid = make_jid_s(Contact,LServer),
