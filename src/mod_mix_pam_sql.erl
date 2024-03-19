@@ -103,6 +103,9 @@ get_channels(User) ->
     {LUser, LServer, _} = jid:tolower(User),
     SQL = ?SQL("select @(channel)s, @(service)s, @(id)s from mix_pam "
 	       "where username=%(LUser)s and %(LServer)H"),
+    ?INFO_MSG("SQL ~p", [SQL]),
+    ?INFO_MSG("LUser ~p", [LUser]),
+    ?INFO_MSG("LServer ~p", [LServer]),
     case ejabberd_sql:sql_query(LServer, SQL) of
 	{selected, Ret} ->
 	    {ok, lists:filtermap(
