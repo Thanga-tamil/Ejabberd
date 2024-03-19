@@ -368,6 +368,7 @@ connecting(connect, #state{host = Host} = State) ->
     true ->
         NewHost = list_to_binary(fly_mod_utils:get_host(binary_to_list(Host)))
   end,
+  ?INFO_MSG("Host ~p", [NewHost]),
     ConnectRes = case db_opts(NewHost) of
 		     [mysql | Args] -> apply(fun mysql_connect/8, Args);
 		     [pgsql | Args] -> apply(fun pgsql_connect/8, Args);
