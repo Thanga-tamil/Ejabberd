@@ -362,8 +362,14 @@ init([Host]) ->
 	    pending_requests = p1_queue:new(QueueType, max_fsm_queue())}}.
 
 connecting(connect, #state{host = Host} = State) ->
-    ?INFO_MSG("Host ~p", [Host]),
-    ConnectRes = case db_opts(Host) of
+    NewSubstring = string:str(binary_to_list(Host), binary_to_list(<<"mix.">>)),
+    if NewSubstring =:= 0 ->
+        NewHost = Host;
+    true ->
+        NewHost = list_to_binary(fly_mod_utils:get_host(binary_to_list(Host)))
+  end,
+  ?INFO_MSG("Host ~p", [NewHost]),
+    ConnectRes = case db_opts(NewHost) of
 		     [mysql | Args] -> apply(fun mysql_connect/8, Args);
 		     [pgsql | Args] -> apply(fun pgsql_connect/8, Args);
 		     [sqlite | Args] -> apply(fun sqlite_connect/1, Args);
@@ -459,8 +465,6 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 handle_info({'EXIT', _Pid, _Reason}, connecting, State) ->
     {next_state, connecting, State};
 handle_info({'EXIT', _Pid, Reason}, _StateName, State) ->
-    ?INFO_MSG("EXIT _Pid~p", [_Pid]),
-    ?INFO_MSG("EXIT Reason~p", [Reason]),
     handle_reconnect(Reason, State);
 handle_info(Info, StateName, State) ->
     ?WARNING_MSG("Unexpected info in ~p: ~p",
@@ -513,11 +517,8 @@ run_sql_cmd(Command, From, State, Timestamp) ->
 	false ->
 	    receive
 		{'EXIT', _Pid, Reason} ->
-
 		    PR = p1_queue:in({sql_cmd, Command, From, Timestamp},
 				     State#state.pending_requests),
-                     ?INFO_MSG("Command ~p", [Command]),
-                     ?INFO_MSG("Command PR ~p", [PR]),
 		    handle_reconnect(Reason, State#state{pending_requests = PR})
 	    after 0 ->
 		put(?NESTING_KEY, ?TOP_LEVEL_TXN),
@@ -959,7 +960,6 @@ driver_restart_required(_) -> false.
 %% Generate the OTP callback return tuple depending on the driver result.
 abort_on_driver_error({Tag, Msg} = Reply, From, Timestamp) when Tag == error; Tag == aborted ->
     reply(From, Reply, Timestamp),
-    ?INFO_MSG("Msg ~p", Msg),
     case driver_restart_required(Msg) of
 	true ->
 	    handle_reconnect(Msg, get(?STATE_KEY));
