@@ -175,6 +175,7 @@
   get_messagestatus/2,
   getuserBlockedList/1,
   jid_to_string/1,
+  get_host/1,
   get_nick/2,
   get_recent_profile/3,
   get_all_media_conversation/2,empty_from_user_to_chat_media/2,update_tousers_to_chat_media/3,
@@ -1929,6 +1930,13 @@ U.
 get_device_from_resource(Jid) ->
 [_,U] = binary:split(Jid,<<"-">>,[global]),
 U.
+
+get_host(Host)->
+% Find the position of the first dot
+DotIndex = string:str(Host, "."),
+% Extract the substring starting from the position after the first dot
+NewString = string:substr(Host, DotIndex + 1),
+NewString.
 
 jid_to_string(Jid) ->
   #jid{user = User, lserver = Server} = Jid,

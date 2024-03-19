@@ -362,7 +362,14 @@ init([Host]) ->
 	    pending_requests = p1_queue:new(QueueType, max_fsm_queue())}}.
 
 connecting(connect, #state{host = Host} = State) ->
-    ConnectRes = case db_opts(Host) of
+    NewSubstring = string:str(binary_to_list(Host), binary_to_list(<<"mix.">>)),
+    if NewSubstring =:= 0 ->
+        NewHost = Host;
+    true ->
+        NewHost = list_to_binary(fly_mod_utils:get_host(binary_to_list(Host)))
+  end,
+  ?INFO_MSG("Host ~p", [NewHost]),
+    ConnectRes = case db_opts(NewHost) of
 		     [mysql | Args] -> apply(fun mysql_connect/8, Args);
 		     [pgsql | Args] -> apply(fun pgsql_connect/8, Args);
 		     [sqlite | Args] -> apply(fun sqlite_connect/1, Args);
