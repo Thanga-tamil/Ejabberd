@@ -372,7 +372,6 @@ add_participants_service(From, To, SubEl, IQ) ->
                   end,
       ConvertUserstring = fly_mod_utils:get_user_from_string_jid(ParticipantData),
       FromJID = jid:make(ConvertUserstring,FServer),
-      ?INFO_MSG("FromJID participants ~p",[FromJID]),
       mod_mix:notify_participant_joined_api(ServerHost, GroupJid, FromJID, [NickName, AdminUser, FromJID,JIDs ],MsgId)
     end, Participants#xmlel.children),
 fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify add member to group members successfully">>})

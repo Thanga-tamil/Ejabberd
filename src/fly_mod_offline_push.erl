@@ -1745,11 +1745,6 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
                             "@" ++
                             binary_to_list(GroupName)
                         end,
-                        ?INFO_MSG("ChangedMessage ~p", [ChangedMessage]),
-
-                        ?INFO_MSG("Message_Content ~p", [Message_Content]),
-                        ?INFO_MSG("UserNickName ~p", [UserNickName]),
-                        ?INFO_MSG("GroupName ~p", [GroupName]),
       Msg = [{<<"mutable-content">>, integer_to_list(1)},
         {alert, ChangedMessage},  {mode, binary_to_list(Mode)},
         {sound, binary_to_list(<<"default">>)}],
