@@ -1193,7 +1193,7 @@ delete_recentchat(#jid{luser = FUser,lserver = FServer},#jid{luser = ToUser} ) -
 delete_message_recentchat(FServer, User, ToUser) ->
   ejabberd_sql:sql_query(
     FServer,
-    [<<"update chat_recent set status  = 4, txt = ''  WHERE  from_user ='">>,User, <<"' and to_user ='">>,ToUser, <<"';">>]).
+    [<<"update chat_recent set message_type = '', status  = 4, txt = ''  WHERE  from_user ='">>,User, <<"' and to_user ='">>,ToUser, <<"';">>]).
 
 %% Delete Particular messages
 %%
