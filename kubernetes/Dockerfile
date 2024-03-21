@@ -1,4 +1,4 @@
-FROM nexus-demo.contus.us:8446/mirrorfly-uikit/prod/erlang25:v1
+FROM nexus-demo.contus.us:8446/mirrorfly-uikit/prod/erlang23:v1
 
 ### Expose the ejabberd ports ###
 EXPOSE 5222
