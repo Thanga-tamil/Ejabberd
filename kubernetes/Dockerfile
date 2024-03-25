@@ -23,7 +23,7 @@ COPY limits.conf /etc/security/limits.conf
 
 COPY . /tmp/ejabberd/
 RUN chmod -R 755 /opt/
-RUN cd /tmp/ejabberd; ./autogen.sh; ./configure --enable-user=ejabberd --enable-mysql --prefix=/opt/ejabberd24-02
+RUN cd /tmp/ejabberd; ./autogen.sh; ./configure --with-rebar=rebar --enable-user=ejabberd --enable-mysql --prefix=/opt/ejabberd
 RUN cd /tmp/ejabberd; make; exit 0
 RUN cd /tmp/ejabberd; cp xmpp_codec.spec deps/xmpp/specs/xmpp_codec.spec
 RUN cd /tmp/ejabberd/deps/xmpp; make spec; make
