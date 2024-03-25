@@ -507,6 +507,10 @@ send_push_notifications(Sender, Recipient, ChatType,
               gcm_single_push(DeviceToken, UserType, ChatType, Sender,
                 Recipient, SubEl, TimestampValue, Packet,
                 State#state.rabbitmq_connection, State#state.rabbitmq_exchange);
+              <<"web">> ->
+                  gcm_single_push(DeviceToken, UserType, ChatType, Sender,
+                    Recipient, SubEl, TimestampValue, Packet,
+                    State#state.rabbitmq_connection, State#state.rabbitmq_exchange);
               <<"ios">> ->
                 if ChatType == <<"mediacall">> andalso VoipDeviceToken == <<>> ->
                   ?INFO_MSG("voip token is empty ~p", [Recipient#jid.luser]);

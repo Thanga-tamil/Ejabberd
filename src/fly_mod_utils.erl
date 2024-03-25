@@ -308,10 +308,10 @@ get_user_device(LServer, LUser, LResource, ChatType) ->
   % true ->
     if LResource =:= "" ->
       ejabberd_sql:sql_query(LServer,
-      [<<"SELECT  device_type, device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE username = '">>, LUser, <<"' and ( device_token != '' and device_token != 'null' and device_type !='Web' and device_type !='') and device_id != ''  ;">>]);
+      [<<"SELECT  device_type, device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE username = '">>, LUser, <<"' and ( device_token != '' and device_token != 'null'  and device_type !='') and device_id != ''  ;">>]);
       true ->
       ejabberd_sql:sql_query(LServer,
-      [<<"SELECT  device_type,device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE  username = '">>, LUser, <<"'  and ( device_token != '' and device_token != 'null' and device_type !='Web' and device_type !='') and device_id != ''  and device_id not in  ('">>, LResource, <<"' );">>])
+      [<<"SELECT  device_type,device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE  username = '">>, LUser, <<"'  and ( device_token != '' and device_token != 'null'  and device_type !='') and device_id != ''  and device_id not in  ('">>, LResource, <<"' );">>])
       % end
   end.
 
