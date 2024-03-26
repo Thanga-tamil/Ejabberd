@@ -369,12 +369,15 @@ connecting(connect, #state{host = Host} = State) ->
         NewHost = list_to_binary(fly_mod_utils:get_host(binary_to_list(Host)))
   end,
   ?INFO_MSG("Host ~p", [NewHost]),
+  ?INFO_MSG("trace ~p", [erlang:get_stacktrace()]),
+
     ConnectRes = case db_opts(NewHost) of
 		     [mysql | Args] -> apply(fun mysql_connect/8, Args);
 		     [pgsql | Args] -> apply(fun pgsql_connect/8, Args);
 		     [sqlite | Args] -> apply(fun sqlite_connect/1, Args);
 		     [mssql | Args] -> apply(fun odbc_connect/2, Args);
-		     [odbc | Args] -> apply(fun odbc_connect/2, Args)
+		     [odbc | Args] -> apply(fun odbc_connect/2, Args);
+             [_ | Args] -> apply(fun mysql_connect/8, Args)
 		 end,
     case ConnectRes of
         {ok, Ref} ->
