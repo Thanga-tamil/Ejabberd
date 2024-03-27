@@ -79,16 +79,16 @@ if ChatType =:= <<"normal">> ->
 		#jid{user = TUser, lserver = _TServer, lresource = FResource} =  From,
 		Mid = xmpp:get_id(M#offline_msg.packet),
 		case fxml:get_subtag(Stanza, <<"mix">>) of
-			false -> MessageId = list_to_binary(string:concat(binary_to_list(Mid), binary_to_list(LUser)));
+			false -> MessageId = Mid;
 			Mix ->
 				case fxml:get_subtag(Stanza, <<"body">>) of
-					false -> MessageId = list_to_binary(string:concat(binary_to_list(Mid), binary_to_list(LUser)));
+					false -> MessageId = Mid;
 					_Body ->
 						case fxml:get_subtag(Mix, <<"submission-id">>) of
-							false -> MessageId = list_to_binary(string:concat(binary_to_list(Mid), binary_to_list(LUser)));
+							false -> MessageId = Mid;
 							SubmissionID ->
 								GroupMsgId = fxml:get_tag_cdata(SubmissionID),
-							MessageId = list_to_binary(string:concat(binary_to_list(GroupMsgId), binary_to_list(LUser)))
+							MessageId = GroupMsgId
 						end
 				end
 		end;
@@ -97,39 +97,53 @@ if ChatType =:= <<"normal">> ->
 	  case mod_carboncopy:is_carbon_copy(Packet) of
 			false ->
 				#jid{user = TUser, lserver = _TServer} =  To,
-				Mid = xmpp:get_id(M#offline_msg.packet),
-				MessageId = list_to_binary(string:concat(binary_to_list(Mid), binary_to_list(LUser)));
+				MessageId = xmpp:get_id(M#offline_msg.packet);
+
 			true->
 				CarbonPacket =  misc:unwrap_carbon(xmpp:encode(NewPacket)),
 				case fxml:get_subtag(CarbonPacket, <<"sent">>) of
 					false ->
 						#jid{user = TUser, lserver = _TServer} =  To,
-						Mid = <<"">>;
+						MessageId = <<"">>;
 					Sentpacket ->
 						case fxml:get_subtag(Sentpacket, <<"forwarded">>) of
 							false ->
 								#jid{user = TUser, lserver = _TServer} =  To,
-								Mid = <<"">>;
+								MessageId = <<"">>;
 							Forwardedpacket->
 								case fxml:get_subtag(Forwardedpacket, <<"message">>) of
 									false ->
 										#jid{user = TUser, lserver = _TServer} =  To,
-										Mid = <<"">>;
+										MessageId = <<"">>;
 									Messagepacket->
 										Mtype = fxml:get_attr_s(<<"type">>,Messagepacket#xmlel.attrs),
 												if Mtype =:=  <<"normal">> ->
+													case fxml:get_subtag(Messagepacket, <<"mix">>) of
+													false -> MessageId = fxml:get_attr_s(<<"id">>,Messagepacket#xmlel.attrs);
+													Mix ->
+
+													case fxml:get_subtag(Mix, <<"submission-id">>) of
+														false -> MessageId = fxml:get_attr_s(<<"id">>,Messagepacket#xmlel.attrs);
+														SubmissionID ->
+															MessageId = fxml:get_tag_cdata(SubmissionID)
+
+													end
+
+												end,
 												FromUser =  #jid{} = jid:from_string(fxml:get_attr_s(<<"from">>,Messagepacket#xmlel.attrs)),
 												#jid{user = TUser, lserver = _TServer} =  FromUser;
 												true ->
+												MessageId = fxml:get_attr_s(<<"id">>,Messagepacket#xmlel.attrs),
 												FromUser = #jid{} = jid:from_string(fxml:get_attr_s(<<"to">>,Messagepacket#xmlel.attrs)),
 												#jid{user = TUser, lserver = _TServer} =  FromUser
-												end,
-										Mid = fxml:get_attr_s(<<"id">>,Messagepacket#xmlel.attrs)
+												end
+
 								end
 					    end
 			    end
 
 			    end
+
 
 	 end,
 	Message = fxml:element_to_binary(
@@ -147,7 +161,7 @@ case catch fly_mod_utils:get_user_resources(LUser, LServer) of
 					"spool",
 					["username=%(LUser)s",
 						"server_host=%(LServer)s",
-						"message_id=%(Mid)s",
+						"message_id=%(MessageId)s",
 						"chat_type=%(ChatType)s",
 						"to_user=%(TUser)s",
 						"device_id=%(UResources)s",
@@ -179,7 +193,7 @@ true ->
 					"spool",
 					["username=%(LUser)s",
 						"server_host=%(LServer)s",
-						"message_id=%(Mid)s",
+						"message_id=%(MessageId)s",
 						"chat_type=%(ChatType)s",
 						"to_user=%(TUser)s",
 						"device_id=%(UResources)s",
