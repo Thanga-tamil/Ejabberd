@@ -1375,7 +1375,7 @@ process_get_group_profile(From, _To, SubEl, IQ, RequestType) ->
       SubEls1 = lists:map(fun(G) ->
         [GID, CreatedDate, Vcard, Affiliation, ItemId] = G,
         VCard = case fxml_stream:parse_element(Vcard) of
-                    {error, _Reason} -> error;
+                    {error, _Reason} -> [];
                     VCARD -> [VCARD]
                   end,
         #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}],
@@ -1408,7 +1408,7 @@ process_get_group_vcard(From, _To, SubEl, IQ, RequestType) ->
       SubEls1 = lists:map(fun(G) ->
         [Vcard,CreatedDate] = G,
         VCard = case fxml_stream:parse_element(Vcard) of
-                    {error, _Reason} -> error;
+                    {error, _Reason} -> [];
                     VCARD -> [VCARD]
                   end,
         #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GroupId }, {<<"createddate">>,  CreatedDate}],
@@ -1440,7 +1440,7 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
       SubEls1 = lists:map(fun(G) ->
         [GID, CreatedDate, Vcard, Affiliation, ItemId, IsAdminBlocked] = G,
         VCard = case fxml_stream:parse_element(Vcard) of
-                    {error, _Reason} -> error;
+                    {error, _Reason} -> [];
                     VCARD -> [VCARD]
                   end,
         #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}, {<<"is_admin_blocked">>,  IsAdminBlocked }],

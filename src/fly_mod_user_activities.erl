@@ -527,7 +527,7 @@ process_get_recent_profile(From, RequestType, SubEl, IQ) ->
       SubEls1 = lists:map(fun(G) ->
         [UserName,  Vcard] = G,
         VCard = case fxml_stream:parse_element(Vcard) of
-                    {error, _Reason} -> error;
+                    {error, _Reason} -> [];
                     VCARD -> [VCARD]
                   end,
         #xmlel{name = <<"vcarddetails">>, attrs = [{<<"username">>,  UserName }],

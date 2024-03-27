@@ -938,7 +938,7 @@ gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
         VCard = case catch fly_mod_utils:get_vcard(LServer, Name) of
                   {selected, [{SVCARD, _CreatedAt}]} ->
                     case fxml_stream:parse_element(SVCARD) of
-                      {error, _Reason} -> error;
+                      {error, _Reason} -> [];
                       VCARD ->
                         [VCARD],
                         %% Remove the namespace from the xml
@@ -2024,7 +2024,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
               of
                 {selected, [{SVCARD, _CreatedAt}]} ->
                   case fxml_stream:parse_element(SVCARD) of
-                    {error, _Reason} -> error;
+                    {error, _Reason} -> [];
                     VCARD ->
                       [VCARD],
                       %% Remove the namespace from the xml
