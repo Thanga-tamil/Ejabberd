@@ -128,7 +128,7 @@ get_vcard(LUser, LServer) ->
                 " where username=%(LUser)s and %(LServer)H")) of
 	{selected, [{SVCARD}]} ->
 	    case fxml_stream:parse_element(SVCARD) of
-		{error, _Reason} -> error;
+		{error, _Reason} -> [];
 		VCARD -> {ok, [VCARD]}
 	    end;
 	{selected, []} -> {ok, []};
