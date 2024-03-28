@@ -2110,7 +2110,7 @@ validate_license(LServer, Init, Type) ->
       false
     end;
   true ->
-    ?INFO_MSG("license expired: ~p , Expire: ~p, Domain: ~p", [Expiry, LServer]),
+    ?INFO_MSG("license expired:  Expire: ~p, Domain: ~p", [Expiry, LServer]),
     if Init =:= true ->
       fly_mod_utils:update_license_lookup(LServer),
       validate_license(LServer, false, Type);
