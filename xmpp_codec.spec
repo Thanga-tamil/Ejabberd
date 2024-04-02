@@ -516,6 +516,13 @@
           result = {vcard_thumb_image, '$vcard_thumb_image'},
               cdata = #cdata{default = <<"">>, label = '$vcard_thumb_image'}}).
 
+-xml(vcard_history,
+     #elem{name = <<"history">>,
+           xmlns = <<"vcard-temp">>,
+	   module = 'xep0054',
+          result = {vcard_history, '$vcard_history'},
+              cdata = #cdata{default = <<"">>, label = '$vcard_history'}}).
+
 -xml(vcard_designation,
      #elem{name = <<"designation">>,
            xmlns = <<"vcard-temp">>,
@@ -2417,7 +2424,7 @@
                      '$mailer', '$tz', '$geo', '$title', '$role', '$logo',
                      '$vcard_thumb_image','$vcard_status','$vcard_mobile_number',
                      '$vcard_designation','$vcard_coverimg','$vcard_image',
-                     '$vcard_emailid','$vcard_nickName',
+                     '$vcard_emailid','$vcard_nickName','$vcard_history',
                      '$org', '$categories', '$note', '$prodid', %% '$agent',
                      '$rev', '$sort_string', '$sound', '$uid', '$url', '$class',
                      '$key', '$desc', '$_els'},
@@ -2433,6 +2440,7 @@
                    #ref{name = vcard_status, min = 0, max = 1, label = '$vcard_status'},
                    #ref{name = vcard_mobile_number, min = 0, max = 1, label = '$vcard_mobile_number'},
                    #ref{name = vcard_thumb_image, min = 0, max = 1, label = '$vcard_thumb_image'},
+                   #ref{name = vcard_history, min = 0, max = 1, label = '$vcard_history'},
                    #ref{name = vcard_designation, min = 0, max = 1, label = '$vcard_designation'},
                    #ref{name = vcard_coverimg, min = 0, max = 1, label = '$vcard_coverimg'},
                    #ref{name = vcard_image, min = 0, max = 1, label = '$vcard_image'},
