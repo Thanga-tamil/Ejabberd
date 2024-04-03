@@ -980,7 +980,7 @@ clear_message(#jid{luser = User,lserver = Server}, ToUser, Favourite, Delete_Typ
   if Delete_Type =:= <<"1">> ->
     if Favourite =:= <<"0">> ->
       ejabberd_sql:sql_query(Server,
-        [<<"update chat_recent set created_at = NOW(), txt = '', message_type = '', status  = 4, unread =  0 WHERE from_user ='">>, ToUser, <<"' and to_user = '">>, User, <<"' and message_id = '">>, MsgId, <<"';">>]),
+        [<<"update chat_recent set  txt = '', message_type = '', status  = 4, unread =  0 WHERE from_user ='">>, ToUser, <<"' and to_user = '">>, User, <<"' and message_id = '">>, MsgId, <<"';">>]),
       ejabberd_sql:sql_query(Server,
         [<<"update message_status set deleted_status = 2, deleted_by = '' where   ((from_user ='">>, ToUser, <<"' and  to_user='">>, User, <<"') or  (to_user ='">>, ToUser, <<"' and  from_user='">>, User, <<"')) and deleted_status = 1 and deleted_by != '">>, User, <<"' ;">>]),
       ejabberd_sql:sql_query(Server,
@@ -991,7 +991,7 @@ clear_message(#jid{luser = User,lserver = Server}, ToUser, Favourite, Delete_Typ
         [<<"UPDATE chat_media_files SET to_users = TRIM(BOTH ',' FROM REPLACE(CONCAT(',', to_users), ',">>, User, <<"', '')) where (from_user ='">>, ToUser, <<"' and to_users like '">>,<<"%">>,User,<<"%">>, <<"' ) ;">>]);
     true ->
       ejabberd_sql:sql_query(Server,
-        [<<"update chat_recent set created_at = NOW(), txt = '', message_type = '', status  = 4,unread =  0 WHERE favourite_status = 0 and from_user ='">>, ToUser, <<"' and to_user = '">>, User, <<"' and message_id = '">>, MsgId, <<"';">>]),
+        [<<"update chat_recent set  txt = '', message_type = '', status  = 4,unread =  0 WHERE favourite_status = 0 and from_user ='">>, ToUser, <<"' and to_user = '">>, User, <<"' and message_id = '">>, MsgId, <<"';">>]),
       ejabberd_sql:sql_query(Server,
         [<<"update message_status set deleted_status = 2, deleted_by = '' where ((from_user ='">>, ToUser, <<"' and  to_user='">>, User, <<"') or  (to_user ='">>, ToUser, <<"' and  from_user='">>, User, <<"')) and favourite_status = 0 and deleted_status =1 and deleted_by != '">>, User, <<"' ;">>]),
       ejabberd_sql:sql_query(Server,
