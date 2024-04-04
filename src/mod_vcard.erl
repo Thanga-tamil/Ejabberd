@@ -377,7 +377,6 @@ make_vcard_search(User, LUser, LServer, VCARD) ->
     LStatus = string2lower(Status),
 	LImage = string2lower(Image),
     LThumbImage = string2lower(ThumbImage),
-    LHistory = string2lower(History),
 	LMobileNumber = string2lower(MobileNumber),
     US = {LUser, LServer},
     #vcard_search{us = US,
@@ -411,7 +410,6 @@ make_vcard_search(User, LUser, LServer, VCARD) ->
           thumbimage = ThumbImage,
           lthumbimage = LThumbImage,
           history = History,
-          lhistory = LHistory,
           mobilenumber = MobileNumber,
           lmobilenumber = LMobileNumber}.
 

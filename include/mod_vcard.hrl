@@ -23,7 +23,7 @@
 	 lgiven, middle, lmiddle, nickname, lnickname, bday,
 	 lbday, ctry, lctry, locality, llocality, email, lemail,
 	 status, lstatus,mobilenumber,lmobilenumber,thumbimage,lthumbimage,
-	 history,lhistory, image, limage, orgname, lorgname, orgunit, lorgunit}).
+	 history, image, limage, orgname, lorgname, orgunit, lorgunit}).
 
 -record(vcard, {us = {<<"">>, <<"">>} :: {binary(), binary()} | binary(),
                 vcard = #xmlel{} :: xmlel()}).
