@@ -357,6 +357,8 @@ make_vcard_search(User, LUser, LServer, VCARD) ->
 	        	[{elem, <<"mobileNumber">>}, cdata]),
     ThumbImage = fxml:get_path_s(VCARD,
 	        	[{elem, <<"thumbImage">>}, cdata]),
+    History = fxml:get_path_s(VCARD,
+	        	[{elem, <<"history">>}, cdata]),
     EMail = case EMail1 of
 	      <<"">> -> EMail2;
 	      _ -> EMail1
@@ -407,6 +409,7 @@ make_vcard_search(User, LUser, LServer, VCARD) ->
           limage = LImage,
           thumbimage = ThumbImage,
           lthumbimage = LThumbImage,
+          history = History,
           mobilenumber = MobileNumber,
           lmobilenumber = LMobileNumber}.
 
