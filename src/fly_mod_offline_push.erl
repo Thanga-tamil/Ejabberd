@@ -754,6 +754,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
       _ ->
         <<"">>
     end,
+          Expiry = get_timestamp(),
 
       SessionStatus = case fxml:get_tag_attr(<<"session_status">>, MediaCall) of
                       {value, Sessionstatus} ->
@@ -788,6 +789,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
               {<<"userDomain">>, binary_to_list(Server)},
               {<<"user_type">>, binary_to_list(PushType)},
               {<<"call_mode">>, binary_to_list(CallMode)},
+              {<<"expiration">>, integer_to_list(Expiry)},
               {<<"call_link">>, binary_to_list(RoomLink)},
               {<<"title">>, "Calling"}];
           InviteUsers ->
@@ -811,6 +813,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
             {<<"caller_name">>, binary_to_list(CallerName)},
             {<<"session_status">>, binary_to_list(SessionStatus)},
             {<<"call_mode">>, binary_to_list(CallMode)},
+            {<<"expiration">>, integer_to_list(Expiry)},
             {<<"call_link">>, binary_to_list(RoomLink)},
             {<<"title">>, "Calling"}]
           end,
