@@ -165,6 +165,7 @@ set_vcard(LUser, LServer, VCARD,
             limage = LImage,
             thumbimage = ThumbImage,
             lthumbimage = LThumbImage,
+            history = History,
             mobilenumber = MobileNumber,
             lmobilenumber = LMobileNumber}) ->
     SVCARD = fxml:element_to_binary(VCARD),
@@ -207,6 +208,7 @@ set_vcard(LUser, LServer, VCARD,
                            "limage=%(LImage)s",
                            "thumbimage=%(ThumbImage)s",
                            "lthumbimage=%(LThumbImage)s",
+                           "history=%(History)s",
                            "mobilenumber=%(MobileNumber)s",
                            "lmobilenumber=%(LMobileNumber)s"])
       end).
