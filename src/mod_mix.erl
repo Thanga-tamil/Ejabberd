@@ -937,7 +937,6 @@ notify_participant_joined(Mod, LServer, To, From, ID, [Nick, GroupCreate, Publis
 		      #jid{user = FUser, lserver = FServer} = From,
 		      PublisherJID = jid:make(fly_mod_utils:get_user_from_string_jid(Publisher),FServer),
 		      #jid{user = PUser, lserver = PServer} = PublisherJID,
-                      ?INFO_MSG("From ~p",[From]),
 		      Vcard = case catch fly_mod_utils:get_vcard(FServer, FUser) of
 			      {selected, [{GVCARD, _GrpCreatedAt}]} ->
 			      xmpp:encode(fxml_stream:parse_element(GVCARD));
