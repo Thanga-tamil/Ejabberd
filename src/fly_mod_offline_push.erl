@@ -504,9 +504,13 @@ send_push_notifications(Sender, Recipient, ChatType,
             <<"">> -> ?INFO_MSG("push_message user device is empty error is ~p", [Recipient#jid.luser]),
               device_type_is_empty;
             <<"android">> ->
-              gcm_single_push(DeviceToken, UserType, ChatType, Sender,
+              gcm_single_push(DeviceType,DeviceToken, UserType, ChatType, Sender,
                 Recipient, SubEl, TimestampValue, Packet,
                 State#state.rabbitmq_connection, State#state.rabbitmq_exchange);
+              <<"web">> ->
+                  gcm_single_push(DeviceType, DeviceToken, UserType, ChatType, Sender,
+                    Recipient, SubEl, TimestampValue, Packet,
+                    State#state.rabbitmq_connection, State#state.rabbitmq_exchange);
               <<"ios">> ->
                 if ChatType == <<"mediacall">> andalso VoipDeviceToken == <<>> ->
                   ?INFO_MSG("voip token is empty ~p", [Recipient#jid.luser]);
@@ -534,7 +538,7 @@ send_push_notifications(Sender, Recipient, ChatType,
 %% @param record Recipient
 %% @param record Packet
 %% @return atom
-gcm_single_push(DeviceToken, PushType, ChatType, From, To, Message,
+gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     TimestampValue, Packet, Channel, RMExchange) ->
 
   if ChatType == <<"chat">> ->
@@ -584,7 +588,11 @@ gcm_single_push(DeviceToken, PushType, ChatType, From, To, Message,
       {<<"type">>, binary_to_list(MessageType)}],
     Payload = create_android_json(DeviceToken, BF),
     if (EditMsgId =:= MessageId) or (EditMsgId =:= <<"">>) ->
-    send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
+      if DeviceType ==  <<"android">> ->
+      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
+      true ->
+        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server)
+      end;
     true ->
       ok
     end;
@@ -614,7 +622,11 @@ gcm_single_push(DeviceToken, PushType, ChatType, From, To, Message,
         {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
         {<<"title">>, "Poll"}],
       Payload = create_android_json(DeviceToken, BF),
-      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server);
+      if DeviceType ==  <<"android">> ->
+      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
+      true ->
+        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server)
+      end;
     ChatType == <<"seen">> ->
     FromUser = From#jid.luser,
     Server = To#jid.server,
@@ -639,39 +651,11 @@ gcm_single_push(DeviceToken, PushType, ChatType, From, To, Message,
       {<<"title">>, binary_to_list(ChatType)},
       {<<"type">>, binary_to_list(ChatType)}],
     Payload = create_android_json(DeviceToken, BF),
-    send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
-    ChatType == <<"call">> ->
-      FromUser = From#jid.luser,
-      Server = To#jid.server,
-      Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
-      FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
-
-      Call = fxml:get_subtag_with_xmlns(Packet, <<"call">>,
-        <<"urn:xmpp:call">>),
-      {value, SocketId} = fxml:get_tag_attr(<<"socket_id">>,
-        Call),
-      {value, CallStatus} = fxml:get_tag_attr(<<"call_status">>, Call),
-      {value, CallType} = fxml:get_tag_attr(<<"call_type">>,
-        Call),
-      {value, CallId} = fxml:get_tag_attr(<<"call_id">>,
-        Call),
-      {value, CallerDevice} = fxml:get_tag_attr(<<"caller_device">>, Call),
-      SendFrom = list_to_binary(binary_to_list(FromUser) ++
-        "@" ++ binary_to_list(Server)),
-      BF = [{<<"type">>, "call"},
-        {<<"call_status">>, binary_to_list(CallStatus)},
-        {<<"caller_device">>, binary_to_list(CallerDevice)},
-        {<<"caller_id">>, binary_to_list(SendFrom)},
-        {<<"socket_id">>, binary_to_list(SocketId)},
-        {<<"userDomain">>, binary_to_list(Server)},
-        {<<"user_type">>, binary_to_list(PushType)},
-        {<<"call_id">>, binary_to_list(CallId)},
-        {<<"call_type">>, binary_to_list(CallType)},
-        {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
-        {<<"time">>, FlatTimeStamp},
-        {<<"title">>, binary_to_list(CallStatus)}],
-      Payload = create_android_json(DeviceToken, BF),
+    if DeviceType ==  <<"android">> ->
       send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
+      true ->
+        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server)
+      end;
     ChatType == <<"recall">> ->
       FromUser = From#jid.luser,
       Server = To#jid.server,
@@ -692,7 +676,11 @@ gcm_single_push(DeviceToken, PushType, ChatType, From, To, Message,
         {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
         {<<"title">>, "This message was deleted"}],
       Payload = create_android_json(DeviceToken, BF),
-      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server);
+      if DeviceType ==  <<"android">> ->
+        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
+        true ->
+          send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server)
+        end;
 
     ChatType == <<"mediacall">> ->
       FromUser = From#jid.luser,
@@ -766,6 +754,7 @@ gcm_single_push(DeviceToken, PushType, ChatType, From, To, Message,
       _ ->
         <<"">>
     end,
+          Expiry = get_timestamp(),
 
       SessionStatus = case fxml:get_tag_attr(<<"session_status">>, MediaCall) of
                       {value, Sessionstatus} ->
@@ -800,6 +789,7 @@ gcm_single_push(DeviceToken, PushType, ChatType, From, To, Message,
               {<<"userDomain">>, binary_to_list(Server)},
               {<<"user_type">>, binary_to_list(PushType)},
               {<<"call_mode">>, binary_to_list(CallMode)},
+              {<<"expiration">>, integer_to_list(Expiry)},
               {<<"call_link">>, binary_to_list(RoomLink)},
               {<<"title">>, "Calling"}];
           InviteUsers ->
@@ -823,35 +813,17 @@ gcm_single_push(DeviceToken, PushType, ChatType, From, To, Message,
             {<<"caller_name">>, binary_to_list(CallerName)},
             {<<"session_status">>, binary_to_list(SessionStatus)},
             {<<"call_mode">>, binary_to_list(CallMode)},
+            {<<"expiration">>, integer_to_list(Expiry)},
             {<<"call_link">>, binary_to_list(RoomLink)},
             {<<"title">>, "Calling"}]
           end,
           Payload = create_android_json(DeviceToken, BF),
-          send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server)
+          if DeviceType ==  <<"android">> ->
+      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
+      true ->
+        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server)
+      end
       end;
-
-    ChatType == <<"recall">> ->
-      FromUser = From#jid.luser,
-      Server = To#jid.server,
-
-      ReCall = fxml:get_subtag_with_xmlns(Packet, <<"recall">>,
-        <<"urn:xmpp:receipts">>),
-      {value, MessageId} = fxml:get_tag_attr(<<"id">>,
-        ReCall),
-
-      SendFrom = list_to_binary(binary_to_list(FromUser) ++
-        "@" ++ binary_to_list(Server)),
-      BF = [{<<"type">>, "recall"},
-        {<<"message_id">>, binary_to_list(MessageId)},
-        {<<"message_content">>, "This message was deleted"},
-        {<<"userDomain">>, binary_to_list(Server)},
-        {<<"user_type">>, binary_to_list(PushType)},
-        {<<"send_from">>, binary_to_list(SendFrom)},
-        {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
-        {<<"title">>, "This message was deleted"}],
-      Payload = create_android_json(DeviceToken, BF),
-      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server);
-
     ChatType == <<"adminblock">> ->
       FromUser = From#jid.luser,
       Server = To#jid.server,
@@ -883,37 +855,11 @@ gcm_single_push(DeviceToken, PushType, ChatType, From, To, Message,
               {<<"title">>, "Blocking"}],
 
           Payload = create_android_json(DeviceToken, BF),
-          send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server);
-
-      ChatType == <<"ptt">> ->
-
-      FromUser = From#jid.luser,
-      Server = To#jid.server,
-      Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
-      FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
-      Ptt = fxml:get_subtag_with_xmlns(Packet, <<"ptt">>,
-        <<"urn:xmpp:receipts">>),
-      MessageId = fxml:get_attr_s(<<"id">>,
-        Packet#xmlel.attrs),
-      {value, PttStatus} = fxml:get_tag_attr(<<"ptt_status">>,
-        Ptt),
-
-      SendFrom = list_to_binary(binary_to_list(FromUser) ++
-        "@" ++ binary_to_list(Server)),
-      BF = [{<<"type">>, "ptt"},
-        {<<"message_id">>, binary_to_list(MessageId)},
-        {<<"message_content">>, binary_to_list(PttStatus)},
-        {<<"userDomain">>, binary_to_list(Server)},
-        {<<"user_type">>, binary_to_list(PushType)},
-        {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
-        {<<"time">>, FlatTimeStamp},
-        {<<"title">>,  binary_to_list(SendFrom)}],
-      Payload = create_android_json(DeviceToken, BF),
-      if PttStatus =:= <<"start">> ->
-        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server);
-        true ->
-          ok
-      end;
+          if DeviceType ==  <<"android">> ->
+            send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
+            true ->
+              send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server)
+            end;
     true -> {ok, <<"chat type is different gcm">>}
   end.
 
@@ -995,7 +941,7 @@ gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
         VCard = case catch fly_mod_utils:get_vcard(LServer, Name) of
                   {selected, [{SVCARD, _CreatedAt}]} ->
                     case fxml_stream:parse_element(SVCARD) of
-                      {error, _Reason} -> error;
+                      {error, _Reason} -> [];
                       VCARD ->
                         [VCARD],
                         %% Remove the namespace from the xml
@@ -1175,6 +1121,38 @@ send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host) ->
         #'basic.publish'{
           exchange = RMExchange,
           routing_key = <<"android_message">>},
+        #amqp_msg{payload = list_to_binary(Payload)}) of
+        ok ->
+          {ok, <<"success">>};
+        Error ->
+          ?ERROR_MSG("Android: Unable to send push messages to the rabbitmq server"
+          "server: ~p",
+            [Error])
+      end
+  end.
+
+%% Send Android push payloads to the rabbit mq server
+send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host) ->
+
+  ChannelPid = check_rabbit_mq_connection_is_alive(Channel,Host),
+  if (ChatType =:= <<"call">>)  or (ChatType =:= <<"mediacall">>)->
+    case amqp_channel:cast(ChannelPid,
+      #'basic.publish'{
+        exchange = RMExchange,
+        routing_key = <<"web_call">>},
+      #amqp_msg{payload = list_to_binary(Payload)}) of
+      ok ->
+        {ok, <<"success">>};
+      Error ->
+        ?ERROR_MSG("Android: Unable to send call push notification to the rabbitmq server"
+        "server: ~p",
+          [Error])
+    end;
+    true ->
+      case amqp_channel:cast(ChannelPid,
+        #'basic.publish'{
+          exchange = RMExchange,
+          routing_key = <<"web_message">>},
         #amqp_msg{payload = list_to_binary(Payload)}) of
         ok ->
           {ok, <<"success">>};
@@ -1745,11 +1723,6 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
                             "@" ++
                             binary_to_list(GroupName)
                         end,
-                        ?INFO_MSG("ChangedMessage ~p", [ChangedMessage]),
-
-                        ?INFO_MSG("Message_Content ~p", [Message_Content]),
-                        ?INFO_MSG("UserNickName ~p", [UserNickName]),
-                        ?INFO_MSG("GroupName ~p", [GroupName]),
       Msg = [{<<"mutable-content">>, integer_to_list(1)},
         {alert, ChangedMessage},  {mode, binary_to_list(Mode)},
         {sound, binary_to_list(<<"default">>)}],
@@ -1920,7 +1893,7 @@ send_own_push_notifications(Sender, Recipient, ChatType,
                   case DeviceType of
                     <<"">> -> device_type_is_empty;
                     <<"android">> ->
-                      gcm_single_push(DeviceToken, UserType,  ChatType, Sender,
+                      gcm_single_push(DeviceType, DeviceToken, UserType,  ChatType, Sender,
                         Recipient, SubEl, TimestampValue, Packet,
                         State#state.rabbitmq_connection, State#state.rabbitmq_exchange);
                     % <<"ios">> ->
@@ -2054,7 +2027,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
               of
                 {selected, [{SVCARD, _CreatedAt}]} ->
                   case fxml_stream:parse_element(SVCARD) of
-                    {error, _Reason} -> error;
+                    {error, _Reason} -> [];
                     VCARD ->
                       [VCARD],
                       %% Remove the namespace from the xml

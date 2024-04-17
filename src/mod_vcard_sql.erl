@@ -128,7 +128,7 @@ get_vcard(LUser, LServer) ->
                 " where username=%(LUser)s and %(LServer)H")) of
 	{selected, [{SVCARD}]} ->
 	    case fxml_stream:parse_element(SVCARD) of
-		{error, _Reason} -> error;
+		{error, _Reason} -> [];
 		VCARD -> {ok, [VCARD]}
 	    end;
 	{selected, []} -> {ok, []};
@@ -165,6 +165,7 @@ set_vcard(LUser, LServer, VCARD,
             limage = LImage,
             thumbimage = ThumbImage,
             lthumbimage = LThumbImage,
+            history = History,
             mobilenumber = MobileNumber,
             lmobilenumber = LMobileNumber}) ->
     SVCARD = fxml:element_to_binary(VCARD),
@@ -207,6 +208,7 @@ set_vcard(LUser, LServer, VCARD,
                            "limage=%(LImage)s",
                            "thumbimage=%(ThumbImage)s",
                            "lthumbimage=%(LThumbImage)s",
+                           "history=%(History)s",
                            "mobilenumber=%(MobileNumber)s",
                            "lmobilenumber=%(LMobileNumber)s"])
       end).

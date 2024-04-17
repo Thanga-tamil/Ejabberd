@@ -35,6 +35,7 @@
     mobile = <<>>                          :: binary() | '_',
     image = <<>>                           :: binary() | '_',
     thumbimage = <<>>                      :: binary() | '_',
+    history = <<>>                      :: binary() | '_',
     is_admin_blocked = <<>>                :: binary() | '_'
 }).
 

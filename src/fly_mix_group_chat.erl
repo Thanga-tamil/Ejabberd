@@ -372,7 +372,6 @@ add_participants_service(From, To, SubEl, IQ) ->
                   end,
       ConvertUserstring = fly_mod_utils:get_user_from_string_jid(ParticipantData),
       FromJID = jid:make(ConvertUserstring,FServer),
-      ?INFO_MSG("FromJID participants ~p",[FromJID]),
       mod_mix:notify_participant_joined_api(ServerHost, GroupJid, FromJID, [NickName, AdminUser, FromJID,JIDs ],MsgId)
     end, Participants#xmlel.children),
 fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify add member to group members successfully">>})
@@ -1376,7 +1375,7 @@ process_get_group_profile(From, _To, SubEl, IQ, RequestType) ->
       SubEls1 = lists:map(fun(G) ->
         [GID, CreatedDate, Vcard, Affiliation, ItemId] = G,
         VCard = case fxml_stream:parse_element(Vcard) of
-                    {error, _Reason} -> error;
+                    {error, _Reason} -> [];
                     VCARD -> [VCARD]
                   end,
         #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}],
@@ -1409,7 +1408,7 @@ process_get_group_vcard(From, _To, SubEl, IQ, RequestType) ->
       SubEls1 = lists:map(fun(G) ->
         [Vcard,CreatedDate] = G,
         VCard = case fxml_stream:parse_element(Vcard) of
-                    {error, _Reason} -> error;
+                    {error, _Reason} -> [];
                     VCARD -> [VCARD]
                   end,
         #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GroupId }, {<<"createddate">>,  CreatedDate}],
@@ -1441,7 +1440,7 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
       SubEls1 = lists:map(fun(G) ->
         [GID, CreatedDate, Vcard, Affiliation, ItemId, IsAdminBlocked] = G,
         VCard = case fxml_stream:parse_element(Vcard) of
-                    {error, _Reason} -> error;
+                    {error, _Reason} -> [];
                     VCARD -> [VCARD]
                   end,
         #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}, {<<"is_admin_blocked">>,  IsAdminBlocked }],
