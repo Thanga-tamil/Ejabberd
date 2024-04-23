@@ -208,7 +208,7 @@ set_vcard(LUser, LServer, VCARD,
                            "limage=%(LImage)s",
                            "thumbimage=%(ThumbImage)s",
                            "lthumbimage=%(LThumbImage)s",
-                           "history=%(History)d",
+                           "history=%(History)s",
                            "mobilenumber=%(MobileNumber)s",
                            "lmobilenumber=%(LMobileNumber)s"])
       end).

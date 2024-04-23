@@ -416,7 +416,6 @@ make_vcard_search(User, LUser, LServer, VCARD) ->
 -spec vcard_iq_set(iq()) -> iq() | {stop, stanza_error()}.
 vcard_iq_set(#iq{from = From, lang = Lang, sub_els = [VCard]} = IQ) ->
     #jid{user = User, lserver = LServer} = From,
-    ?INFO_MSG("VCard ~p", [VCard]),
     case set_vcard(User, LServer, VCard) of
 	{error, badarg} ->
 	    %% Should not be here?
@@ -436,7 +435,6 @@ set_vcard(User, LServer, VCARD) ->
 	LUser ->
 	    VCardEl = xmpp:encode(VCARD),
 	    VCardSearch = make_vcard_search(User, LUser, LServer, VCardEl),
-        ?INFO_MSG("VCardSearch ~p", [VCardSearch]),
 	    Mod = gen_mod:db_mod(LServer, ?MODULE),
             case Mod:set_vcard(LUser, LServer, VCardEl, VCardSearch) of
                 {atomic, ok} ->
