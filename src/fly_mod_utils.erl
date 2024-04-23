@@ -1623,10 +1623,12 @@ get_broadcast_chat_media_messages(#jid{luser = FUser, lserver = FServer}, TUser,
   end.
 
 get_group_chat_messages(#jid{luser = FUser, lserver = FServer}, TUser,  Position, _MsgId, Limit, RowId, SendSeen) ->
-
+  ?INFO_MSG("SendSeen ~p", [SendSeen]),
+  ?INFO_MSG("from_user ~p", [TUser]),
+  ?INFO_MSG("to_user ~p", [FUser]),
   if SendSeen =:= <<"1">> ->
     ejabberd_sql:sql_query(FServer,
-      [<<"UPDATE  chat_recent SET unread = 0 where from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"';">>]);
+      [<<"UPDATE chat_recent SET unread = 0 where from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"';">>]);
   true ->
     ok
   end,
