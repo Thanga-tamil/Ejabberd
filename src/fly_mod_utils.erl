@@ -2188,7 +2188,7 @@ get_recent_profile(FServer, FUser, Updatedat) ->
     true ->
   ejabberd_sql:sql_query(
     FServer,
-    [<<"SELECT E.username, E.vcard from vcard E JOIN chat_recent S ON E.username = S.from_user and E.updated_at = '">>,Updatedat, <<"' and S.to_user = '">>, FUser, <<"' order by S.created_at asc;">>])
+    [<<"SELECT E.username, E.vcard from vcard E JOIN chat_recent S ON E.username = S.from_user and E.updated_at > '">>,Updatedat, <<"' and S.to_user = '">>, FUser, <<"' order by S.created_at asc;">>])
 end.
 
 remove_poll_offline(FServer, FResource, PollMsgId)->
