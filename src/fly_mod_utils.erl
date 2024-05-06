@@ -1407,7 +1407,7 @@ end,
       '',0,'0000-00-00 00:00:00','0000-00-00 00:00:00') ON DUPLICATE KEY UPDATE to_user = '">>, ToUser, <<"',message_id = '">>, MessageId, <<"' ;">>])
       end;
     true ->
-  ejabberd_sql:sql_query(ToServer, [<<"delete from spool where message_id ='">>,MessageId, <<"';">>]),
+  ejabberd_sql:sql_query(ToServer, [<<"delete from spool where username = '">>,ToUser, <<"' and message_id ='">>,MessageId, <<"';">>]),
   ejabberd_sql:sql_query( ToServer, [<<"update  message_status set edit_status = 1, status = 0,  edit_message_id = '">>, EditMsgId , <<"', txt = '">>, Msg , <<"' where message_id = '">>, MessageId, <<"' ;">>])
   end,
   ejabberd_sql:sql_query( ToServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg) values ('">>, User, <<"', '">>, ToUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'chat', '">>, Msg, <<"');">>]).
@@ -1623,10 +1623,12 @@ get_broadcast_chat_media_messages(#jid{luser = FUser, lserver = FServer}, TUser,
   end.
 
 get_group_chat_messages(#jid{luser = FUser, lserver = FServer}, TUser,  Position, _MsgId, Limit, RowId, SendSeen) ->
-
+  ?INFO_MSG("SendSeen ~p", [SendSeen]),
+  ?INFO_MSG("from_user ~p", [TUser]),
+  ?INFO_MSG("to_user ~p", [FUser]),
   if SendSeen =:= <<"1">> ->
     ejabberd_sql:sql_query(FServer,
-      [<<"UPDATE  chat_recent SET unread = 0 where from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"';">>]);
+      [<<"UPDATE chat_recent SET unread = 0 where from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"';">>]);
   true ->
     ok
   end,
@@ -2188,7 +2190,7 @@ get_recent_profile(FServer, FUser, Updatedat) ->
     true ->
   ejabberd_sql:sql_query(
     FServer,
-    [<<"SELECT E.username, E.vcard from vcard E JOIN chat_recent S ON E.username = S.from_user and E.updated_at = '">>,Updatedat, <<"' and S.to_user = '">>, FUser, <<"' order by S.created_at asc;">>])
+    [<<"SELECT E.username, E.vcard from vcard E JOIN chat_recent S ON E.username = S.from_user and E.updated_at > '">>,Updatedat, <<"' and S.to_user = '">>, FUser, <<"' order by S.created_at asc;">>])
 end.
 
 remove_poll_offline(FServer, FResource, PollMsgId)->

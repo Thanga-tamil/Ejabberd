@@ -180,8 +180,15 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
               {_, _, FlatTimeStamp} = GetTimestamp,
               TimeStampedPacket = NewPacket
           end,
+          if MetaData =:= <<>> ->
+            Metadata = <<"{}">>;
+          MetaData =:= <<"">> ->
+            Metadata = <<"{}">>;
+        true ->
+            Metadata = MetaData
+        end,
           store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, MetaData,BlockUser, EditMsgid, FlatTimeStamp),
-
+          fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid),
         if BlockUser == <<"0">> ->
           case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
             true ->
@@ -197,17 +204,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             end;
         true ->
           ok
-        end,
-
-        if MetaData =:= <<>> ->
-            Metadata = <<"{}">>;
-          MetaData =:= <<"">> ->
-            Metadata = <<"{}">>;
-        true ->
-            Metadata = MetaData
-        end,
-
-        fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid);
+        end;
         S when (S == false) ->
           ok
       end
