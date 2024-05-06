@@ -98,6 +98,25 @@ store_offline_user_send(Packet, _C2SState, #jid{luser = FUser, lserver = FServer
       case fly_mod_utils:is_carbon_copy(Packet) of
         false ->
           NewPacket = build_forward_packet(From, Packet, Sender, Dest, sent),
+          ContentAcknowledge = xmpp:get_subtag(Packet, #chatcontent{}),
+  if (ContentAcknowledge =:= false)  ->
+      ok;
+    true ->
+          if ContentAcknowledge == false ->
+            MessageType = <<"">>,
+            Topicid = <<"">>,
+            MetaData = <<"">>,
+            EditMsgid = MessageId;
+            true ->
+              {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,_} = ContentAcknowledge
+          end,
+
+          if EditMsgid =/= MessageId ->
+            ejabberd_sql:sql_query(FServer, [<<"delete from spool where username = '">>,FUser, <<"' and message_id ='">>,MessageId, <<"';">>]);
+            true ->
+              ok
+      end
+    end,
           mod_offline:store_packet({_C2SState,NewPacket});
         true ->
           ok
