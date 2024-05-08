@@ -160,8 +160,8 @@
   update_recent_chat/13,
   update_recent_chat_topic/12,
   update_recent_chat_broadcast/11,
-  update_deleted_recent_chat/15,
-  update_deleted_grouprecent_chat/15,
+  update_deleted_recent_chat/16,
+  update_deleted_grouprecent_chat/16,
   clear_particular_call_log/2,
   clear_call_log/2,
   get_message/3,
@@ -1209,7 +1209,7 @@ update_last_recent_message(#jid{luser = FUser,lserver = FServer},#jid{luser = To
 get_last_messages(#jid{luser = FUser,lserver = FServer},#jid{luser = ToUser}, _BroadcastId) ->
   ejabberd_sql:sql_query(
     FServer,
-    [<<"select from_user, to_user, message_id,message_type,chat_type,status, recall_status, from_notification,to_notification,message_notification,created_at,topic_id,IFNULL(json_unquote(meta_data),'') as meta from message_status USE INDEX (from_user,to_user) WHERE ((from_user = '">>, FUser, <<"' AND to_user = '">>, ToUser, <<"') OR (from_user = '">>, ToUser, <<"' AND to_user = '">>, FUser, <<"'))  and deleted_by!='">>, FUser, <<"' and deleted_status!=2 order by id DESC LIMIT 1;">>]).
+    [<<"select from_user, to_user, message_id,message_type,chat_type,status, recall_status, message_time, from_notification,to_notification,message_notification,created_at,topic_id,IFNULL(json_unquote(meta_data),'') as meta from message_status USE INDEX (from_user,to_user) WHERE ((from_user = '">>, FUser, <<"' AND to_user = '">>, ToUser, <<"') OR (from_user = '">>, ToUser, <<"' AND to_user = '">>, FUser, <<"'))  and deleted_by!='">>, FUser, <<"' and deleted_status!=2 order by id DESC LIMIT 1;">>]).
 
 %% Get user alternate resource
 %%
@@ -1477,14 +1477,14 @@ update_recent_chat_broadcast(LServer,Fromuser,_Touser,MessageId,MessageFrom,Body
 ejabberd_sql:sql_query(LServer,
     [<<"UPDATE  chat_recent SET  message_id =  '">>,MessageId, <<"',message_from =  '">>,MessageFrom, <<"',txt =  '">>,Body, <<"',chat_type =  '">>,SType, <<"',message_type =  '">>,MessageType, <<"',unread =  '">>,Unread, <<"',status =  '0', recall_status = '0', created_at = NOW() WHERE  from_user ='">>,Fromuser, <<"' and broadcast_msg_id !='">>,BroadcastmsgId, <<"';">>]).
 
-update_deleted_recent_chat(LServer,SUser,BarePeer,MessageId,_MessageFrom,Body,SType,MessageType,Notification_to,Status, Recall_status,Created_at,MessageFrom,Topicid, MetaData) ->
+update_deleted_recent_chat(LServer,SUser,BarePeer,MessageId,_MessageFrom,Body,SType,MessageType,Notification_to,Status, Recall_status,Created_at,MessageFrom,Topicid, MetaData, MessageTime) ->
   ejabberd_sql:sql_query(LServer,
-    [<<"UPDATE  chat_recent SET  topic_id =  '">>,Topicid, <<"', meta_data =  '">>,MetaData, <<"', message_id =  '">>,MessageId, <<"',message_from =  '">>,MessageFrom, <<"',txt =  '">>,Body, <<"',chat_type =  '">>,SType, <<"',status =  '">>,Status, <<"',recall_status ='">>,Recall_status, <<"',message_type =  '">>,MessageType, <<"',notification_to =  '">>,Notification_to, <<"',created_at =  '">>,Created_at, <<"' WHERE  from_user ='">>,SUser, <<"' and to_user ='">>,BarePeer, <<"';">>]).
+    [<<"UPDATE  chat_recent SET  topic_id =  '">>,Topicid, <<"', meta_data =  '">>,MetaData, <<"', message_id =  '">>,MessageId, <<"',message_from =  '">>,MessageFrom, <<"',txt =  '">>,Body, <<"',message_time =  '">>,MessageTime, <<"',chat_type =  '">>,SType, <<"',status =  '">>,Status, <<"',recall_status ='">>,Recall_status, <<"',message_type =  '">>,MessageType, <<"',notification_to =  '">>,Notification_to, <<"',created_at =  '">>,Created_at, <<"' WHERE  from_user ='">>,SUser, <<"' and to_user ='">>,BarePeer, <<"';">>]).
 
-update_deleted_grouprecent_chat(LServer,SUser,BarePeer,MessageId,_MessageFrom,Body,SType,MessageType,Notification_to,Status, Recall_status,Created_at, ToUser,Topicid, MetaData) ->
+update_deleted_grouprecent_chat(LServer,SUser,BarePeer,MessageId,_MessageFrom,Body,SType,MessageType,Notification_to,Status, Recall_status,Created_at, ToUser,Topicid, MetaData, MessageTime) ->
   User = get_user_from_string_jid(SUser),
   ejabberd_sql:sql_query(LServer,
-    [<<"UPDATE  chat_recent SET  topic_id =  '">>,Topicid, <<"', meta_data =  '">>,MetaData, <<"', message_id =  '">>,MessageId, <<"',message_from =  '">>,User, <<"',txt =  '">>,Body, <<"',chat_type =  '">>,SType, <<"',status =  '">>,Status, <<"',recall_status ='">>,Recall_status, <<"',message_type =  '">>,MessageType,  <<"',notification_to =  '">>,Notification_to, <<"',created_at =  '">>,Created_at, <<"' WHERE  from_user ='">>,BarePeer, <<"' and to_user ='">>,ToUser, <<"';">>]).
+    [<<"UPDATE  chat_recent SET  topic_id =  '">>,Topicid, <<"', meta_data =  '">>,MetaData, <<"', message_id =  '">>,MessageId, <<"',message_from =  '">>,User, <<"',txt =  '">>,Body, <<"',message_time =  '">>,MessageTime, <<"',chat_type =  '">>,SType, <<"',status =  '">>,Status, <<"',recall_status ='">>,Recall_status, <<"',message_type =  '">>,MessageType,  <<"',notification_to =  '">>,Notification_to, <<"',created_at =  '">>,Created_at, <<"' WHERE  from_user ='">>,BarePeer, <<"' and to_user ='">>,ToUser, <<"';">>]).
 
 update_recent_groupchat(LServer,SUser,BarePeer,MessageId,MessageFrom,Body,SType,MessageType,NotifyUser,Unread,Currenttime) ->
   if Unread =:= <<"1">> ->
