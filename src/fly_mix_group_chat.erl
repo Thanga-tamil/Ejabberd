@@ -1488,7 +1488,6 @@ update_group_info_to_members(ActionUser, GroupFrom, Status, Data, Members, Notif
       MessageId = <<(get_string()) / binary>>,
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
-
         #jid{user = TUser, lserver = TServer} = RouteToJid,
         fly_mod_utils:group_notify_message(ActionUser, RouteToJid, Data, FUser, Notification, Status, MessageId),
         Packet = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(GroupFrom)}, {<<"type">>, <<"normal">>}, {<<"id">>,MessageId}, {<<"to">>, jid:to_string(RouteToJid)}],
@@ -1510,7 +1509,6 @@ Status == <<"remove_admin">> ->
   MessageId = <<(get_string()) / binary>>,
   lists:foreach(fun(To) ->
     RouteToJid = jid:make(To, _AServer, <<>>),
-
     #jid{user = TUser, lserver = TServer} = RouteToJid,
     fly_mod_utils:group_notify_message(ActionUser, RouteToJid, Data, FUser, Notification, Status, MessageId),
     Packet = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(GroupFrom)}, {<<"type">>, <<"normal">>}, {<<"id">>,MessageId}, {<<"to">>, jid:to_string(RouteToJid)}],
@@ -1531,7 +1529,6 @@ Status == <<"remove_admin">> ->
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
         #jid{user = TUser, lserver = TServer} = RouteToJid,
-
         fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId),
         Packet = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupFrom)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
