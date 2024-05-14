@@ -1747,7 +1747,7 @@ group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser},
      ('">>,FromNotification, <<"','">>,TUser, <<"','">>,Groupid, <<"','">>,FUser,  <<"','">>,Msgid, <<"','">>,Msgid, <<"','">>,NotifyId, <<"','normal','">>,Currenttime, <<"','','0000-00-00 00:00:00','0000-00-00 00:00:00','{}') ON DUPLICATE KEY UPDATE to_user = '">>, FUser, <<"',message_id = '">>, Msgid, <<"' ;">>]),
 
   if FUser =/= AUser ->
-      Unread = <<"1">>;
+      Unread = <<"2">>;
   true ->
       Unread = <<"0">>
   end,
