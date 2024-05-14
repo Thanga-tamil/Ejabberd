@@ -2238,7 +2238,7 @@ update_admin_block_status(From, RequestType, SubEl, IQ) ->
   #jid{luser = _FUser, lserver = Server} = From,
   #jid{luser = TUser, lserver = TServer} = ToJid,
   NewMessageId = fly_mod_utils:get_iq_message_id(20),
-  fly_mod_utils:update_block_status_user(Server, ToJid, BlockStatus),
+  % fly_mod_utils:update_block_status_user(Server, ToJid, BlockStatus),
   if (Type =:= <<"chat">>)  or (Type =:= <<"user">>)->
     XmlBody = #xmlel{name = <<"message">>,
       attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, ToUserJid}, {<<"type">>, <<"chat">>}, {<<"id">>, NewMessageId}],
@@ -2256,7 +2256,7 @@ update_admin_block_status(From, RequestType, SubEl, IQ) ->
 
     push_to_rosters_and_recent_admin_block(ToJid, From,BlockStatus,ToUserJid);
   true ->
-    fly_mod_utils:update_block_status_group(Server, ToJid, BlockStatus),
+    % fly_mod_utils:update_block_status_group(Server, ToJid, BlockStatus),
 
     case catch fly_mod_utils:get_group_users(Server, ToUser) of
     {selected, _, []} ->
