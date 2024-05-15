@@ -1485,9 +1485,9 @@ update_group_info_to_members(ActionUser, GroupFrom, Status, Data, Members, Notif
   if Status == <<"new_admin_added">> ->
       ParticipantJid = <<Data / binary, $@,_AServer / binary>>,
       fly_mod_utils:update_group_count(_AServer, FUser),
+      MessageId = <<(get_string()) / binary>>,
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
-        MessageId = <<(get_string()) / binary>>,
         #jid{user = TUser, lserver = TServer} = RouteToJid,
         fly_mod_utils:group_notify_message(ActionUser, RouteToJid, Data, FUser, Notification, Status, MessageId),
         Packet = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(GroupFrom)}, {<<"type">>, <<"normal">>}, {<<"id">>,MessageId}, {<<"to">>, jid:to_string(RouteToJid)}],
@@ -1506,9 +1506,9 @@ update_group_info_to_members(ActionUser, GroupFrom, Status, Data, Members, Notif
 Status == <<"remove_admin">> ->
   ParticipantJid = <<Data / binary, $@,_AServer / binary>>,
   fly_mod_utils:update_group_count(_AServer, FUser),
+  MessageId = <<(get_string()) / binary>>,
   lists:foreach(fun(To) ->
     RouteToJid = jid:make(To, _AServer, <<>>),
-    MessageId = <<(get_string()) / binary>>,
     #jid{user = TUser, lserver = TServer} = RouteToJid,
     fly_mod_utils:group_notify_message(ActionUser, RouteToJid, Data, FUser, Notification, Status, MessageId),
     Packet = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(GroupFrom)}, {<<"type">>, <<"normal">>}, {<<"id">>,MessageId}, {<<"to">>, jid:to_string(RouteToJid)}],
@@ -1525,10 +1525,10 @@ Status == <<"remove_admin">> ->
     end, Members);
     Status == <<"group_profile_updated">> ->
       fly_mod_utils:update_group_count(_AServer, FUser),
+      MessageId = <<(get_string()) / binary>>,
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
         #jid{user = TUser, lserver = TServer} = RouteToJid,
-        MessageId = <<(get_string()) / binary>>,
         fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId),
         Packet = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupFrom)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
