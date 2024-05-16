@@ -1511,7 +1511,7 @@ delete_message(FromUser, RequestType, SubEl, IQ) ->
       {selected, _, []} ->
         LastMessageId = <<"">>,
         fly_mod_utils:delete_message_recentchat(Server, ToJID, User);
-      {selected, _, [[MessageFrom,MessageTo, Message_id, Message_type, ChatType, Status, Recall_status, From_notification, To_notification, Message_notification, Created_at,Topic_id,MetaData]]} ->
+      {selected, _, [[MessageFrom,MessageTo, Message_id, Message_type, ChatType, Status, Recall_status, Message_time, From_notification, To_notification, Message_notification, Created_at,Topic_id,MetaData]]} ->
         LastMessageId = Message_id,
         if (Message_type =:= <<"text">>)  or (Message_type =:= <<"poll">>)->
           case catch fly_mod_utils:get_message(Server, ChatType, Message_id) of
@@ -1543,12 +1543,12 @@ delete_message(FromUser, RequestType, SubEl, IQ) ->
         end,
       if(ChatType =:= <<"chat">>) ->
         if(MessageFrom =:= User) ->
-          fly_mod_utils:update_deleted_recent_chat(Server,MessageTo,User,Message_id,From_notification,MsgContent,ChatType,Message_type,To_notification,Status, Recall_status,Created_at, MessageFrom,Topic_id,Metadata);
+          fly_mod_utils:update_deleted_recent_chat(Server,MessageTo,User,Message_id,From_notification,MsgContent,ChatType,Message_type,To_notification,Status, Recall_status,Created_at, MessageFrom,Topic_id,Metadata,Message_time);
         true ->
-          fly_mod_utils:update_deleted_recent_chat(Server,MessageFrom,User,Message_id,From_notification,MsgContent,ChatType,Message_type,To_notification,Status, Recall_status,Created_at, MessageFrom,Topic_id,Metadata)
+          fly_mod_utils:update_deleted_recent_chat(Server,MessageFrom,User,Message_id,From_notification,MsgContent,ChatType,Message_type,To_notification,Status, Recall_status,Created_at, MessageFrom,Topic_id,Metadata,Message_time)
         end;
       true ->
-        fly_mod_utils:update_deleted_grouprecent_chat(Server,From_notification,MessageFrom,Message_id,From_notification,MsgContent,ChatType,Message_type,To_notification,Status, Recall_status,Created_at, User,Topic_id,Metadata)
+        fly_mod_utils:update_deleted_grouprecent_chat(Server,From_notification,MessageFrom,Message_id,From_notification,MsgContent,ChatType,Message_type,To_notification,Status, Recall_status,Created_at, User,Topic_id,Metadata,Message_time)
       end
     end,
     XmlBody = #xmlel{name = <<"message">>,
@@ -2238,7 +2238,7 @@ update_admin_block_status(From, RequestType, SubEl, IQ) ->
   #jid{luser = _FUser, lserver = Server} = From,
   #jid{luser = TUser, lserver = TServer} = ToJid,
   NewMessageId = fly_mod_utils:get_iq_message_id(20),
-  fly_mod_utils:update_block_status_user(Server, ToJid, BlockStatus),
+  % fly_mod_utils:update_block_status_user(Server, ToJid, BlockStatus),
   if (Type =:= <<"chat">>)  or (Type =:= <<"user">>)->
     XmlBody = #xmlel{name = <<"message">>,
       attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, ToUserJid}, {<<"type">>, <<"chat">>}, {<<"id">>, NewMessageId}],
@@ -2256,7 +2256,7 @@ update_admin_block_status(From, RequestType, SubEl, IQ) ->
 
     push_to_rosters_and_recent_admin_block(ToJid, From,BlockStatus,ToUserJid);
   true ->
-    fly_mod_utils:update_block_status_group(Server, ToJid, BlockStatus),
+    % fly_mod_utils:update_block_status_group(Server, ToJid, BlockStatus),
 
     case catch fly_mod_utils:get_group_users(Server, ToUser) of
     {selected, _, []} ->
