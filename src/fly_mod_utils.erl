@@ -1746,8 +1746,6 @@ group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser},
     [<<"insert into message_status (from_notification,to_notification,from_user,to_user,message_id, edit_message_id, message_notification,chat_type, message_time,txt,received_at,seen_at,meta_data) values
      ('">>,FromNotification, <<"','">>,TUser, <<"','">>,Groupid, <<"','">>,FUser,  <<"','">>,Msgid, <<"','">>,Msgid, <<"','">>,NotifyId, <<"','normal','">>,Currenttime, <<"','','0000-00-00 00:00:00','0000-00-00 00:00:00','{}') ON DUPLICATE KEY UPDATE to_user = '">>, FUser, <<"',message_id = '">>, Msgid, <<"' ;">>]),
 
-
-
   case catch update_recent_groupchat(AServer,Groupid,FUser,Msgid,AUser,NotifyId,<<"normal">>,<<"notification">>,TUser,<<"2">>,Currenttime) of
     {updated,1} ->
       ok;
