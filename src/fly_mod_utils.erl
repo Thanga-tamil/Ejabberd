@@ -1311,7 +1311,7 @@ update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
 update_delivery(#jid{luser = User,lserver = Server}, TUser,  MessageId, GroupId) ->
   ejabberd_sql:sql_query(
     Server,
-    [<<"update message_status set status =  1, received_at = NOW() where   to_user='">>,User,<<"' and message_id='">>,MessageId,<<"' and status = 0;">>]),
+    [<<"update message_status set status =  1, received_at = NOW() where  (from_user='">>,User,<<"' or to_user='">>,User,<<"') and message_id='">>,MessageId,<<"' and status = 0;">>]),
 
   if GroupId =/= <<"">> ->
     ToJid = jid:make(TUser, Server, <<>>),
