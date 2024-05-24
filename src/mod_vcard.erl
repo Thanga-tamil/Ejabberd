@@ -357,12 +357,21 @@ make_vcard_search(User, LUser, LServer, VCARD) ->
 	        	[{elem, <<"mobileNumber">>}, cdata]),
     ThumbImage = fxml:get_path_s(VCARD,
 	        	[{elem, <<"thumbImage">>}, cdata]),
-    History = fxml:get_path_s(VCARD,
+    HistoryValue = fxml:get_path_s(VCARD,
 	        	[{elem, <<"history">>}, cdata]),
     EMail = case EMail1 of
 	      <<"">> -> EMail2;
 	      _ -> EMail1
 	    end,
+    ?INFO_MSG("History ~p", [HistoryValue]),
+    if HistoryValue =:= <<>> ->
+        History = <<"{}">>;
+    HistoryValue =:= <<"">> ->
+        History = <<"{}">>;
+    true ->
+        History = HistoryValue
+    end,
+
     LFN = string2lower(FN),
     LFamily = string2lower(Family),
     LGiven = string2lower(Given),

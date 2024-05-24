@@ -1329,7 +1329,7 @@ update_delivery(#jid{luser = User,lserver = Server}, TUser,  MessageId, GroupId)
 
   ejabberd_sql:sql_query(
     Server,
-    [<<"update chat_recent set status = '">>,Status,<<"' where   to_user ='">>,TUser,<<"'and message_id='">>,MessageId,<<"' and status = 0;">>]).
+    [<<"update chat_recent set status = '">>,Status,<<"' where  (from_user = '">>,TUser,<<"' or  to_user ='">>,TUser,<<"') and message_id='">>,MessageId,<<"' and status = 0;">>]).
 
 update_delivery_offline(Server, User) ->
 
