@@ -363,11 +363,10 @@ make_vcard_search(User, LUser, LServer, VCARD) ->
 	      <<"">> -> EMail2;
 	      _ -> EMail1
 	    end,
-    ?INFO_MSG("History ~p", [HistoryValue]),
     if HistoryValue =:= <<>> ->
-        History = <<"{}">>;
+        History = <<"0">>;
     HistoryValue =:= <<"">> ->
-        History = <<"{}">>;
+        History = <<"0">>;
     true ->
         History = HistoryValue
     end,
