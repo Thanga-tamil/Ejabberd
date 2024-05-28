@@ -846,7 +846,7 @@ save_message(From,TServer,MessageContent,To,Node,Stanza, _MsgTime) ->
 													Content1 = [Chan,Publisher,RemovedUser,NodeId,<<"">>,IdValue],
 
 													Resources = ejabberd_sm:get_user_resources(TUser, LServer),
-							if LServer =/= <<"vezbi-xmpp.mirrorfly.com">> ->
+													if (LServer =/= <<"vezbi-xmpp.mirrorfly.com">>) or (LServer =/= <<"kooratech-xmpp.mirrorfly.com">>) ->
 														fly_mod_offline_push:send_bulk_group_push(From,LServer,Content1,TUser,Node,Stanza,<<"remove">>);
 													true ->
 														ok
@@ -866,7 +866,8 @@ save_message(From,TServer,MessageContent,To,Node,Stanza, _MsgTime) ->
 												Content1 = [Chan,Publisher,Jid,NodeId,GroupName,IdValue],
 												[U,_] = binary:split(Jid, <<"@">>),
 						    Resources = ejabberd_sm:get_user_resources(TUser, LServer),
-												if LServer =/= <<"vezbi-xmpp.mirrorfly.com">> ->
+												if (LServer =/= <<"vezbi-xmpp.mirrorfly.com">>) or (LServer =/= <<"kooratech-xmpp.mirrorfly.com">>) ->
+
 												fly_mod_offline_push:send_bulk_group_push(From,LServer,Content1,TUser,Node,Stanza,<<"added">>);
 												true ->
 												ok
@@ -979,7 +980,7 @@ notify_participant_joined(Mod, LServer, To, From, ID, [Nick, GroupCreate, Publis
 			Stanza = xmpp:encode(Msg2),
 			Node = ?NS_MIX_NODES_PARTICIPANTS,
 			Content1 = [Chan,Publisher,jid:to_string(From),ItemId,Nick,MsgId],
-			if TServer =/= <<"vezbi-xmpp.mirrorfly.com">> ->
+			if (TServer =/= <<"vezbi-xmpp.mirrorfly.com">>) or (TServer =/= <<"kooratech-xmpp.mirrorfly.com">>) ->
 			fly_mod_offline_push:send_bulk_group_push(To,TServer,Content1,ToJid,Node,Stanza,<<"added">>);
 			true ->
 			ok
@@ -1018,7 +1019,7 @@ notify_participant_joined(Mod, LServer, To, From, ID, [Nick, GroupCreate, Publis
 			  Stanza = xmpp:encode(Msg2),
 			  Node = ?NS_MIX_NODES_PARTICIPANTS,
 			  Content1 = [Chan,Publisher,RemovedUser,ItemId,<<"">>,MsgId],
-			  if TServer =/= <<"vezbi-xmpp.mirrorfly.com">> ->
+			if (TServer =/= <<"vezbi-xmpp.mirrorfly.com">>) or (TServer =/= <<"kooratech-xmpp.mirrorfly.com">>) ->
 			  fly_mod_offline_push:send_bulk_group_push(To,TServer,Content1,ToJid,Node,Stanza,<<"remove">>);
 			  true ->
 			  ok
