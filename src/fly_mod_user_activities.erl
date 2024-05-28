@@ -1520,8 +1520,10 @@ delete_message(FromUser, RequestType, SubEl, IQ) ->
             {selected, _, [[Txt]]} ->
               Body = Txt
           end,
+          MessageType = Message_type,
           MsgContent = Body;
         Message_type =:= <<"auto_text">> ->
+          MessageType = Message_type,
           case catch fly_mod_utils:get_message(Server, ChatType, Message_id) of
             {selected, _, []} ->
               Body = <<"">>;
@@ -1530,8 +1532,10 @@ delete_message(FromUser, RequestType, SubEl, IQ) ->
           end,
           MsgContent = Body;
           Message_type =:= <<"0">> ->
+          MessageType = <<"notification">>,
           MsgContent = Message_notification;
         true ->
+          MessageType = Message_type,
           MsgContent = Message_type
         end,
         if MetaData =:= <<>> ->
@@ -1548,7 +1552,7 @@ delete_message(FromUser, RequestType, SubEl, IQ) ->
           fly_mod_utils:update_deleted_recent_chat(Server,MessageFrom,User,Message_id,From_notification,MsgContent,ChatType,Message_type,To_notification,Status, Recall_status,Created_at, MessageFrom,Topic_id,Metadata,Message_time)
         end;
       true ->
-        fly_mod_utils:update_deleted_grouprecent_chat(Server,From_notification,MessageFrom,Message_id,From_notification,MsgContent,ChatType,Message_type,To_notification,Status, Recall_status,Created_at, User,Topic_id,Metadata,Message_time)
+        fly_mod_utils:update_deleted_grouprecent_chat(Server,From_notification,MessageFrom,Message_id,From_notification,MsgContent,ChatType,MessageType,To_notification,Status, Recall_status,Created_at, User,Topic_id,Metadata,Message_time)
       end
     end,
     XmlBody = #xmlel{name = <<"message">>,
