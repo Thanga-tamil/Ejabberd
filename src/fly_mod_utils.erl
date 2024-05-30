@@ -1631,8 +1631,6 @@ get_id(FServer,MsgId)->
   ejabberd_sql:sql_query(FServer,
   [<<"select id from message_status where message_id ='">>, MsgId, <<"' limit 1;">>]).
 
-
-
 get_broadcast_chat_media_messages(#jid{luser = FUser, lserver = FServer}, TUser, MsgId) ->
   if MsgId =:= <<"">> ->
     ejabberd_sql:sql_query(FServer,
