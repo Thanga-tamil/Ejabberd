@@ -1607,9 +1607,9 @@ if Topicid =:= <<"">> ->
           ejabberd_sql:sql_query(FServer,
         [<<"SELECT txt, message_id, edit_message_id,  message_time, topic_id, IFNULL(json_unquote(meta_data),'') as meta  FROM  message_status WHERE ((from_user = '">>, FUser, <<"' AND to_user = '">>, TUser, <<"') OR (from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"')) AND message_type !='text' AND chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2'  AND recall_status =0 AND blocked != '">>, FUser, <<"' and id < '">>, Id, <<"'  GROUP BY message_id ORDER BY created_at DESC LIMIT 0,10;">>]);
         _ ->
-         ok
+        ok
       end
-       end;
+      end;
 true ->
   if MsgId =:= <<"">> ->
     ejabberd_sql:sql_query(FServer,
@@ -1622,7 +1622,7 @@ true ->
           ejabberd_sql:sql_query(FServer,
         [<<"SELECT txt, message_id, edit_message_id,  message_time, topic_id, IFNULL(json_unquote(meta_data),'') as meta  FROM  message_status WHERE ((from_user = '">>, FUser, <<"' AND to_user = '">>, TUser, <<"') OR (from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"')) AND message_type !='text' AND chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2'  AND recall_status =0 AND blocked != '">>, FUser, <<"'and topic_id = '">>, Topicid, <<"' and id < '">>, Id, <<"' GROUP BY message_id ORDER BY created_at DESC LIMIT 0,10;">>]);
         _ ->
-         ok
+        ok
       end
       end
 end.
