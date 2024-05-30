@@ -1598,20 +1598,40 @@ get_single_chat_media_messages(#jid{luser = FUser, lserver = FServer}, TUser, Ms
 if Topicid =:= <<"">> ->
   if MsgId =:= <<"">> ->
     ejabberd_sql:sql_query(FServer,
-      [<<"SELECT txt, message_id, edit_message_id, message_time,  topic_id,IFNULL(json_unquote(meta_data),'') as meta  FROM  message_status WHERE ((from_user = '">>, FUser, <<"' AND to_user = '">>, TUser, <<"') OR (from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"')) and (message_type ='image' OR message_type ='video' OR message_type ='file' OR message_type ='audio') AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND recall_status =0 AND blocked != '">>, FUser, <<"' GROUP BY message_id ORDER BY created_at DESC LIMIT 0,3;">>]);
+      [<<"SELECT txt, message_id, edit_message_id, message_time,  topic_id,IFNULL(json_unquote(meta_data),'') as meta  FROM  message_status WHERE ((from_user = '">>, FUser, <<"' AND to_user = '">>, TUser, <<"') OR (from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"')) and message_type !='text' AND chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND recall_status =0 AND blocked != '">>, FUser, <<"' GROUP BY message_id ORDER BY created_at DESC LIMIT 0,3;">>]);
     true->
-      ejabberd_sql:sql_query(FServer,
-        [<<"SELECT txt, message_id, edit_message_id,  message_time, topic_id, IFNULL(json_unquote(meta_data),'') as meta  FROM  message_status WHERE ((from_user = '">>, FUser, <<"' AND to_user = '">>, TUser, <<"') OR (from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"')) AND (message_type ='image' OR message_type ='video' OR message_type ='file' OR message_type ='audio') AND deleted_by != '">>, FUser, <<"' and deleted_status != '2'  AND recall_status =0 AND blocked != '">>, FUser, <<"' and id < (select id from message_status where message_id ='">>, MsgId, <<"' limit 1) GROUP BY message_id ORDER BY created_at DESC LIMIT 0,10;">>])
-  end;
+      case catch get_id(FServer, MsgId) of
+        {selected, _, []} ->
+          ok;
+        {selected, _, [[Id]]} ->
+          ejabberd_sql:sql_query(FServer,
+        [<<"SELECT txt, message_id, edit_message_id,  message_time, topic_id, IFNULL(json_unquote(meta_data),'') as meta  FROM  message_status WHERE ((from_user = '">>, FUser, <<"' AND to_user = '">>, TUser, <<"') OR (from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"')) AND message_type !='text' AND chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2'  AND recall_status =0 AND blocked != '">>, FUser, <<"' and id < '">>, Id, <<"'  GROUP BY message_id ORDER BY created_at DESC LIMIT 0,10;">>]);
+        _ ->
+         ok
+      end
+       end;
 true ->
   if MsgId =:= <<"">> ->
     ejabberd_sql:sql_query(FServer,
-      [<<"SELECT txt, message_id, edit_message_id, message_time,  topic_id,IFNULL(json_unquote(meta_data),'') as meta  FROM  message_status WHERE ((from_user = '">>, FUser, <<"' AND to_user = '">>, TUser, <<"') OR (from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"')) and (message_type ='image' OR message_type ='video' OR message_type ='file' OR message_type ='audio') AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND recall_status =0 AND blocked != '">>, FUser, <<"' and topic_id = '">>, Topicid, <<"' GROUP BY message_id ORDER BY created_at DESC LIMIT 0,3;">>]);
+      [<<"SELECT txt, message_id, edit_message_id, message_time,  topic_id,IFNULL(json_unquote(meta_data),'') as meta  FROM  message_status WHERE ((from_user = '">>, FUser, <<"' AND to_user = '">>, TUser, <<"') OR (from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"')) and message_type !='text' AND chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND recall_status =0 AND blocked != '">>, FUser, <<"' and topic_id = '">>, Topicid, <<"' GROUP BY message_id ORDER BY created_at DESC LIMIT 0,3;">>]);
     true->
-      ejabberd_sql:sql_query(FServer,
-        [<<"SELECT txt, message_id, edit_message_id,  message_time, topic_id, IFNULL(json_unquote(meta_data),'') as meta  FROM  message_status WHERE ((from_user = '">>, FUser, <<"' AND to_user = '">>, TUser, <<"') OR (from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"')) AND (message_type ='image' OR message_type ='video' OR message_type ='file' OR message_type ='audio') AND deleted_by != '">>, FUser, <<"' and deleted_status != '2'  AND recall_status =0 AND blocked != '">>, FUser, <<"'and topic_id = '">>, Topicid, <<"' and id < (select id from message_status where message_id ='">>, MsgId, <<"' limit 1) GROUP BY message_id ORDER BY created_at DESC LIMIT 0,10;">>])
-  end
+      case catch get_id(FServer, MsgId) of
+        {selected, _, []} ->
+          ok;
+        {selected, _, [[Id]]} ->
+          ejabberd_sql:sql_query(FServer,
+        [<<"SELECT txt, message_id, edit_message_id,  message_time, topic_id, IFNULL(json_unquote(meta_data),'') as meta  FROM  message_status WHERE ((from_user = '">>, FUser, <<"' AND to_user = '">>, TUser, <<"') OR (from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"')) AND message_type !='text' AND chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2'  AND recall_status =0 AND blocked != '">>, FUser, <<"'and topic_id = '">>, Topicid, <<"' and id < '">>, Id, <<"' GROUP BY message_id ORDER BY created_at DESC LIMIT 0,10;">>]);
+        _ ->
+         ok
+      end
+      end
 end.
+
+get_id(FServer,MsgId)->
+  ejabberd_sql:sql_query(FServer,
+  [<<"select id from message_status where message_id ='">>, MsgId, <<"' limit 1;">>]).
+
+
 
 get_broadcast_chat_media_messages(#jid{luser = FUser, lserver = FServer}, TUser, MsgId) ->
   if MsgId =:= <<"">> ->
@@ -1623,9 +1643,6 @@ get_broadcast_chat_media_messages(#jid{luser = FUser, lserver = FServer}, TUser,
   end.
 
 get_group_chat_messages(#jid{luser = FUser, lserver = FServer}, TUser,  Position, _MsgId, Limit, RowId, SendSeen) ->
-  ?INFO_MSG("SendSeen ~p", [SendSeen]),
-  ?INFO_MSG("from_user ~p", [TUser]),
-  ?INFO_MSG("to_user ~p", [FUser]),
   if SendSeen =:= <<"1">> ->
     ejabberd_sql:sql_query(FServer,
       [<<"UPDATE chat_recent SET unread = 0 where from_user = '">>, TUser, <<"' AND to_user = '">>, FUser, <<"';">>]);
