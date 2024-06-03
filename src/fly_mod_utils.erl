@@ -2136,7 +2136,7 @@ update_mute_chat(#jid{luser = FUser, lserver = FServer}, ToUser, MuteStatus)->
 
 update_archive_chat(#jid{luser = FUser, lserver = FServer}, ToUser, ArchiveStatus)->
   ejabberd_sql:sql_query(FServer,
-    [<<"update chat_recent set archive_status = '">>, binary_to_list(ArchiveStatus), <<"' where from_user = '">>, ToUser, <<"' and to_user = '">>, FUser, <<"' ;">>]).
+    [<<"update chat_recent set archive_status = '">>, ArchiveStatus, <<"' where from_user = '">>, ToUser, <<"' and to_user = '">>, FUser, <<"';">>]).
 
 get_user_settings(#jid{luser = FUser, lserver = LServer}) ->
   ejabberd_sql:sql_query( LServer,
