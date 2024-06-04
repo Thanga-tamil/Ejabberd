@@ -1635,13 +1635,12 @@ end,
           end,
                 {MSeconds, Seconds, _} = erlang:now(),
                 Expiry = get_timestamp(),
-                ?INFO_MSG("Expiry ios ~p", [Expiry]),
                 Msg = [{<<"mutable-content">>, integer_to_list(1)},
                 {alert, Message},
                 {mode, binary_to_list(Mode)},
                 {sound, binary_to_list(<<"default">>)}],
                 JSON = create_json(Msg, Args, binary_to_list(VoipDeviceToken), Mode,1,Expiry,PushType),
-                ?INFO_MSG("Expiry JSON ~p", [JSON]),
+
           send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType)
       end;
     true -> {ok, <<"chat type is different in ios">>,ChatType}
