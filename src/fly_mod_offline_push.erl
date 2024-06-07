@@ -769,6 +769,8 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
         Users ->
           User = lists:flatmap(fun(U) ->
             [fxml:get_tag_cdata(U)] end, Users#xmlel.children),
+
+
           case fxml:get_subtag(MediaCall, <<"invite">>) of
           false  ->
             BF = [{<<"type">>, "mediacall"},
@@ -1633,7 +1635,6 @@ end,
             {call_mode, binary_to_list(CallMode)},
             {type, "media_call"}]
           end,
-                {MSeconds, Seconds, _} = erlang:now(),
                 Expiry = get_timestamp(),
                 Msg = [{<<"mutable-content">>, integer_to_list(1)},
                 {alert, Message},
@@ -2264,7 +2265,8 @@ send_own_group_push_notifications(FromUser, ToUser,
 
 create_android_json(DeviceToken, BF) ->
   RandomId = fly_mod_utils:get_iq_message_id(7),
-  lists:append(["{\"deviceToken\":\"", binary_to_list(DeviceToken),  "\",\"collapse_key\":\"", binary_to_list(RandomId),  "\",\"data\":{", create_keyvalue(BF), "}}"]).
+  Expiry = get_timestamp(),
+  lists:append(["{\"deviceToken\":\"", binary_to_list(DeviceToken), "\",\"expiration\":\"", integer_to_list(Expiry), "\",\"collapse_key\":\"", binary_to_list(RandomId),  "\",\"data\":{", create_keyvalue(BF), "}}"]).
 
 create_bulk_push_json(DeviceTokens, BF) ->
   lists:append(["{\"deviceTokens\":", "[\"", DeviceTokens, "\"],\"data\":{", create_keyvalue(BF), "}}"]).
