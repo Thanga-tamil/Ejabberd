@@ -770,7 +770,6 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
           User = lists:flatmap(fun(U) ->
             [fxml:get_tag_cdata(U)] end, Users#xmlel.children),
 
-
           case fxml:get_subtag(MediaCall, <<"invite">>) of
           false  ->
             BF = [{<<"type">>, "mediacall"},
