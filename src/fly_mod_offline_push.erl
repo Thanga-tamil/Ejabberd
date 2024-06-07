@@ -1213,13 +1213,13 @@ create_json(List1, List2, Token, Mode, ViopStatus,Expiration, PushType) ->
     "}, ", create_keyvalue(List2), "}}"])
     end;
   true ->
-  if PushType =:= <<"fcm">> ->
-    lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), "\",\"expiration\":\"", integer_to_list(Expiration), "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{",  create_keyvalue(List2), "}}"]);
+  % if PushType =:= <<"fcm">> ->
+  %   lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), "\",\"expiration\":\"", integer_to_list(Expiration), "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{",  create_keyvalue(List2), "}}"]);
 
-    true ->
+  %   true ->
       lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), "\",\"expiration\":\"", integer_to_list(Expiration), "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{\"aps\":{", create_keyvalue(List1),
     "}, ", create_keyvalue(List2), "}}"])
-    end
+    % end
   end.
 
 
