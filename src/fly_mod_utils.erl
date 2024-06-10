@@ -378,14 +378,27 @@ update_media_call_status(LServer,RoomId,LUser,CallStatus) ->
     LServer,
     [<<"update media_call_logs set call_status='">>, CallStatus, <<"'   WHERE room_id = '">>, RoomId, <<"' and to_user = '">>, LUser, <<"' ;">>]).
 
-insert_media_call_status(FServer,FUser,TUser,RoomId,CallType,CallStatus,_CallTime,CallMode,GroupId,CallLink,MetaData) ->
+insert_media_call_status(FServer,FUser,TUser,RoomId,CallType,CallStatus,_CallTime,CallMode,GroupId,CallLink,Meta_data) ->
+  if Meta_data =:= <<>> ->
+      MetaData = <<"{}">>;
+    MetaData =:= <<"">> ->
+      MetaData = <<"{}">>;
+    true ->
+      MetaData = Meta_data
+  end,
   ejabberd_sql:sql_query(FServer, [<<"insert into media_call_logs (from_user,to_user,room_id,called_type,call_status,call_mode,group_id,room_link, metadata) values ('">>,FUser, <<"','">>,TUser, <<"','">>,RoomId, <<"','">>,CallType, <<"','">>,CallStatus, <<"','">>,CallMode, <<"','">>,GroupId, <<"','">>,CallLink, <<"','">>,MetaData, <<"')
   ON DUPLICATE KEY UPDATE from_user = '">>, FUser, <<"',to_user = '">>, TUser, <<"',room_id = '">>,RoomId , <<"';">> ]).
 
-insert_call_log_status(FServer,FUser,TUser,RoomId,CallType,CallStatus,_CallTime,CallMode,GroupId,CallLink,UserList,CallerDevice,MetaData) ->
+insert_call_log_status(FServer,FUser,TUser,RoomId,CallType,CallStatus,_CallTime,CallMode,GroupId,CallLink,UserList,CallerDevice,Meta_data) ->
   Substring = string:str(binary_to_list(CallerDevice),binary_to_list(<<"Web-">>)),
   Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
-
+  if Meta_data =:= <<>> ->
+      MetaData = <<"{}">>;
+    MetaData =:= <<"">> ->
+      MetaData = <<"{}">>;
+    true ->
+      MetaData = Meta_data
+  end,
   FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
 
   Currenttime = list_to_binary(FlatTimeStamp),
