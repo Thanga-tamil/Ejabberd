@@ -279,7 +279,7 @@
      #elem{name = <<"mediacall">>,
            xmlns = <<"urn:xmpp:call">>,
 	   module = 'call',
-           result = {mediacall, '$call_mode', '$call_time','$call_status','$call_from','$call_type', '$room_id','$group_id','$call_link','$caller_name'},
+           result = {mediacall, '$call_mode', '$call_time','$call_status','$call_from','$call_type', '$meta_data', '$room_id','$group_id','$call_link','$caller_name'},
            attrs = [#attr{name = <<"room_id">>,default = <<"">>},
                     #attr{name = <<"call_type">>,default = <<"">>},
                     #attr{name = <<"call_status">>,default = <<"">>},
@@ -288,6 +288,7 @@
                     #attr{name = <<"call_link">>,default = <<"">>},
                     #attr{name = <<"caller_name">>,default = <<"">>},
                     #attr{name = <<"call_from">>,default = <<"">>},
+                    #attr{name = <<"meta_data">>,default = <<"">>},
                     #attr{name = <<"call_mode">>,default = <<"">>}]}).
 
 -xml(register_update,

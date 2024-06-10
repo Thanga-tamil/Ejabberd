@@ -755,6 +755,13 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
         <<"">>
     end,
 
+    MetaData = case fxml:get_tag_attr(<<"meda_data">>, MediaCall) of
+    {value, Metadata} ->
+      Metadata;
+    _ ->
+      <<"">>
+  end,
+
       SessionStatus = case fxml:get_tag_attr(<<"session_status">>, MediaCall) of
                       {value, Sessionstatus} ->
                       Sessionstatus;
@@ -790,6 +797,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
               {<<"user_type">>, binary_to_list(PushType)},
               {<<"call_mode">>, binary_to_list(CallMode)},
               {<<"call_link">>, binary_to_list(RoomLink)},
+              {<<"meta_data">>, binary_to_list(MetaData)},
               {<<"title">>, "Calling"}];
           InviteUsers ->
             InviteUser = lists:flatmap(fun(I) ->
@@ -812,6 +820,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
             {<<"caller_name">>, binary_to_list(CallerName)},
             {<<"session_status">>, binary_to_list(SessionStatus)},
             {<<"call_mode">>, binary_to_list(CallMode)},
+            {<<"meta_data">>, binary_to_list(MetaData)},
             {<<"call_link">>, binary_to_list(RoomLink)},
             {<<"title">>, "Calling"}]
           end,
@@ -1552,6 +1561,14 @@ end,
         _ ->
           <<"">>
       end,
+
+      MetaData = case fxml:get_tag_attr(<<"meta_data">>, MediaCall) of
+      {value, Metadata} ->
+        Metadata;
+      _ ->
+        <<"">>
+    end,
+
       SessionStatus = case fxml:get_tag_attr(<<"session_status">>, MediaCall) of
                         {value, Sessionstatus} ->
                           Sessionstatus;
@@ -1607,6 +1624,7 @@ end,
             {session_status, binary_to_list(SessionStatus)},
             {userDomain, binary_to_list(Server)},
             {call_time, CallTime},
+            {meta_data, MetaData},
             {call_mode, binary_to_list(CallMode)},
             {type, "media_call"}];
           InviteUsers ->
@@ -1631,6 +1649,7 @@ end,
             {userDomain, binary_to_list(Server)},
             {session_status, binary_to_list(SessionStatus)},
             {call_time, CallTime},
+            {meta_data, MetaData},
             {call_mode, binary_to_list(CallMode)},
             {type, "media_call"}]
           end,
