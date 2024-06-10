@@ -381,7 +381,7 @@ update_media_call_status(LServer,RoomId,LUser,CallStatus) ->
 insert_media_call_status(FServer,FUser,TUser,RoomId,CallType,CallStatus,_CallTime,CallMode,GroupId,CallLink,Meta_data) ->
   if Meta_data =:= <<>> ->
       MetaData = <<"{}">>;
-    MetaData =:= <<"">> ->
+    Meta_data =:= <<"">> ->
       MetaData = <<"{}">>;
     true ->
       MetaData = Meta_data
@@ -394,7 +394,7 @@ insert_call_log_status(FServer,FUser,TUser,RoomId,CallType,CallStatus,_CallTime,
   Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
   if Meta_data =:= <<>> ->
       MetaData = <<"{}">>;
-    MetaData =:= <<"">> ->
+    Meta_data =:= <<"">> ->
       MetaData = <<"{}">>;
     true ->
       MetaData = Meta_data
