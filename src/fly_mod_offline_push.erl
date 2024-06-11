@@ -1596,6 +1596,8 @@ end,
         {selected, [{GroupName}]} = fly_mod_utils:get_nickname(Server, GroupIdUser),
         Message = binary_to_list(GroupName) ++ ": Incoming call"
               end,
+              Expiry = get_timestamp(),
+
       case fxml:get_subtag(MediaCall, <<"users">>) of
         false  ->
 
@@ -1625,6 +1627,7 @@ end,
             {userDomain, binary_to_list(Server)},
             {call_time, CallTime},
             {meta_data, binary_to_list(MetaData)},
+            {expiration, integer_to_list(Expiry)},
             {call_mode, binary_to_list(CallMode)},
             {type, "media_call"}];
           InviteUsers ->
@@ -1650,10 +1653,11 @@ end,
             {session_status, binary_to_list(SessionStatus)},
             {call_time, CallTime},
             {meta_data, binary_to_list(MetaData)},
+            {expiration, integer_to_list(Expiry)},
             {call_mode, binary_to_list(CallMode)},
             {type, "media_call"}]
           end,
-                Expiry = get_timestamp(),
+
                 Msg = [{<<"mutable-content">>, integer_to_list(1)},
                 {alert, Message},
                 {mode, binary_to_list(Mode)},
