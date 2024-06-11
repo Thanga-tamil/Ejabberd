@@ -1624,7 +1624,7 @@ end,
             {session_status, binary_to_list(SessionStatus)},
             {userDomain, binary_to_list(Server)},
             {call_time, CallTime},
-            {meta_data, MetaData},
+            {meta_data, binary_to_list(MetaData)},
             {call_mode, binary_to_list(CallMode)},
             {type, "media_call"}];
           InviteUsers ->
@@ -1649,7 +1649,7 @@ end,
             {userDomain, binary_to_list(Server)},
             {session_status, binary_to_list(SessionStatus)},
             {call_time, CallTime},
-            {meta_data, MetaData},
+            {meta_data, binary_to_list(MetaData)},
             {call_mode, binary_to_list(CallMode)},
             {type, "media_call"}]
           end,
