@@ -754,6 +754,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
       _ ->
         <<"">>
     end,
+          Expiry = get_timestamp(),
 
     MetaData = case fxml:get_tag_attr(<<"meda_data">>, MediaCall) of
     {value, Metadata} ->
@@ -796,6 +797,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
               {<<"userDomain">>, binary_to_list(Server)},
               {<<"user_type">>, binary_to_list(PushType)},
               {<<"call_mode">>, binary_to_list(CallMode)},
+              {<<"expiration">>, integer_to_list(Expiry)},
               {<<"call_link">>, binary_to_list(RoomLink)},
               {<<"meta_data">>, binary_to_list(MetaData)},
               {<<"title">>, "Calling"}];
@@ -821,6 +823,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
             {<<"session_status">>, binary_to_list(SessionStatus)},
             {<<"call_mode">>, binary_to_list(CallMode)},
             {<<"meta_data">>, binary_to_list(MetaData)},
+            {<<"expiration">>, integer_to_list(Expiry)},
             {<<"call_link">>, binary_to_list(RoomLink)},
             {<<"title">>, "Calling"}]
           end,
