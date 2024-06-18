@@ -762,7 +762,8 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     _ ->
       <<"">>
   end,
-
+    ?INFO_MSG("MetaData ~p", [MetaData]),
+    ?INFO_MSG("MediaCall ~p", [MediaCall]),
       SessionStatus = case fxml:get_tag_attr(<<"session_status">>, MediaCall) of
                       {value, Sessionstatus} ->
                       Sessionstatus;
@@ -827,6 +828,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
             {<<"call_link">>, binary_to_list(RoomLink)},
             {<<"title">>, "Calling"}]
           end,
+          ?INFO_MSG("Android Payload ~p", [BF]),
           Payload = create_android_json(DeviceToken, BF),
           ?INFO_MSG("Payload ~p", [Payload]),
           if DeviceType ==  <<"android">> ->
