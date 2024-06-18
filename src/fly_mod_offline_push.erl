@@ -828,6 +828,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
             {<<"title">>, "Calling"}]
           end,
           Payload = create_android_json(DeviceToken, BF),
+          ?INFO_MSG("Payload ~p", [Payload]),
           if DeviceType ==  <<"android">> ->
       send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
       true ->

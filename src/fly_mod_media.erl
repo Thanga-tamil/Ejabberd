@@ -386,7 +386,6 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
       ?INFO_MSG("call packet ~p", [NewPacket]),
       case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
         true ->
-          ?INFO_MSG("call push packet ~p", [ToUser]),
           fly_mod_offline_push:send_offline_message({ From,xmpp:decode(NewPacket,?NS_CLIENT, Opts)});
         false ->
           ok
