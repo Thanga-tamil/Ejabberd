@@ -369,6 +369,7 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
   Opts = ejabberd_config:codec_options(),
   if CallStatus =:= <<"CALLING">>  ->
     fly_mod_utils:insert_media_call_status(FServer,FUser,FUser,RoomId,CallType,<<"ATTENDED">>,CallTime,CallMode,GroupId,CallLink,MetaData),
+
     UserList = lists:map(fun(U) ->
     binary_to_list(fxml:get_tag_cdata(U)) ++ "," end, Users#xmlel.children),
     lists:foreach(fun(U) ->
@@ -385,12 +386,12 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
       ?INFO_MSG("call packet ~p", [NewPacket]),
       case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
         true ->
-          ?INFO_MSG("call push packet ~p", [ToUser]),
           fly_mod_offline_push:send_offline_message({ From,xmpp:decode(NewPacket,?NS_CLIENT, Opts)});
         false ->
           ok
       end
     end, Users#xmlel.children),
+    fly_mod_utils:insert_call_log_status(FServer,FUser,FUser,RoomId,CallType,<<"ATTENDED">>,CallTime,CallMode,GroupId,CallLink,list_to_binary(UserList),LResource,MetaData),
     lists:foreach(fun(U) ->
       User = fxml:get_tag_cdata(U),
       [ToUser, _] = binary:split(User, <<"@">>),

@@ -756,13 +756,12 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     end,
           Expiry = get_timestamp(),
 
-    MetaData = case fxml:get_tag_attr(<<"meda_data">>, MediaCall) of
+    MetaData = case fxml:get_tag_attr(<<"meta_data">>, MediaCall) of
     {value, Metadata} ->
       Metadata;
     _ ->
       <<"">>
   end,
-
       SessionStatus = case fxml:get_tag_attr(<<"session_status">>, MediaCall) of
                       {value, Sessionstatus} ->
                       Sessionstatus;
