@@ -374,7 +374,6 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
     binary_to_list(fxml:get_tag_cdata(U)) ++ "," end, Users#xmlel.children),
     UserLists = binary_to_list(list_to_binary(UserList)),
     UsersList = lists:sublist(UserLists, 1, length(UserLists) - 1),
-    fly_mod_utils:insert_call_log_status(FServer,FUser,FUser,RoomId,CallType,<<"ATTENDED">>,CallTime,CallMode,GroupId,CallLink,list_to_binary(UsersList),LResource,MetaData),
     lists:foreach(fun(U) ->
       User = fxml:get_tag_cdata(U),
       [ToUser, _] = binary:split(User, <<"@">>),
@@ -394,7 +393,8 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
       end,
       fly_mod_utils:insert_media_call_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,MetaData),
       fly_mod_utils:insert_call_log_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,list_to_binary(UsersList),LResource,MetaData)
-    end, Users#xmlel.children);
+    end, Users#xmlel.children),
+    fly_mod_utils:insert_call_log_status(FServer,FUser,FUser,RoomId,CallType,<<"ATTENDED">>,CallTime,CallMode,GroupId,CallLink,list_to_binary(UsersList),LResource,MetaData);
     % lists:foreach(fun(U) ->
     %   User = fxml:get_tag_cdata(U),
     %   [ToUser, _] = binary:split(User, <<"@">>),
