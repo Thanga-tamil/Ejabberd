@@ -372,7 +372,7 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
 
     UserList = lists:map(fun(U) ->
     binary_to_list(fxml:get_tag_cdata(U)) ++ "," end, Users#xmlel.children),
-    fly_mod_utils:insert_call_log_status(FServer,FUser,FUser,RoomId,CallType,<<"ATTENDED">>,CallTime,CallMode,GroupId,CallLink,list_to_binary(UserList),LResource,MetaData),
+    % fly_mod_utils:insert_call_log_status(FServer,FUser,FUser,RoomId,CallType,<<"ATTENDED">>,CallTime,CallMode,GroupId,CallLink,list_to_binary(UserList),LResource,MetaData),
     lists:foreach(fun(U) ->
       User = fxml:get_tag_cdata(U),
       [ToUser, _] = binary:split(User, <<"@">>),
