@@ -390,8 +390,10 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
         false ->
           ok
       end,
+      UserLists = binary_to_list(list_to_binary(UserList)),
+      UsersList = lists:sublist(UserLists, 1, length(UserLists) - 1),
       fly_mod_utils:insert_media_call_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,MetaData),
-      fly_mod_utils:insert_call_log_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,list_to_binary(UserList),LResource,MetaData)
+      fly_mod_utils:insert_call_log_status(FServer,FUser,UsersList,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,list_to_binary(UsersList),LResource,MetaData)
     end, Users#xmlel.children);
     % lists:foreach(fun(U) ->
     %   User = fxml:get_tag_cdata(U),
