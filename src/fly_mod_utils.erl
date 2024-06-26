@@ -410,7 +410,7 @@ insert_call_log_status(FServer,FUser,TUser,RoomId,CallType,CallStatus,_CallTime,
   Value = list_to_binary(binary_to_list(FUser) ++ "@" ++ binary_to_list(FServer)),
   ejabberd_sql:sql_query(FServer, [<<"insert into client_call_logs (from_user,to_user,room_id,call_type,call_mode,group_id,call_time,created_user,caller_device,user_list,metadata)" "values
   ('">>,Value, <<"','">>,UserList, <<"','">>,RoomId, <<"','">>,CallType, <<"','">>,CallMode, <<"','">>,GroupId, <<"','">>,Currenttime, <<"','">>,TUser, <<"','">>,U, <<"','">>,UserList, <<"','">>,MetaData, <<"')
-  ON DUPLICATE KEY UPDATE from_user = '">>, Value, <<"',to_user = '">>, UserList, <<"',room_id = '">>,RoomId , <<"';">> ]).
+  ON DUPLICATE KEY UPDATE created_user = '">>, TUser, <<"',room_id = '">>,RoomId , <<"';">> ]).
 
 get_call_user_list(LServer, RoomId) ->
   ejabberd_sql:sql_query(
