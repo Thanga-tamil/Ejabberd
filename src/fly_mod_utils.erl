@@ -389,7 +389,7 @@ insert_media_call_status(FServer,FUser,TUser,RoomId,CallType,CallStatus,_CallTim
   ejabberd_sql:sql_query(FServer, [<<"insert into media_call_logs (from_user,to_user,room_id,called_type,call_status,call_mode,group_id,room_link, metadata) values ('">>,FUser, <<"','">>,TUser, <<"','">>,RoomId, <<"','">>,CallType, <<"','">>,CallStatus, <<"','">>,CallMode, <<"','">>,GroupId, <<"','">>,CallLink, <<"','">>,MetaData, <<"')
   ON DUPLICATE KEY UPDATE from_user = '">>, FUser, <<"',to_user = '">>, TUser, <<"',room_id = '">>,RoomId , <<"';">> ]).
 
-insert_call_log_status(FServer,FUser,TUser,RoomId,CallType,CallStatus,_CallTime,CallMode,GroupId,CallLink,UserList,CallerDevice,Meta_data) ->
+insert_call_log_status(FServer,FUser,TUser,RoomId,CallType,_CallStatus,_CallTime,CallMode,GroupId,_CallLink,UserList,CallerDevice,Meta_data) ->
   Substring = string:str(binary_to_list(CallerDevice),binary_to_list(<<"Web-">>)),
   Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
   if Meta_data =:= <<>> ->
@@ -407,9 +407,10 @@ insert_call_log_status(FServer,FUser,TUser,RoomId,CallType,CallStatus,_CallTime,
       true ->
       U = <<"Mobile">>
     end,
+  Value = list_to_binary(binary_to_list(FUser) ++ "@" ++ binary_to_list(FServer)),
   ejabberd_sql:sql_query(FServer, [<<"insert into client_call_logs (from_user,to_user,room_id,call_type,call_mode,group_id,call_time,created_user,caller_device,user_list,metadata)" "values
-  ('">>,FUser, <<"','">>,UserList, <<"','">>,RoomId, <<"','">>,CallType, <<"','">>,CallMode, <<"','">>,GroupId, <<"','">>,Currenttime, <<"','">>,TUser, <<"','">>,U, <<"','">>,UserList, <<"','">>,MetaData, <<"')
-  ON DUPLICATE KEY UPDATE from_user = '">>, FUser, <<"',to_user = '">>, TUser, <<"',room_id = '">>,RoomId , <<"';">> ]).
+  ('">>,Value, <<"','">>,UserList, <<"','">>,RoomId, <<"','">>,CallType, <<"','">>,CallMode, <<"','">>,GroupId, <<"','">>,Currenttime, <<"','">>,TUser, <<"','">>,U, <<"','">>,UserList, <<"','">>,MetaData, <<"')
+  ON DUPLICATE KEY UPDATE created_user = '">>, TUser, <<"',room_id = '">>,RoomId , <<"';">> ]).
 
 get_call_user_list(LServer, RoomId) ->
   ejabberd_sql:sql_query(
