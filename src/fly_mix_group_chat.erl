@@ -1250,6 +1250,7 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"No Participants Exists">>});
 
     {selected, _, Members} ->
+      {ok,VCard} = mod_vcard_sql:get_vcard(TUser, Server),
 
       SubEls1 = lists:map(fun(G) ->
 
@@ -1280,7 +1281,7 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
 
       end, Members),
 
-      GroupXml = [#xmlel{name = <<"groupinfo">>, attrs = [{<<"groupupdate">>,<<"0">>}], children = []}, #xmlel{name = <<"participants">>, attrs = [], children = SubEls1}],
+      GroupXml = [#xmlel{name = <<"groupinfo">>, attrs = [{<<"groupupdate">>,<<"0">>}], children = VCard}, #xmlel{name = <<"participants">>, attrs = [], children = SubEls1}],
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType ,sub_els = GroupXml })
 
   end.
