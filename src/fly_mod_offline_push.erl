@@ -756,6 +756,12 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     end,
           Expiry = get_timestamp(),
 
+    MetaData = case fxml:get_tag_attr(<<"meta_data">>, MediaCall) of
+    {value, Metadata} ->
+      Metadata;
+    _ ->
+      <<"">>
+  end,
       SessionStatus = case fxml:get_tag_attr(<<"session_status">>, MediaCall) of
                       {value, Sessionstatus} ->
                       Sessionstatus;
@@ -770,6 +776,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
         Users ->
           User = lists:flatmap(fun(U) ->
             [fxml:get_tag_cdata(U)] end, Users#xmlel.children),
+
           case fxml:get_subtag(MediaCall, <<"invite">>) of
           false  ->
             BF = [{<<"type">>, "mediacall"},
@@ -791,6 +798,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
               {<<"call_mode">>, binary_to_list(CallMode)},
               {<<"expiration">>, integer_to_list(Expiry)},
               {<<"call_link">>, binary_to_list(RoomLink)},
+              {<<"meta_data">>, binary_to_list(MetaData)},
               {<<"title">>, "Calling"}];
           InviteUsers ->
             InviteUser = lists:flatmap(fun(I) ->
@@ -813,6 +821,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
             {<<"caller_name">>, binary_to_list(CallerName)},
             {<<"session_status">>, binary_to_list(SessionStatus)},
             {<<"call_mode">>, binary_to_list(CallMode)},
+            {<<"meta_data">>, binary_to_list(MetaData)},
             {<<"expiration">>, integer_to_list(Expiry)},
             {<<"call_link">>, binary_to_list(RoomLink)},
             {<<"title">>, "Calling"}]
@@ -1216,13 +1225,13 @@ create_json(List1, List2, Token, Mode, ViopStatus,Expiration, PushType) ->
     "}, ", create_keyvalue(List2), "}}"])
     end;
   true ->
-  if PushType =:= <<"fcm">> ->
-    lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), "\",\"expiration\":\"", integer_to_list(Expiration), "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{",  create_keyvalue(List2), "}}"]);
+  % if PushType =:= <<"fcm">> ->
+  %   lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), "\",\"expiration\":\"", integer_to_list(Expiration), "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{",  create_keyvalue(List2), "}}"]);
 
-    true ->
+  %   true ->
       lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), "\",\"expiration\":\"", integer_to_list(Expiration), "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{\"aps\":{", create_keyvalue(List1),
     "}, ", create_keyvalue(List2), "}}"])
-    end
+    % end
   end.
 
 
@@ -1554,6 +1563,14 @@ end,
         _ ->
           <<"">>
       end,
+
+      MetaData = case fxml:get_tag_attr(<<"meta_data">>, MediaCall) of
+      {value, Metadata} ->
+        Metadata;
+      _ ->
+        <<"">>
+    end,
+
       SessionStatus = case fxml:get_tag_attr(<<"session_status">>, MediaCall) of
                         {value, Sessionstatus} ->
                           Sessionstatus;
@@ -1581,6 +1598,8 @@ end,
         {selected, [{GroupName}]} = fly_mod_utils:get_nickname(Server, GroupIdUser),
         Message = binary_to_list(GroupName) ++ ": Incoming call"
               end,
+              Expiry = get_timestamp(),
+
       case fxml:get_subtag(MediaCall, <<"users">>) of
         false  ->
 
@@ -1609,6 +1628,8 @@ end,
             {session_status, binary_to_list(SessionStatus)},
             {userDomain, binary_to_list(Server)},
             {call_time, CallTime},
+            {meta_data, binary_to_list(MetaData)},
+            {expiration, integer_to_list(Expiry)},
             {call_mode, binary_to_list(CallMode)},
             {type, "media_call"}];
           InviteUsers ->
@@ -1633,11 +1654,12 @@ end,
             {userDomain, binary_to_list(Server)},
             {session_status, binary_to_list(SessionStatus)},
             {call_time, CallTime},
+            {meta_data, binary_to_list(MetaData)},
+            {expiration, integer_to_list(Expiry)},
             {call_mode, binary_to_list(CallMode)},
             {type, "media_call"}]
           end,
-                {MSeconds, Seconds, _} = erlang:now(),
-                Expiry = get_timestamp(),
+
                 Msg = [{<<"mutable-content">>, integer_to_list(1)},
                 {alert, Message},
                 {mode, binary_to_list(Mode)},
@@ -2267,7 +2289,8 @@ send_own_group_push_notifications(FromUser, ToUser,
 
 create_android_json(DeviceToken, BF) ->
   RandomId = fly_mod_utils:get_iq_message_id(7),
-  lists:append(["{\"deviceToken\":\"", binary_to_list(DeviceToken),  "\",\"collapse_key\":\"", binary_to_list(RandomId),  "\",\"data\":{", create_keyvalue(BF), "}}"]).
+  Expiry = get_timestamp(),
+  lists:append(["{\"deviceToken\":\"", binary_to_list(DeviceToken), "\",\"expiration\":\"", integer_to_list(Expiry), "\",\"collapse_key\":\"", binary_to_list(RandomId),  "\",\"data\":{", create_keyvalue(BF), "}}"]).
 
 create_bulk_push_json(DeviceTokens, BF) ->
   lists:append(["{\"deviceTokens\":", "[\"", DeviceTokens, "\"],\"data\":{", create_keyvalue(BF), "}}"]).
