@@ -162,7 +162,7 @@
            xmlns = <<"jabber:iq:media_call_activities">>,
 	   module = 'media_call_activities',
            result = {media_call_activities,  '$type', '$status','$call_status','$session_status','$start_time','$call_mode',
-           '$call_from','$call_time','$call_type','$end_time' ,'$room_id','$group_id','$call_link','$caller_name', '$result_type'
+           '$call_from','$call_time','$call_type','$end_time' ,'$room_id','$group_id','$call_link','$caller_name','$meta_data', '$result_type'
            ,'$_els'},
                      attrs = [#attr{name = <<"type">>,default = <<"">>},
                               #attr{name = <<"room_id">>,default = <<"">>},
@@ -177,6 +177,7 @@
                               #attr{name = <<"call_link">>,default = <<"">>},
                               #attr{name = <<"caller_name">>,default = <<"">>},
                               #attr{name = <<"end_time">>,default = <<"">>},
+                              #attr{name = <<"meta_data">>,default = <<"">>},
                               #attr{name = <<"status">>,default = <<"">>}],
                        cdata = #cdata{default = <<"">>, label = '$result_type'}}).
 
@@ -279,7 +280,7 @@
      #elem{name = <<"mediacall">>,
            xmlns = <<"urn:xmpp:call">>,
 	   module = 'call',
-           result = {mediacall, '$call_mode', '$call_time','$call_status','$call_from','$call_type', '$room_id','$group_id','$call_link','$caller_name'},
+           result = {mediacall, '$call_mode', '$call_time','$call_status','$call_from','$call_type', '$meta_data', '$room_id','$group_id','$call_link','$caller_name'},
            attrs = [#attr{name = <<"room_id">>,default = <<"">>},
                     #attr{name = <<"call_type">>,default = <<"">>},
                     #attr{name = <<"call_status">>,default = <<"">>},
@@ -288,6 +289,7 @@
                     #attr{name = <<"call_link">>,default = <<"">>},
                     #attr{name = <<"caller_name">>,default = <<"">>},
                     #attr{name = <<"call_from">>,default = <<"">>},
+                    #attr{name = <<"meta_data">>,default = <<"">>},
                     #attr{name = <<"call_mode">>,default = <<"">>}]}).
 
 -xml(register_update,
