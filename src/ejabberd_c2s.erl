@@ -681,20 +681,33 @@ process_message_in(State, #message{type = T} = Msg) ->
     %% blocked, i.e. room@conference.server.org/participant.
     case privacy_check_packet(State, Msg, in) of
 	allow ->
-		?INFO_MSG("allow user ~P", [Msg]),
 	    {true, State};
 	deny when T == groupchat; T == headline ->
 	    {false, State};
 	deny ->
-	    ?INFO_MSG("blocking user ~P", [Msg]),
-	    case xmpp:has_subtag(Msg, #muc_user{}) of
-		true ->
-		    ok;
-		false ->
-		    ejabberd_router:route_error(
-		      Msg, xmpp:err_service_unavailable())
-	    end,
-	    {false, State}
+	Delivered = xmpp:get_subtag(Msg, #delivered{}),
+	if Delivered =:= false ->
+		Seen = xmpp:get_subtag(Msg, #seen{}),
+		  if Seen =:= false ->
+		    Poll = xmpp:get_subtag(Msg, #poll{}),
+			    if Poll =:= false ->
+				case xmpp:has_subtag(Msg, #muc_user{}) of
+					true ->
+					    ok;
+					false ->
+					    ejabberd_router:route_error(
+					      Msg, xmpp:err_service_unavailable())
+				    end,
+				    {false, State};
+			    true ->
+				{true, State}
+			    end;
+		  true ->
+			{true, State}
+		  end;
+	    true ->
+		{true, State}
+	      end
     end.
 
 -spec process_presence_in(state(), presence()) -> {boolean(), state()}.
