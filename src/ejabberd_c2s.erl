@@ -681,6 +681,7 @@ process_message_in(State, #message{type = T} = Msg) ->
     %% blocked, i.e. room@conference.server.org/participant.
     case privacy_check_packet(State, Msg, in) of
 	allow ->
+		?INFO_MSG("allow user ~P", [Msg]),
 	    {true, State};
 	deny when T == groupchat; T == headline ->
 	    {false, State};
