@@ -685,6 +685,7 @@ process_message_in(State, #message{type = T} = Msg) ->
 	deny when T == groupchat; T == headline ->
 	    {false, State};
 	deny ->
+	    ?INFO_MSG("blocking user ~P", [Msg]),
 	    case xmpp:has_subtag(Msg, #muc_user{}) of
 		true ->
 		    ok;
