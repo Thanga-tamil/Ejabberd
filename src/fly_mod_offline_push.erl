@@ -604,7 +604,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     SendFrom = list_to_binary(binary_to_list(FromUser) ++
       "@" ++ binary_to_list(Server)),
     ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #poll{}),
-    {poll,PollId,VoterUserId,VoteId,Status,PollOptionId,PollUser} = ElementAcknowledge,
+    {poll,PollId,VoterUserId,VoteId,Status,_Chattype,PollOptionId,PollUser} = ElementAcknowledge,
     VoterId = fly_mod_utils:get_user_from_string_jid(VoterUserId),
     BF = [{<<"type">>, "poll"},
         {<<"message_content">>, "Poll"},
@@ -1470,7 +1470,7 @@ end,
                         FromUser = Sender#jid.luser,
 
                         ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #poll{}),
-                      {poll,PollId,VoterUserId,VoteId,Status,PollOptionId,PollUser} = ElementAcknowledge,
+                      {poll,PollId,VoterUserId,VoteId,Status,_Chattype,PollOptionId,PollUser} = ElementAcknowledge,
                       VoterId = fly_mod_utils:get_user_from_string_jid(VoterUserId),
                         Message = binary_to_list(Status),
 

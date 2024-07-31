@@ -701,7 +701,7 @@ process_message_in(State, #message{type = T} = Msg) ->
 				    {false, State};
 			    true ->
 				ElementAcknowledge = xmpp:get_subtag(Msg, #poll{}),
-                                {poll,_PollId,_VoterUserId,_VoteId,Status,PollOptionId,Chattype,PollUser} = ElementAcknowledge,
+                                {poll,_PollId,_VoterUserId,_VoteId,Status,Chattype,PollOptionId,PollUser} = ElementAcknowledge,
 				?INFO_MSG("Chattype ~p", [Chattype]),
 				?INFO_MSG("Status ~p", [Status]),
 				?INFO_MSG("PollUser ~p", [PollUser]),
