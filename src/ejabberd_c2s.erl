@@ -700,7 +700,20 @@ process_message_in(State, #message{type = T} = Msg) ->
 				    end,
 				    {false, State};
 			    true ->
-				{true, State}
+				ElementAcknowledge = xmpp:get_subtag(Msg, #poll{}),
+                                {poll,_PollId,_VoterUserId,_VoteId,_Status,_PollOptionId,Chattype,_PollUser} = ElementAcknowledge,
+				if Chattype =:= <<"normal">>->
+				{true, State};
+				true->
+					case xmpp:has_subtag(Msg, #muc_user{}) of
+					true ->
+					    ok;
+					false ->
+					    ejabberd_router:route_error(
+					      Msg, xmpp:err_service_unavailable())
+				    end,
+				    {false, State}
+				end
 			    end;
 		  true ->
 			{true, State}
