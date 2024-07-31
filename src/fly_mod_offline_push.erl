@@ -488,19 +488,46 @@ send_push_notifications(Sender, Recipient, ChatType,
             TimestampValue = fxml:get_attr_s(<<"time">>,
             Timestamp#xmlel.attrs)
       end,
-      SubEls1 = lists:map(fun(G) ->
-        [DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, DeviceId, UserType,PushType ] = G,
+      lists:map(fun(G) ->
+        [DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion,  UserType,PushType ] = G,
 
       case catch fly_mod_utils:check_blockedlist(Recipient#jid.server, Recipient#jid.luser,
         Sender#jid.luser)
       of
         {selected, _, [[_T]]} ->
+          if ChatType == <<"poll">> ->
+            ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #poll{}),
+            {poll,_,_,_,_,Chattype,_,_} = ElementAcknowledge,
+            if Chattype =:=<<"normal">> ->
+              call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType,
+              SubEl, Packet,TimestampValue,State);
+              true ->
+                fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
+                user_blocked
+             end;
+            true ->
           fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
-          user_blocked;
+          user_blocked
+          end;
         {error,timeout}  ->
           ok;
         {selected, _, []} ->
-          case DeviceType of
+          call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType,
+          SubEl, Packet,TimestampValue,State)
+      end
+
+          end,Tokens);
+
+    _Error ->
+      ?INFO_MSG("push_message get_user_device_details error is ~p", [_Error]),
+      database_error
+    %    end;
+    %    true -> ok
+  end.
+
+call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType,
+SubEl, Packet,TimestampValue,State)->
+  case DeviceType of
             <<"">> -> ?INFO_MSG("push_message user device is empty error is ~p", [Recipient#jid.luser]),
               device_type_is_empty;
             <<"android">> ->
@@ -519,19 +546,7 @@ send_push_notifications(Sender, Recipient, ChatType,
                 end;
             _ -> ?INFO_MSG("push_message user device not found error is ~p", [Recipient#jid.luser]),
               database_error
-          end
-      end
-
-          end,Tokens);
-
-    _Error ->
-      ?INFO_MSG("push_message get_user_device_details error is ~p", [_Error]),
-      database_error
-    %    end;
-    %    true -> ok
   end.
-
-
 %% Prepare and push message to android devices
 %%
 %% @param record Sender
