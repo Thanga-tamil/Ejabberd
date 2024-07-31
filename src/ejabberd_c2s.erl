@@ -685,14 +685,42 @@ process_message_in(State, #message{type = T} = Msg) ->
 	deny when T == groupchat; T == headline ->
 	    {false, State};
 	deny ->
-	    case xmpp:has_subtag(Msg, #muc_user{}) of
-		true ->
-		    ok;
-		false ->
-		    ejabberd_router:route_error(
-		      Msg, xmpp:err_service_unavailable())
-	    end,
-	    {false, State}
+	Delivered = xmpp:get_subtag(Msg, #delivered{}),
+	if Delivered =:= false ->
+		Seen = xmpp:get_subtag(Msg, #seen{}),
+		  if Seen =:= false ->
+		    Poll = xmpp:get_subtag(Msg, #poll{}),
+			    if Poll =:= false ->
+				case xmpp:has_subtag(Msg, #muc_user{}) of
+					true ->
+					    ok;
+					false ->
+					    ejabberd_router:route_error(
+					      Msg, xmpp:err_service_unavailable())
+				    end,
+				    {false, State};
+			    true ->
+				ElementAcknowledge = xmpp:get_subtag(Msg, #poll{}),
+                                {poll,_PollId,_VoterUserId,_VoteId,_Status,_PollOptionId,Chattype,_PollUser} = ElementAcknowledge,
+				if Chattype =:= <<"normal">>->
+				{true, State};
+				true->
+					case xmpp:has_subtag(Msg, #muc_user{}) of
+					true ->
+					    ok;
+					false ->
+					    ejabberd_router:route_error(
+					      Msg, xmpp:err_service_unavailable())
+				    end,
+				    {false, State}
+				end
+			    end;
+		  true ->
+			{true, State}
+		  end;
+	    true ->
+		{true, State}
+	      end
     end.
 
 -spec process_presence_in(state(), presence()) -> {boolean(), state()}.

@@ -112,13 +112,12 @@ Type = XML#message.type,
           Return = add_timestamp(XML)
       end;
     _ ->
-      Seen = fxml:get_subtag(xmpp:encode(XML),<<"seen">>),
-      if Seen =/= false andalso  LServer =:= <<"weiilla-xmpp.mirrorfly.com">> ->
-      ?INFO_MSG("Seen log ~p",[XML]);
-    true ->
-      ok
-    end,
-
+    %   Seen = fxml:get_subtag(xmpp:encode(XML),<<"seen">>),
+    %   if Seen =/= false andalso  LServer =:= <<"weiilla-xmpp.mirrorfly.com">> ->
+    %   ?INFO_MSG("Seen log ~p",[XML]);
+    % true ->
+    %   ok
+    % end,
       Return = XML
 end,
   {Return,State};

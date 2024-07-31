@@ -351,12 +351,13 @@
      #elem{name = <<"poll">>,
            xmlns = <<"urn:xmpp:receipts">>,
 	   module = 'poll',
-           result = {poll, '$poll_id', '$voter_user_id', '$vote_id', '$status','$poll_option_id', '$to_user'},
+           result = {poll, '$poll_id', '$voter_user_id', '$vote_id', '$status', '$chat_type', '$poll_option_id', '$to_user'},
            attrs = [#attr{name = <<"poll_id">>,default = <<"">>},
                     #attr{name = <<"voter_user_id">>,default = <<"">>},
-                     #attr{name = <<"vote_id">>,default = <<"">>},
+                    #attr{name = <<"vote_id">>,default = <<"">>},
                     #attr{name = <<"status">>,default = <<"">>},
                     #attr{name = <<"poll_option_id">>,default = <<"">>},
+                    #attr{name = <<"chat_type">>,default = <<"">>},
                     #attr{name = <<"to_user">>,default = <<"">>}]}).
 
 -xml(logout,
