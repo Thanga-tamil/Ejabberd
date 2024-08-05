@@ -489,7 +489,7 @@ send_push_notifications(Sender, Recipient, ChatType,
             Timestamp#xmlel.attrs)
       end,
       lists:map(fun(G) ->
-        [DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion,  UserType,PushType ] = G,
+        [DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, _DeviceId, UserType,PushType ] = G,
 
       case catch fly_mod_utils:check_blockedlist(Recipient#jid.server, Recipient#jid.luser,
         Sender#jid.luser)
