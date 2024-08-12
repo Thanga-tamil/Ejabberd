@@ -637,7 +637,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 			Stanza = xmpp:encode(Pkt),
 			if Node =:= <<"urn:xmpp:mix:nodes:messages">>  ->
 				Content = get_message_content(Stanza , Pkt),
-				[_, CMessageId, _, _, _, CEditMsgId ] = Content,
+				[_, CMessageId, _, _, _, CEditMsgId, _ ] = Content,
 				if (CEditMsgId =:= CMessageId) or (CEditMsgId =:= <<"">>) ->
 				spawn(?MODULE, send_group_push_message, [F,Node,Subscribers,LServer,Chan,Service,Stanza,Content]);
 				true ->
@@ -650,7 +650,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 			% Bulk Insert Starts
 			if Node =:= <<"urn:xmpp:mix:nodes:messages">> ->
 
-				[MessageType, MessageId, MesssageSend, _GroupName, MsgData, EditmsgId] = MsgContent,
+				[MessageType, MessageId, MesssageSend, _GroupName, MsgData, EditmsgId, MetaData] = MsgContent,
 
 				% fly_mod_offline_push:queryexecfunctions(LServer, <<"group_insert">>, From, MsgContent, Subscribers);
 				TimestampNew = fly_add_timestamp:now_to_microseconds(erlang:now()),
@@ -667,7 +667,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 			   RecentInsert = <<"insert into chat_recent (from_user, to_user,  message_id, message_from, txt, chat_type, message_type,  notification_to, unread, message_time,meta_data) values ">>,
 				ValueStatement = lists:map(fun(Part) ->
 					#jid{luser = ToUser} = Part,
-					string:concat("", ", ('" ++ binary_to_list(FromUser) ++ "', '" ++ binary_to_list(ToUser) ++ "', 0,1, '" ++ binary_to_list(MessageId) ++ "', '" ++ binary_to_list(EditMsgId) ++ "','" ++ binary_to_list(MessageType) ++ "', '" ++ binary_to_list(MsgData) ++"', 'normal', '" ++ binary_to_list(MesssageSend) ++ "', '" ++ FlatTimeStampNew ++ "','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00','{}')")
+					string:concat("", ", ('" ++ binary_to_list(FromUser) ++ "', '" ++ binary_to_list(ToUser) ++ "', 0,1, '" ++ binary_to_list(MessageId) ++ "', '" ++ binary_to_list(EditMsgId) ++ "','" ++ binary_to_list(MessageType) ++ "', '" ++ binary_to_list(MsgData) ++"', 'normal', '" ++ binary_to_list(MesssageSend) ++ "', '" ++ FlatTimeStampNew ++ "','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00','" ++ binary_to_list(MetaData) ++"')")
 				end, Subscribers),
 
 				RecentValueStatement = lists:map(fun(Part) ->
@@ -678,7 +678,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 					true ->
 						Unread = <<"1">>
 					end,
-					string:concat("", ", ('" ++ binary_to_list(FromUser) ++ "', '" ++ binary_to_list(ToUser) ++ "', '" ++ binary_to_list(MessageId) ++ "', '"  ++ binary_to_list(SUser) ++ "', '"  ++ binary_to_list(MsgData) ++ "', 'normal', '" ++ binary_to_list(MessageType) ++ "', '', '" ++ binary_to_list(Unread) ++ "', '" ++ FlatTimeStampNew ++ "','{}')")
+					string:concat("", ", ('" ++ binary_to_list(FromUser) ++ "', '" ++ binary_to_list(ToUser) ++ "', '" ++ binary_to_list(MessageId) ++ "', '"  ++ binary_to_list(SUser) ++ "', '"  ++ binary_to_list(MsgData) ++ "', 'normal', '" ++ binary_to_list(MessageType) ++ "', '', '" ++ binary_to_list(Unread) ++ "', '" ++ FlatTimeStampNew ++ "','" ++ binary_to_list(MetaData) ++"')")
 				end, Subscribers),
 
 				DuplicateStatement = "ON DUPLICATE KEY UPDATE to_user = values(to_user), message_id = '" ++ binary_to_list(MessageId) ++"' ;",
@@ -753,11 +753,17 @@ get_message_content(Stanza, Pkt) ->
 													Type = fxml:get_tag_cdata(MsgType),
 													GroupName = fxml:get_tag_cdata(Nick),
 													if ContentAcknowledge == false ->
+													MetaData = <<"">>,
 													EditMsgid = Id;
 													true ->
-													{_,_,_,_,_,_, _,EditMsgid,_} = ContentAcknowledge
-												    end,
-													[Type, Id, SentFrom, GroupName, MSG, EditMsgid]
+													{_,_,_,_,_,_, MetaData,EditMsgid,_} = ContentAcknowledge
+												        end,
+													if  MetaData =:= <<"">> ->
+														Metadata = <<"{}">>;
+													    true ->
+														Metadata = MetaData
+													    end,
+												[Type, Id, SentFrom, GroupName, MSG, EditMsgid, Metadata]
 											end
 
 										end
