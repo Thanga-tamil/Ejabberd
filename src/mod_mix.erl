@@ -682,7 +682,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 				end, Subscribers),
 
 				DuplicateStatement = "ON DUPLICATE KEY UPDATE to_user = values(to_user), message_id = '" ++ binary_to_list(MessageId) ++"' ;",
-				RecentDuplicateStatement = " ON DUPLICATE KEY UPDATE message_id = values(message_id), message_from = values(message_from), txt = values(txt), chat_type = values(chat_type), message_type = values(message_type),  notification_to = values(notification_to), unread = unread + values(unread), status = 0, recall_status = 0, favourite_status = 0, message_time= values(message_time), created_at = NOW();",
+				RecentDuplicateStatement = " ON DUPLICATE KEY UPDATE message_id = values(message_id), message_from = values(message_from), txt = values(txt), chat_type = values(chat_type), message_type = values(message_type),  notification_to = values(notification_to), unread = unread + values(unread), status = 0, recall_status = 0, favourite_status = 0, message_time= values(message_time), meta_data= values(meta_data), created_at = NOW();",
 				[_|NewVal] = re:replace(ValueStatement, ",", ""),
 				[_|RecentNewVal] = re:replace(RecentValueStatement, ",", ""),
 
