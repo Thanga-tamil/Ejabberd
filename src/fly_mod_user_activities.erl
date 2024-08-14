@@ -978,8 +978,8 @@ update_mute_notification(From, RequestType, SubEl, IQ) ->
   ReceivedXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(ReceivedFlatTimeStamp)}],
     children = []},
   XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
-  ejabberd_router:route(To, To, XmlBody1),
-  % store_offline_user_send(XmlBody1,To,To),
+  %ejabberd_router:route(To, To, XmlBody1),
+  store_offline_user_send(XmlBody1,To,To),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Updated successfully">>}).
 
 update_archive_chat(FromJid, RequestType, SubEl, IQ) ->
