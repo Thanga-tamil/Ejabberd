@@ -960,20 +960,18 @@ update_mute_notification(From, RequestType, SubEl, IQ) ->
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Updated successfully">>}).
 
   mute_notification(From, RequestType, SubEl, IQ) ->
-    UserIds = fxml:get_path_s(SubEl, [{attr, <<"user_ids">>}]),
+    UserIds = fxml:get_path_s(SubEl, [{attr, <<"user_list">>}]),
     GroupIds = fxml:get_path_s(SubEl, [{attr, <<"group_ids">>}]),
     MuteAction = fxml:get_path_s(SubEl, [{attr, <<"action">>}]),
     MuteSettings = fxml:get_path_s(SubEl, [{attr, <<"mute_setting">>}]),
     ToUser = fxml:get_path_s(SubEl, [{attr, <<"from_user">>}]),
     NewMessageId = fly_mod_utils:get_iq_message_id(20),
     #jid{luser = _User,lserver = Server, lresource = _Resource} = From,
-    ?INFO_MSG("ToUser ~p", [ToUser]),
     To = jid:make(ToUser, Server),
-    ?INFO_MSG("TO address ~p", [To]),
     XmlBody = #xmlel{name = <<"message">>,
       attrs = [{<<"from">>, jid:to_string(To)}, {<<"to">>, jid:to_string(To)}, {<<"type">>, <<"chat">>}, {<<"id">>, NewMessageId}],
       children = [#xmlel{name = <<"mute">>,
-        attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, RequestType}, {<<"action">>,MuteAction}, {<<"mute_setting">>,MuteSettings}, {<<"user_ids">>,UserIds},{<<"group_ids">>,GroupIds}],
+        attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, RequestType}, {<<"action">>,MuteAction}, {<<"mute_setting">>,MuteSettings}, {<<"user_list">>,UserIds},{<<"group_ids">>,GroupIds}],
         children = []}]},
     ReceivedTimestamp = now_to_microseconds(erlang:now()),
   ReceivedFlatTimeStamp = lists:flatten(io_lib:format("~p", [ReceivedTimestamp])),
@@ -981,7 +979,7 @@ update_mute_notification(From, RequestType, SubEl, IQ) ->
     children = []},
   XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
   ejabberd_router:route(To, To, XmlBody1),
-  store_offline_user_send(XmlBody1,To,To),
+  % store_offline_user_send(XmlBody1,To,To),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Updated successfully">>}).
 
 update_archive_chat(FromJid, RequestType, SubEl, IQ) ->
