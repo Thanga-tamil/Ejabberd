@@ -969,7 +969,7 @@ update_mute_notification(From, RequestType, SubEl, IQ) ->
     #jid{luser = _User,lserver = Server, lresource = _Resource} = From,
     To = jid:make({ToUser, Server}),
     XmlBody = #xmlel{name = <<"message">>,
-      attrs = [{<<"from">>, ToUserJid}, {<<"to">>, ToUserJid}, {<<"type">>, <<"chat">>}, {<<"id">>, NewMessageId}],
+      attrs = [{<<"from">>, jid:to_string(To)}, {<<"to">>, jid:to_string(To)}, {<<"type">>, <<"chat">>}, {<<"id">>, NewMessageId}],
       children = [#xmlel{name = <<"mute">>,
         attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, RequestType}, {<<"action">>,MuteAction}, {<<"mute_settings">>,MuteSettings}, {<<"user_ids">>,UserIds},{<<"group_ids">>,GroupIds}],
         children = []}]},
