@@ -1876,6 +1876,12 @@ send_own_offline_message(Sender, Recipient, Packet) ->
       true ->
         ok
   end,
+  Mute = xmpp:get_subtag(xmpp:decode(Packet), #recall{}),
+  if Mute =/= false ->
+  ownpush(Server, <<"chat">>, Sender, Recipient, <<"mute">>, SubEl, Packet);
+  true ->
+    ok
+end,
   if ChatType == <<"chat">> ->
     case SubEl of
       <<"">> ->
