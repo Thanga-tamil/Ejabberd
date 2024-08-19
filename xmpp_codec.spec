@@ -187,7 +187,7 @@
 	   module = 'user_activities',
            result = {user_activities, '$remove_user', '$device_id', '$vote_id', '$edit_message_id', '$type', '$id', '$send_seen', '$license_data', '$result_type','$status','$password',
            '$socket_id','$message_from','$message_to','$to_user', '$from_user', '$mode', '$send_to', '$poll_option_id', '$voter_user_id', '$poll_id', '$send_from', '$message_type','$message_id','$message_ids','$message','$chat_type','$reply_id','$delete_type','$favourite','$_els','$position','$limit','$row_id','$updated_at',
-           '$call_status','$call_type','$caller_device','$call_id','$call_attend_status', '$last_msg_id', '$remove_message_user', '$calllog_ids', '$mute_status','$archive_status','$group_id','$archive','$block_status','$permission_status','$meta_data', '$topic_id', '$topic_time', '$user_ids', '$group_ids', '$action', '$mute_setting', '$busy_message', '$busy_status', '$busy'},
+           '$call_status','$call_type','$caller_device','$call_id','$call_attend_status', '$last_msg_id', '$remove_message_user', '$calllog_ids', '$mute_status','$archive_status','$group_id','$archive','$block_status','$permission_status','$meta_data', '$topic_id', '$topic_time', '$user_list', '$action', '$mute_setting', '$busy_message', '$busy_status', '$busy'},
                      attrs = [#attr{name = <<"remove_user">>,default = <<"">>},
                               #attr{name = <<"type">>,default = <<"">>},
                               #attr{name = <<"id">>,default = <<"">>},
@@ -238,8 +238,7 @@
                               #attr{name = <<"meta_data">>,default = <<"">>},
                               #attr{name = <<"topic_id">>,default = <<"">>},
                               #attr{name = <<"topic_time">>,default = <<"">>},
-                              #attr{name = <<"user_ids">>,default = <<"">>},
-                              #attr{name = <<"group_ids">>,default = <<"">>},
+                              #attr{name = <<"user_list">>,default = <<"">>},
                               #attr{name = <<"action">>,default = <<"">>},
                               #attr{name = <<"mute_setting">>,default = <<"">>},
                               #attr{name = <<"busy_message">>,default = <<"">>},
@@ -380,6 +379,16 @@
                     #attr{name = <<"chat_type">>,default = <<"">>},
                     #attr{name = <<"group_id">>,default = <<"">>},
                     #attr{name = <<"time">>,default = <<"">>}]}).
+
+-xml(mute,
+     #elem{name = <<"mute">>,
+           xmlns = <<"urn:xmpp:receipts">>,
+	   module = 'mute',
+           result = {mute, '$type', '$action','$mute_setting', '$user_list'},
+           attrs = [#attr{name = <<"type">>,default = <<"">>},
+                    #attr{name = <<"action">>,default = <<"">>},
+                    #attr{name = <<"mute_setting">>,default = <<"">>},
+                    #attr{name = <<"user_list">>,default = <<"">>}]}).
 
 -xml(timestamp,
      #elem{name = <<"timestamp">>,
