@@ -139,6 +139,7 @@
   get_single_message/3,
   get_group_message/3,
   check_blockedlist/3,
+  check_chatmuted/3,
   get_reply_message/2,
   get_reply_messages/2,
   delete_spool/2,
@@ -796,6 +797,11 @@ check_blockedlist(LServer,FUser, TUser) ->
   Value = list_to_binary(binary_to_list(TUser) ++ "@" ++ binary_to_list(LServer)),
   ejabberd_sql:sql_query(LServer,
   [<<"SELECT E.t from privacy_list_data E JOIN privacy_list S ON E.id = S.id and E.value = '">>,Value, <<"' and  S.username = '">>,FUser, <<"';">>]).
+
+check_chatmuted(LServer,FUser, TUser) ->
+    ejabberd_sql:sql_query(LServer,
+    [<<"SELECT username FROM muted_chats where username =  '">>,FUser, <<"' and chat_id =  '">>,TUser, <<"' union SELECT username FROM users where username =  '">>,FUser, <<"'  and is_muted = 1 ;">>]).
+
 
 %% check the user blocked or not
 %%
