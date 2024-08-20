@@ -694,7 +694,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 				ejabberd_sql:sql_query(LServer, [<<"update  message_status set status = 0, edit_status = 1, received_at = '0000-00-00 00:00:00' ,seen_at = '0000-00-00 00:00:00',  edit_message_id = '">>, EditMsgId, <<"', txt  = '">>, MsgData , <<"' where message_id = '">>, MessageId, <<"' ;">>]),
 				ejabberd_sql:sql_query(LServer, [<<"update chat_recent set status = 0,  txt  = '">>, MsgData , <<"'where message_id = '">>, MessageId, <<"';">>])
 				end,
-				ejabberd_sql:sql_query( LServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg) values ('">>, SUser, <<"', '">>, FromUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'normal', '">>, MsgData, <<"');">>]);
+				ejabberd_sql:sql_query( LServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg, meta_data) values ('">>, SUser, <<"', '">>, FromUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'normal', '">>, MsgData, <<"', '">>, MetaData, <<"');">>]);
 			true ->
 				ok
 			end,
