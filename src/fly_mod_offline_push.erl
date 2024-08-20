@@ -118,10 +118,6 @@ handle_call(stop, _From, State) ->
 handle_cast({pushnotification, <<"chat">>,
   {Sender, Recipient, ChatType, SubEl, Packet}},
     State) ->
-      ?INFO_MSG("mute query ~p", [fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser,
-      Sender#jid.luser)]),
-      ?INFO_MSG("Tuser ~p", [Sender#jid.luser]),
-      ?INFO_MSG("fuser ~p", [Recipient#jid.luser]),
       case catch fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser,
       Sender#jid.luser)
     of
