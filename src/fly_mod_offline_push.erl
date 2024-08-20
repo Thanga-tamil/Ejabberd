@@ -118,15 +118,23 @@ handle_call(stop, _From, State) ->
 handle_cast({pushnotification, <<"chat">>,
   {Sender, Recipient, ChatType, SubEl, Packet}},
     State) ->
-  case catch send_push_notifications(Sender, Recipient,
-    ChatType, SubEl, Packet, State)
-  of
-    {ok, _Result} -> ok;
-    {error, Error} ->
-      ?INFO_MSG("push error ~p", [Error]), ok;
-    _Exception ->
-      ?INFO_MSG("push exception ~p", [_Exception]), ok
-  end,
+      case catch fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser,
+      Sender#jid.luser)
+    of
+      {selected, _, []} ->
+        case catch send_push_notifications(Sender, Recipient,
+          ChatType, SubEl, Packet, State)
+        of
+          {ok, _Result} -> ok;
+          {error, Error} ->
+            ?INFO_MSG("push error ~p", [Error]), ok;
+          _Exception ->
+            ?INFO_MSG("push exception ~p", [_Exception]), ok
+        end;
+      {selected, _, [[_T]]} ->
+        ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
+        ok
+      end,
   {noreply, State};
 handle_cast({queryexecution, <<"clear_all">>,
   {From, Last_Msg_Id, Delete_Type, XMLBody}},

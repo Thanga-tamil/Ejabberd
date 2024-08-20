@@ -139,6 +139,7 @@
   get_single_message/3,
   get_group_message/3,
   check_blockedlist/3,
+  check_chatmuted/3,
   get_reply_message/2,
   get_reply_messages/2,
   delete_spool/2,
@@ -797,6 +798,11 @@ check_blockedlist(LServer,FUser, TUser) ->
   ejabberd_sql:sql_query(LServer,
   [<<"SELECT E.t from privacy_list_data E JOIN privacy_list S ON E.id = S.id and E.value = '">>,Value, <<"' and  S.username = '">>,FUser, <<"';">>]).
 
+check_chatmuted(LServer,FUser, TUser) ->
+    ejabberd_sql:sql_query(LServer,
+    [<<"SELECT username FROM muted_chats where username =  '">>,FUser, <<"' and chat_id =  '">>,TUser, <<"' union SELECT username FROM users where username =  '">>,FUser, <<"'  and is_muted = 1 ;">>]).
+
+
 %% check the user blocked or not
 %%
 %%
@@ -1424,7 +1430,7 @@ end,
   ejabberd_sql:sql_query(ToServer, [<<"delete from spool where username = '">>,ToUser, <<"' and message_id ='">>,MessageId, <<"';">>]),
   ejabberd_sql:sql_query( ToServer, [<<"update  message_status set edit_status = 1, status = 0,  edit_message_id = '">>, EditMsgId , <<"', txt = '">>, Msg , <<"' where message_id = '">>, MessageId, <<"' ;">>])
   end,
-  ejabberd_sql:sql_query( ToServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg) values ('">>, User, <<"', '">>, ToUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'chat', '">>, Msg, <<"');">>]).
+  ejabberd_sql:sql_query( ToServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg, meta_data) values ('">>, User, <<"', '">>, ToUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'chat', '">>, Msg, <<"', '">>, MetaData, <<"');">>]).
 
 msg_exit(LServer,MsgId)->
   ejabberd_sql:sql_query(
@@ -1902,7 +1908,7 @@ get_single_message(FServer,  MsgId ,_OldMsgId) ->
 
 get_reply_message(FServer,  MsgId) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT msg, message_id, edit_message_id, from_user, chat_type, 0 as deleted_by, 0 as deleted_status, 0 as status, '' as from_notification, '' as to_notification, to_user, created_at, '' as message_notification, 0 as recall_status, created_at, '' as topic_id,  0 as edit_status, created_at,  '{}' as meta FROM chat_message_edit_history WHERE edit_message_id = '">>, MsgId, <<"' limit 1">>]).
+    [<<"SELECT msg, message_id, edit_message_id, from_user, chat_type, 0 as deleted_by, 0 as deleted_status, 0 as status, '' as from_notification, '' as to_notification, to_user, created_at, '' as message_notification, 0 as recall_status, created_at, '' as topic_id,  0 as edit_status, created_at, IFNULL(json_unquote(meta_data),'') as meta FROM chat_message_edit_history WHERE edit_message_id = '">>, MsgId, <<"' limit 1">>]).
 
 get_reply_messages(FServer,  MsgId) ->
   ejabberd_sql:sql_query(FServer,
