@@ -320,34 +320,34 @@ get_user_for_ios_group_device(LServer, LUser, LResource) ->
   if LResource =:= "" ->
   ejabberd_sql:sql_query(
     LServer,
-    [<<"SELECT  device_type,  device_token,voip_device_token ,  mode, device_os_version ,user_type, push_server_type  FROM chat_users_details WHERE  username = '">>, LUser, <<"' and device_token != '' and device_token != 'null' and device_type ='ios'  ;">>]);
+    [<<"SELECT  username, device_type,  device_token,voip_device_token ,  mode, device_os_version ,user_type, push_server_type  FROM chat_users_details WHERE  username = '">>, LUser, <<"' and device_token != '' and device_token != 'null' and device_type ='ios'  ;">>]);
   true ->
       ejabberd_sql:sql_query(LServer,
-      [<<"SELECT  device_type, device_token, voip_device_token ,  mode, device_os_version, user_type,push_server_type FROM chat_users_details WHERE  username = '">>, LUser, <<"' and  device_token != '' and device_token != 'null' and device_type ='ios'   and device_id not in  ('">>, LResource, <<"' );">>])
+      [<<"SELECT username,  device_type, device_token, voip_device_token ,  mode, device_os_version, user_type,push_server_type FROM chat_users_details WHERE  username = '">>, LUser, <<"' and  device_token != '' and device_token != 'null' and device_type ='ios'   and device_id not in  ('">>, LResource, <<"' );">>])
       end.
 
 get_bulk_user_device(LServer, Members, Resources, Type,Fromuser) ->
   FromUser = get_user_from_string_jid(Fromuser),
   ejabberd_sql:sql_query(
     LServer,
-    [<<"SELECT device_token ,user_type, push_server_type  FROM chat_users_details WHERE  username  in ('">>, Members, <<"') and  device_token != '' and device_token != 'null' and (device_type = 'android' or device_type = 'flutter-android' or  device_type = 'flutter-ios') and username != '">>, FromUser, <<"' and device_id not in  ('">>, Resources, <<"' );">>]).
+    [<<"SELECT username, device_token ,user_type, push_server_type  FROM chat_users_details WHERE  username  in ('">>, Members, <<"') and  device_token != '' and device_token != 'null' and (device_type = 'android' or device_type = 'flutter-android' or  device_type = 'flutter-ios') and username != '">>, FromUser, <<"' and device_id not in  ('">>, Resources, <<"' );">>]).
 
 get_bulk_user_device(LServer, Members, Resources, Type,Mode,Fromuser) ->
   FromUser = get_user_from_string_jid(Fromuser),
   ejabberd_sql:sql_query(
     LServer,
-    [<<"SELECT  device_token ,user_type, push_server_type From chat_users_details WHERE  username  in ('">>, Members, <<"') and  device_token != '' and device_token != 'null' and device_type = '">>, Type, <<"'and mode = '">>, Mode, <<"' and device_os_version >= 13 and username != '">>, FromUser, <<"' and device_id not in  ('">>, Resources, <<"' );">>]).
+    [<<"SELECT  username, device_token ,user_type, push_server_type From chat_users_details WHERE  username  in ('">>, Members, <<"') and  device_token != '' and device_token != 'null' and device_type = '">>, Type, <<"'and mode = '">>, Mode, <<"' and device_os_version >= 13 and username != '">>, FromUser, <<"' and device_id not in  ('">>, Resources, <<"' );">>]).
 
 get_bulk_voip_user_device(LServer, Members,Type,Mode,Fromuser) ->
   FromUser = get_user_from_string_jid(Fromuser),
   ejabberd_sql:sql_query(
     LServer,
-    [<<"SELECT  voip_device_token ,user_type, push_server_type From chat_users_details WHERE  username  in ('">>, Members, <<"') and voip_device_token != '' and voip_device_token != 'null' and device_type = '">>, Type, <<"'and mode = '">>, Mode, <<"' and device_os_version < 13 and username != '">>, FromUser, <<"';">> ]).
+    [<<"SELECT username, voip_device_token ,user_type, push_server_type From chat_users_details WHERE  username  in ('">>, Members, <<"') and voip_device_token != '' and voip_device_token != 'null' and device_type = '">>, Type, <<"'and mode = '">>, Mode, <<"' and device_os_version < 13 and username != '">>, FromUser, <<"';">> ]).
 
 get_bulk_group_create_android_user_device(LServer, Member) ->
   ejabberd_sql:sql_query(
     LServer,
-    [<<"SELECT  device_token ,user_type, push_server_type From chat_users_details WHERE  username  ='">>, Member, <<"' and  device_token != '' and device_token != 'null' and device_type = 'android';">> ]).
+    [<<"SELECT username,  device_token ,user_type, push_server_type From chat_users_details WHERE  username  ='">>, Member, <<"' and  device_token != '' and device_token != 'null' and device_type = 'android';">> ]).
 
 %% get roaster usg user jabber id
 %%
