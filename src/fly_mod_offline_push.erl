@@ -118,15 +118,23 @@ handle_call(stop, _From, State) ->
 handle_cast({pushnotification, <<"chat">>,
   {Sender, Recipient, ChatType, SubEl, Packet}},
     State) ->
-  case catch send_push_notifications(Sender, Recipient,
-    ChatType, SubEl, Packet, State)
-  of
-    {ok, _Result} -> ok;
-    {error, Error} ->
-      ?INFO_MSG("push error ~p", [Error]), ok;
-    _Exception ->
-      ?INFO_MSG("push exception ~p", [_Exception]), ok
-  end,
+      case catch fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser,
+      Sender#jid.luser)
+    of
+      {selected, _, []} ->
+        case catch send_push_notifications(Sender, Recipient,
+          ChatType, SubEl, Packet, State)
+        of
+          {ok, _Result} -> ok;
+          {error, Error} ->
+            ?INFO_MSG("push error ~p", [Error]), ok;
+          _Exception ->
+            ?INFO_MSG("push exception ~p", [_Exception]), ok
+        end;
+      {selected, _, [[_T]]} ->
+        ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
+        ok
+      end,
   {noreply, State};
 handle_cast({queryexecution, <<"clear_all">>,
   {From, Last_Msg_Id, Delete_Type, XMLBody}},
@@ -488,19 +496,46 @@ send_push_notifications(Sender, Recipient, ChatType,
             TimestampValue = fxml:get_attr_s(<<"time">>,
             Timestamp#xmlel.attrs)
       end,
-      SubEls1 = lists:map(fun(G) ->
-        [DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, DeviceId, UserType,PushType ] = G,
+      lists:map(fun(G) ->
+        [DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, _DeviceId, UserType,PushType ] = G,
 
       case catch fly_mod_utils:check_blockedlist(Recipient#jid.server, Recipient#jid.luser,
         Sender#jid.luser)
       of
         {selected, _, [[_T]]} ->
+          if ChatType == <<"poll">> ->
+            ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #poll{}),
+            {poll,_,_,_,_,Chattype,_,_} = ElementAcknowledge,
+            if Chattype =:=<<"normal">> ->
+              call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType,
+              SubEl, Packet,TimestampValue,State);
+              true ->
+                fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
+                user_blocked
+             end;
+            true ->
           fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
-          user_blocked;
+          user_blocked
+          end;
         {error,timeout}  ->
           ok;
         {selected, _, []} ->
-          case DeviceType of
+          call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType,
+          SubEl, Packet,TimestampValue,State)
+      end
+
+          end,Tokens);
+
+    _Error ->
+      ?INFO_MSG("push_message get_user_device_details error is ~p", [_Error]),
+      database_error
+    %    end;
+    %    true -> ok
+  end.
+
+call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType,
+SubEl, Packet,TimestampValue,State)->
+  case DeviceType of
             <<"">> -> ?INFO_MSG("push_message user device is empty error is ~p", [Recipient#jid.luser]),
               device_type_is_empty;
             <<"android">> ->
@@ -519,19 +554,7 @@ send_push_notifications(Sender, Recipient, ChatType,
                 end;
             _ -> ?INFO_MSG("push_message user device not found error is ~p", [Recipient#jid.luser]),
               database_error
-          end
-      end
-
-          end,Tokens);
-
-    _Error ->
-      ?INFO_MSG("push_message get_user_device_details error is ~p", [_Error]),
-      database_error
-    %    end;
-    %    true -> ok
   end.
-
-
 %% Prepare and push message to android devices
 %%
 %% @param record Sender
@@ -604,7 +627,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     SendFrom = list_to_binary(binary_to_list(FromUser) ++
       "@" ++ binary_to_list(Server)),
     ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #poll{}),
-    {poll,PollId,VoterUserId,VoteId,Status,PollOptionId,PollUser} = ElementAcknowledge,
+    {poll,PollId,VoterUserId,VoteId,Status,_Chattype,PollOptionId,PollUser} = ElementAcknowledge,
     VoterId = fly_mod_utils:get_user_from_string_jid(VoterUserId),
     BF = [{<<"type">>, "poll"},
         {<<"message_content">>, "Poll"},
@@ -1470,7 +1493,7 @@ end,
                         FromUser = Sender#jid.luser,
 
                         ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #poll{}),
-                      {poll,PollId,VoterUserId,VoteId,Status,PollOptionId,PollUser} = ElementAcknowledge,
+                      {poll,PollId,VoterUserId,VoteId,Status,_Chattype,PollOptionId,PollUser} = ElementAcknowledge,
                       VoterId = fly_mod_utils:get_user_from_string_jid(VoterUserId),
                         Message = binary_to_list(Status),
 
@@ -1861,6 +1884,12 @@ send_own_offline_message(Sender, Recipient, Packet) ->
       true ->
         ok
   end,
+  Mute = xmpp:get_subtag(xmpp:decode(Packet), #recall{}),
+  if Mute =/= false ->
+  ownpush(Server, <<"chat">>, Sender, Recipient, <<"mute">>, SubEl, Packet);
+  true ->
+    ok
+end,
   if ChatType == <<"chat">> ->
     case SubEl of
       <<"">> ->
@@ -1950,13 +1979,13 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
     ResourcesList = get_resources(Members),
     OfflineUsers = lists:filter(fun(Elem) -> not lists:member(Elem, [0]) end, Output),
     OnlineResources = lists:filter(fun(Elem) -> not lists:member(Elem, [0]) end, ResourcesList),
-    [MessageType, MessageId, MesssageSend,_GroupName, _MSGBody,_EditMsg] = MessageContent,
+    [MessageType, MessageId, MesssageSend,_GroupName, _MSGBody,_EditMsg, _MetaData] = MessageContent,
     case catch fly_mod_utils:get_bulk_user_device(Server, list_to_binary(OfflineUsers), list_to_binary(OnlineResources), <<"android">>,MesssageSend)
     of {selected, _, []} ->
     ok;
       {selected, _, ATokens} ->
         lists:map(fun(G) ->
-          [AndroidDeviceToken, UserType, PushType] = G,
+          [Touser, AndroidDeviceToken, UserType, PushType] = G,
         ChangedMessage = case MessageType of
                             <<"image">> -> binary_to_list(<<"Image">>);
                             <<"audio">> -> binary_to_list(<<"Audio">>);
@@ -1971,6 +2000,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
                           end,
         Load = [{<<"user_jid">>, binary_to_list(GroupID)},
           {<<"sent_from">>, binary_to_list(MesssageSend)},
+          {<<"sent_to">>, binary_to_list(Touser)},
           {<<"message_time">>, FlatTimeStamp},
           {<<"chat_type">>, binary_to_list(ChatType)},
           {<<"userDomain">>, binary_to_list(Server)},
@@ -1988,8 +2018,8 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
     of {selected, _, []} -> {ok, <<"user not using ios device">>};
       {selected, _, ITokens} ->
         lists:map(fun(G) ->
-          [IOSDevice, IOSDeviceUserType, IOSDevicePushType] = G,
-        ios_send_bulk_push(Server, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"0">>, IOSDevice, Expiry, State,<<"13above">>,IOSDeviceUserType, IOSDevicePushType)
+          [Touser, IOSDevice, IOSDeviceUserType, IOSDevicePushType] = G,
+        ios_send_bulk_push(Server, Touser, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"0">>, IOSDevice, Expiry, State,<<"13above">>,IOSDeviceUserType, IOSDevicePushType)
         end,ITokens)
     end,
     case catch fly_mod_utils:get_bulk_voip_user_device(Server,
@@ -1997,8 +2027,8 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
     of {selected, _, []} -> {ok, <<"user not using ios device">>};
     {selected, _, VTokens} ->
       lists:map(fun(G) ->
-      [IOSVoipDevice, IOSVoipDeviceUserType, IOSVoipDevicePushType] = G,
-        ios_send_bulk_push(Server, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"0">>, IOSVoipDevice, Expiry, State,<<"13below">>,IOSVoipDeviceUserType, IOSVoipDevicePushType)
+      [Touser, IOSVoipDevice, IOSVoipDeviceUserType, IOSVoipDevicePushType] = G,
+        ios_send_bulk_push(Server, Touser,  MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"0">>, IOSVoipDevice, Expiry, State,<<"13below">>,IOSVoipDeviceUserType, IOSVoipDevicePushType)
         end,VTokens)
     end,
     case catch fly_mod_utils:get_bulk_user_device(Server,
@@ -2006,8 +2036,8 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
     of {selected, _, []} -> {ok, <<"user not using ios device">>};
     {selected, _, IOTokens} ->
       lists:map(fun(G) ->
-      [IOSDevices, IOSDevicesUserType, IOSDevicesPushType] = G,
-        ios_send_bulk_push(Server, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"1">>, IOSDevices, Expiry, State,<<"13above">>,IOSDevicesUserType, IOSDevicesPushType)
+      [Touser, IOSDevices, IOSDevicesUserType, IOSDevicesPushType] = G,
+        ios_send_bulk_push(Server, Touser, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"1">>, IOSDevices, Expiry, State,<<"13above">>,IOSDevicesUserType, IOSDevicesPushType)
         end,IOTokens)
     end,
     case catch fly_mod_utils:get_bulk_voip_user_device(Server,
@@ -2015,8 +2045,8 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
     of {selected, _, []} -> {ok, <<"user not using ios device">>};
         {selected, _, VITokens} ->
         lists:map(fun(G) ->
-        [IOSVoipDevices, IOSVoipDevicesUserType, IOSVoipDevicesPushType] = G,
-        ios_send_bulk_push(Server, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"1">>, IOSVoipDevices, Expiry, State,<<"13below">>,IOSVoipDevicesUserType, IOSVoipDevicesPushType)
+        [Touser, IOSVoipDevices, IOSVoipDevicesUserType, IOSVoipDevicesPushType] = G,
+        ios_send_bulk_push(Server, Touser, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"1">>, IOSVoipDevices, Expiry, State,<<"13below">>,IOSVoipDevicesUserType, IOSVoipDevicesPushType)
         end,VITokens)
     end;
     Node =:= <<"urn:xmpp:mix:nodes:participants">> ->
@@ -2030,7 +2060,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
         ok;
           {selected, _, ATokens} ->
           lists:map(fun(G) ->
-          [AndroidDeviceToken, UserType, PushType] = G,
+          [Touser, AndroidDeviceToken, UserType, PushType] = G,
         {selected, [{UserName}]} = fly_mod_utils:get_nickname(Server, Owner),
           [NewUser, _] = binary:split(ParticipantJid, <<"@">>),
           {selected, [{ReceiverUserName}]} = fly_mod_utils:get_nickname(Server, NewUser),
@@ -2081,6 +2111,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
             {<<"node_id">>, binary_to_list(NodeId)},
             {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
             {<<"sent_from">>, binary_to_list(MsgFrom)},
+            {<<"sent_to">>, binary_to_list(Touser)},
             {<<"user_name">>, binary_to_list(UserName)},
             {<<"added_user">>, binary_to_list(ReceiverUserName)},
             {<<"participant">>, binary_to_list(ParticipantJid)},
@@ -2118,6 +2149,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
             {<<"node_id">>, binary_to_list(NodeId)},
             {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
             {<<"sent_from">>, binary_to_list(MsgFrom)},
+            {<<"sent_to">>, binary_to_list(Touser)},
             {<<"publisher_profile">>, binary_to_list(PublisherVcard)},
             {<<"title">>, binary_to_list(GroupNickName)},
             {<<"type">>, "normal"}]
@@ -2133,12 +2165,12 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
         {ok, <<"user not using ios device">>};
         {selected, _, Tokens} ->
         lists:map(fun(G) ->
-        [_DeviceType, DeviceToken, VoipDeviceToken,Mode,IOSVersion, UserType, PushType] = G,
+        [Touser, _DeviceType, DeviceToken, VoipDeviceToken,Mode,IOSVersion, UserType, PushType] = G,
           if IOSVersion >= <<"13">>
               ->
-                ios_group_create_push(MessageContent, Server,Members, Group, FlatTimeStamp, ChatType, Mode, DeviceToken, Expiry, Stanza, State,<<"13above">>,Type,UserType, PushType);
+                ios_group_create_push(Touser, MessageContent, Server,Members, Group, FlatTimeStamp, ChatType, Mode, DeviceToken, Expiry, Stanza, State,<<"13above">>,Type,UserType, PushType);
             true ->
-                ios_group_create_push(MessageContent, Server,Members, Group, FlatTimeStamp, ChatType, Mode, VoipDeviceToken, Expiry, Stanza, State,<<"13below">>,Type,UserType, PushType)
+                ios_group_create_push(Touser, MessageContent, Server,Members, Group, FlatTimeStamp, ChatType, Mode, VoipDeviceToken, Expiry, Stanza, State,<<"13below">>,Type,UserType, PushType)
             end
           end,
           Tokens)
@@ -2147,7 +2179,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
       ok
   end.
 
-ios_group_create_push(MessageContent, Server, Members, _Group, FlatTimeStamp, ChatType, Mode, IOSDeviceToken, Expiry, _Stanza, State, IOSPushType, Type, UserType, PushType) ->
+ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeStamp, ChatType, Mode, IOSDeviceToken, Expiry, _Stanza, State, IOSPushType, Type, UserType, PushType) ->
   [Chan,MsgFrom,ParticipantJid,NodeId,UserNickName,NotifyId] = MessageContent,
   [Owner, _] = binary:split(MsgFrom, <<"@">>),
   [NewUser, _] = binary:split(ParticipantJid, <<"@">>),
@@ -2174,6 +2206,7 @@ ios_group_create_push(MessageContent, Server, Members, _Group, FlatTimeStamp, Ch
     {user_name, binary_to_list(ReceiverUserName)},
     {updated_username, binary_to_list(NewUserName)},
     {sent_from, binary_to_list(MsgFrom)},
+    {sent_to, binary_to_list(Touser)},
     {created_at, FlatTimeStamp},
     {notify_id, binary_to_list(NotifyId)},
     {added_at, FlatTimeStamp},
@@ -2192,8 +2225,8 @@ ios_group_create_push(MessageContent, Server, Members, _Group, FlatTimeStamp, Ch
       send_payload(IOSPayLoad, ChatType, State#state.rabbitmq_connection, State#state.rabbitmq_exchange,Server, PushType)
   end.
 
-ios_send_bulk_push(Server, MessageContent, _FromUser, FlatTimeStamp, ChatType, GroupID, Mode, IOSDeviceToken, _Expiry, State,IOSPushType, UserType, PushType) ->
-[MessageType, MessageId, MesssageSend,GroupName, MSGBody, _EditMsg] = MessageContent,
+ios_send_bulk_push(Server, ToUser, MessageContent, _FromUser, FlatTimeStamp, ChatType, GroupID, Mode, IOSDeviceToken, _Expiry, State,IOSPushType, UserType, PushType) ->
+[MessageType, MessageId, MesssageSend,GroupName, MSGBody, _EditMsg, _MetaData] = MessageContent,
   ChangedMessage = case MessageType of
                     <<"image">> ->
                       Message_Content = <<"">>,
@@ -2217,7 +2250,7 @@ ios_send_bulk_push(Server, MessageContent, _FromUser, FlatTimeStamp, ChatType, G
   Args = [{message_id, binary_to_list(MessageId)}, {message_time, FlatTimeStamp}, {chat_type, binary_to_list(ChatType)},
     {message_content, binary_to_list(Message_Content)}, {from_user, binary_to_list(GroupID)}, {group_name, binary_to_list(GroupName)},
     {userDomain, binary_to_list(Server)}, {user_type, binary_to_list(UserType)}, {push_from, binary_to_list(<<"MirrorFly">>)},
-    {sent_from, binary_to_list(MesssageSend)}, {type, binary_to_list(MessageType)}],
+    {sent_from, binary_to_list(MesssageSend)}, {sent_to, binary_to_list(ToUser)}, {type, binary_to_list(MessageType)}],
   if IOSPushType =:= <<"13above">> ->
     Msg = [{<<"mutable-content">>, integer_to_list(1)}, {alert, ChangedMessage},{mode, binary_to_list(Mode)}, {sound, binary_to_list(<<"default">>)}],
     IOSPayLoad = create_json(Msg, Args, binary_to_list(IOSDeviceToken), Mode,0,0,PushType),
