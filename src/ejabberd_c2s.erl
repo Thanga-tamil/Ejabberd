@@ -685,14 +685,48 @@ process_message_in(State, #message{type = T} = Msg) ->
 	deny when T == groupchat; T == headline ->
 	    {false, State};
 	deny ->
-	    case xmpp:has_subtag(Msg, #muc_user{}) of
-		true ->
-		    ok;
-		false ->
-		    ejabberd_router:route_error(
-		      Msg, xmpp:err_service_unavailable())
-	    end,
-	    {false, State}
+	Delivered = xmpp:get_subtag(Msg, #delivered{}),
+	if Delivered =:= false ->
+		Seen = xmpp:get_subtag(Msg, #seen{}),
+		  if Seen =:= false ->
+		    Poll = xmpp:get_subtag(Msg, #poll{}),
+			    if Poll =:= false ->
+				case xmpp:has_subtag(Msg, #muc_user{}) of
+					true ->
+					    ok;
+					false ->
+					    ejabberd_router:route_error(
+					      Msg, xmpp:err_service_unavailable())
+				    end,
+				    {false, State};
+			    true ->
+				ElementAcknowledge = xmpp:get_subtag(Msg, #poll{}),
+                                {poll,_PollId,_VoterUserId,_VoteId,Status,Chattype,PollOptionId,PollUser} = ElementAcknowledge,
+				?INFO_MSG("Chattype ~p", [Chattype]),
+				?INFO_MSG("Status ~p", [Status]),
+				?INFO_MSG("PollUser ~p", [PollUser]),
+				?INFO_MSG("PollOptionId ~p", [PollOptionId]),
+				if Chattype =:= <<"normal">>->
+				?INFO_MSG("Poll alowwed ~p", [Chattype]),
+				{true, State};
+				true->
+					?INFO_MSG("Poll not alowwed ~p", [Chattype]),
+					case xmpp:has_subtag(Msg, #muc_user{}) of
+					true ->
+					    ok;
+					false ->
+					    ejabberd_router:route_error(
+					      Msg, xmpp:err_service_unavailable())
+				    end,
+				    {false, State}
+				end
+			    end;
+		  true ->
+			{true, State}
+		  end;
+	    true ->
+		{true, State}
+	      end
     end.
 
 -spec process_presence_in(state(), presence()) -> {boolean(), state()}.

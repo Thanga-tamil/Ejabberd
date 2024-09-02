@@ -139,6 +139,7 @@
   get_single_message/3,
   get_group_message/3,
   check_blockedlist/3,
+  check_chatmuted/3,
   get_reply_message/2,
   get_reply_messages/2,
   delete_spool/2,
@@ -319,34 +320,34 @@ get_user_for_ios_group_device(LServer, LUser, LResource) ->
   if LResource =:= "" ->
   ejabberd_sql:sql_query(
     LServer,
-    [<<"SELECT  device_type,  device_token,voip_device_token ,  mode, device_os_version ,user_type, push_server_type  FROM chat_users_details WHERE  username = '">>, LUser, <<"' and device_token != '' and device_token != 'null' and device_type ='ios'  ;">>]);
+    [<<"SELECT  username, device_type,  device_token,voip_device_token ,  mode, device_os_version ,user_type, push_server_type  FROM chat_users_details WHERE  username = '">>, LUser, <<"' and device_token != '' and device_token != 'null' and device_type ='ios'  ;">>]);
   true ->
       ejabberd_sql:sql_query(LServer,
-      [<<"SELECT  device_type, device_token, voip_device_token ,  mode, device_os_version, user_type,push_server_type FROM chat_users_details WHERE  username = '">>, LUser, <<"' and  device_token != '' and device_token != 'null' and device_type ='ios'   and device_id not in  ('">>, LResource, <<"' );">>])
+      [<<"SELECT username,  device_type, device_token, voip_device_token ,  mode, device_os_version, user_type,push_server_type FROM chat_users_details WHERE  username = '">>, LUser, <<"' and  device_token != '' and device_token != 'null' and device_type ='ios'   and device_id not in  ('">>, LResource, <<"' );">>])
       end.
 
 get_bulk_user_device(LServer, Members, Resources, Type,Fromuser) ->
   FromUser = get_user_from_string_jid(Fromuser),
   ejabberd_sql:sql_query(
     LServer,
-    [<<"SELECT device_token ,user_type, push_server_type  FROM chat_users_details WHERE  username  in ('">>, Members, <<"') and  device_token != '' and device_token != 'null' and (device_type = 'android' or device_type = 'flutter-android' or  device_type = 'flutter-ios') and username != '">>, FromUser, <<"' and device_id not in  ('">>, Resources, <<"' );">>]).
+    [<<"SELECT username, device_token ,user_type, push_server_type  FROM chat_users_details WHERE  username  in ('">>, Members, <<"') and  device_token != '' and device_token != 'null' and (device_type = 'android' or device_type = 'flutter-android' or  device_type = 'flutter-ios') and username != '">>, FromUser, <<"' and device_id not in  ('">>, Resources, <<"' );">>]).
 
 get_bulk_user_device(LServer, Members, Resources, Type,Mode,Fromuser) ->
   FromUser = get_user_from_string_jid(Fromuser),
   ejabberd_sql:sql_query(
     LServer,
-    [<<"SELECT  device_token ,user_type, push_server_type From chat_users_details WHERE  username  in ('">>, Members, <<"') and  device_token != '' and device_token != 'null' and device_type = '">>, Type, <<"'and mode = '">>, Mode, <<"' and device_os_version >= 13 and username != '">>, FromUser, <<"' and device_id not in  ('">>, Resources, <<"' );">>]).
+    [<<"SELECT  username, device_token ,user_type, push_server_type From chat_users_details WHERE  username  in ('">>, Members, <<"') and  device_token != '' and device_token != 'null' and device_type = '">>, Type, <<"'and mode = '">>, Mode, <<"' and device_os_version >= 13 and username != '">>, FromUser, <<"' and device_id not in  ('">>, Resources, <<"' );">>]).
 
 get_bulk_voip_user_device(LServer, Members,Type,Mode,Fromuser) ->
   FromUser = get_user_from_string_jid(Fromuser),
   ejabberd_sql:sql_query(
     LServer,
-    [<<"SELECT  voip_device_token ,user_type, push_server_type From chat_users_details WHERE  username  in ('">>, Members, <<"') and voip_device_token != '' and voip_device_token != 'null' and device_type = '">>, Type, <<"'and mode = '">>, Mode, <<"' and device_os_version < 13 and username != '">>, FromUser, <<"';">> ]).
+    [<<"SELECT username, voip_device_token ,user_type, push_server_type From chat_users_details WHERE  username  in ('">>, Members, <<"') and voip_device_token != '' and voip_device_token != 'null' and device_type = '">>, Type, <<"'and mode = '">>, Mode, <<"' and device_os_version < 13 and username != '">>, FromUser, <<"';">> ]).
 
 get_bulk_group_create_android_user_device(LServer, Member) ->
   ejabberd_sql:sql_query(
     LServer,
-    [<<"SELECT  device_token ,user_type, push_server_type From chat_users_details WHERE  username  ='">>, Member, <<"' and  device_token != '' and device_token != 'null' and device_type = 'android';">> ]).
+    [<<"SELECT username,  device_token ,user_type, push_server_type From chat_users_details WHERE  username  ='">>, Member, <<"' and  device_token != '' and device_token != 'null' and device_type = 'android';">> ]).
 
 %% get roaster usg user jabber id
 %%
@@ -796,6 +797,11 @@ check_blockedlist(LServer,FUser, TUser) ->
   Value = list_to_binary(binary_to_list(TUser) ++ "@" ++ binary_to_list(LServer)),
   ejabberd_sql:sql_query(LServer,
   [<<"SELECT E.t from privacy_list_data E JOIN privacy_list S ON E.id = S.id and E.value = '">>,Value, <<"' and  S.username = '">>,FUser, <<"';">>]).
+
+check_chatmuted(LServer,FUser, TUser) ->
+    ejabberd_sql:sql_query(LServer,
+    [<<"SELECT username FROM muted_chats where username =  '">>,FUser, <<"' and chat_id =  '">>,TUser, <<"' union SELECT username FROM users where username =  '">>,FUser, <<"'  and is_muted = 1 ;">>]).
+
 
 %% check the user blocked or not
 %%
@@ -1424,7 +1430,7 @@ end,
   ejabberd_sql:sql_query(ToServer, [<<"delete from spool where username = '">>,ToUser, <<"' and message_id ='">>,MessageId, <<"';">>]),
   ejabberd_sql:sql_query( ToServer, [<<"update  message_status set edit_status = 1, status = 0,  edit_message_id = '">>, EditMsgId , <<"', txt = '">>, Msg , <<"' where message_id = '">>, MessageId, <<"' ;">>])
   end,
-  ejabberd_sql:sql_query( ToServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg) values ('">>, User, <<"', '">>, ToUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'chat', '">>, Msg, <<"');">>]).
+  ejabberd_sql:sql_query( ToServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg, meta_data) values ('">>, User, <<"', '">>, ToUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'chat', '">>, Msg, <<"', '">>, MetaData, <<"');">>]).
 
 msg_exit(LServer,MsgId)->
   ejabberd_sql:sql_query(
@@ -1902,7 +1908,7 @@ get_single_message(FServer,  MsgId ,_OldMsgId) ->
 
 get_reply_message(FServer,  MsgId) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT msg, message_id, edit_message_id, from_user, chat_type, 0 as deleted_by, 0 as deleted_status, 0 as status, '' as from_notification, '' as to_notification, to_user, created_at, '' as message_notification, 0 as recall_status, created_at, '' as topic_id,  0 as edit_status, created_at,  '{}' as meta FROM chat_message_edit_history WHERE edit_message_id = '">>, MsgId, <<"' limit 1">>]).
+    [<<"SELECT msg, message_id, edit_message_id, from_user, chat_type, 0 as deleted_by, 0 as deleted_status, 0 as status, '' as from_notification, '' as to_notification, to_user, created_at, '' as message_notification, 0 as recall_status, created_at, '' as topic_id,  0 as edit_status, created_at, IFNULL(json_unquote(meta_data),'') as meta FROM chat_message_edit_history WHERE edit_message_id = '">>, MsgId, <<"' limit 1">>]).
 
 get_reply_messages(FServer,  MsgId) ->
   ejabberd_sql:sql_query(FServer,
