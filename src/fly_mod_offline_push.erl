@@ -2185,22 +2185,23 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
   [NewUser, _] = binary:split(ParticipantJid, <<"@">>),
   {selected, [{NewUserName}]} = fly_mod_utils:get_nickname(Server, NewUser),
   {selected, [{ReceiverUserName}]} = fly_mod_utils:get_nickname(Server, Owner),
+  {selected, [{GroupName}]} = fly_mod_utils:get_nickname(Server, Chan),
   if Type =:= <<"added">> ->
           if NewUser =:= Members ->
-            Message = <<UserNickName / binary, <<":">> / binary, Owner / binary, <<" added you">> / binary>>;
+            Message = <<GroupName / binary, <<":">> / binary, Owner / binary, <<" added you">> / binary>>;
           true ->
-            Message = <<UserNickName / binary, <<":">> / binary, Owner / binary, <<" added ">> / binary, NewUser / binary>>
+            Message = <<GroupName / binary, <<":">> / binary, Owner / binary, <<" added ">> / binary, NewUser / binary>>
           end;
       true ->
         if NewUser =:= Members ->
-            Message = <<UserNickName / binary, <<":">> / binary, Owner / binary, <<" removed you">> / binary>>;
+            Message = <<GroupName / binary, <<":">> / binary, Owner / binary, <<" removed you">> / binary>>;
           true ->
-            Message = <<UserNickName / binary, <<":">> / binary,  Owner / binary, <<" removed ">> / binary, NewUser / binary>>
+            Message = <<GroupName / binary, <<":">> / binary,  Owner / binary, <<" removed ">> / binary, NewUser / binary>>
           end
         end,
   Args = [{message_content,
     binary_to_list(Message)},
-    {group_name, binary_to_list(UserNickName)},
+    {group_name, binary_to_list(GroupName)},
     {user_id, binary_to_list(Owner)},
     {updated_userid, binary_to_list(NewUser)},
     {user_name, binary_to_list(ReceiverUserName)},
