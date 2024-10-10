@@ -118,10 +118,10 @@ handle_call(stop, _From, State) ->
 handle_cast({pushnotification, <<"chat">>,
   {Sender, Recipient, ChatType, SubEl, Packet}},
     State) ->
-    %   case catch fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser,
-    %   Sender#jid.luser)
-    % of
-    %   {selected, _, []} ->
+      case catch fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser,
+      Sender#jid.luser)
+    of
+      {selected, _, []} ->
         case catch send_push_notifications(Sender, Recipient,
           ChatType, SubEl, Packet, State)
         of
@@ -130,10 +130,10 @@ handle_cast({pushnotification, <<"chat">>,
             ?INFO_MSG("push error ~p", [Error]), ok;
           _Exception ->
             ?INFO_MSG("push exception ~p", [_Exception]), ok
-      %   end;
-      % {selected, _, [[_T]]} ->
-      %   ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
-      %   ok
+        end;
+      {selected, _, [[_T]]} ->
+        ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
+        ok
       end,
   {noreply, State};
 handle_cast({queryexecution, <<"clear_all">>,
@@ -2185,22 +2185,23 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
   [NewUser, _] = binary:split(ParticipantJid, <<"@">>),
   {selected, [{NewUserName}]} = fly_mod_utils:get_nickname(Server, NewUser),
   {selected, [{ReceiverUserName}]} = fly_mod_utils:get_nickname(Server, Owner),
+  {selected, [{GroupName}]} = fly_mod_utils:get_nickname(Server, Chan),
   if Type =:= <<"added">> ->
           if NewUser =:= Members ->
-            Message = <<UserNickName / binary, <<":">> / binary, Owner / binary, <<" added you">> / binary>>;
+            Message = <<GroupName / binary, <<":">> / binary, Owner / binary, <<" added you">> / binary>>;
           true ->
-            Message = <<UserNickName / binary, <<":">> / binary, Owner / binary, <<" added ">> / binary, NewUser / binary>>
+            Message = <<GroupName / binary, <<":">> / binary, Owner / binary, <<" added ">> / binary, NewUser / binary>>
           end;
       true ->
         if NewUser =:= Members ->
-            Message = <<UserNickName / binary, <<":">> / binary, Owner / binary, <<" removed you">> / binary>>;
+            Message = <<GroupName / binary, <<":">> / binary, Owner / binary, <<" removed you">> / binary>>;
           true ->
-            Message = <<UserNickName / binary, <<":">> / binary,  Owner / binary, <<" removed ">> / binary, NewUser / binary>>
+            Message = <<GroupName / binary, <<":">> / binary,  Owner / binary, <<" removed ">> / binary, NewUser / binary>>
           end
         end,
   Args = [{message_content,
     binary_to_list(Message)},
-    {group_name, binary_to_list(UserNickName)},
+    {group_name, binary_to_list(GroupName)},
     {user_id, binary_to_list(Owner)},
     {updated_userid, binary_to_list(NewUser)},
     {user_name, binary_to_list(ReceiverUserName)},
