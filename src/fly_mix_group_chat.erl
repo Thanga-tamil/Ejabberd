@@ -1410,17 +1410,17 @@ process_get_group_vcard(From, _To, SubEl, IQ, RequestType) ->
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
-                                    CustomFeatures= <<"">>;
+                                    CustomFeatures = <<"">>;
                                     {selected, _, [[GHistory ,GMessageMode,GAccessMode,GCustomFeatures]]} ->
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
-                                      CustomFeatures= GCustomFeatures;
+                                      CustomFeatures = GCustomFeatures;
                                     _ ->
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
-                                      CustomFeatures= <<"">>
+                                      CustomFeatures = <<"">>
                                     end,
       SubEls1 = lists:map(fun(G) ->
         [Vcard,CreatedDate] = G,
@@ -1459,17 +1459,17 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
-                                    CustomFeatures= <<"">>;
+                                    CustomFeatures = <<"">>;
                                     {selected, _, [[GHistory ,GMessageMode,GAccessMode,GCustomFeatures]]} ->
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
-                                      CustomFeatures= GCustomFeatures;
+                                      CustomFeatures = GCustomFeatures;
                                     _ ->
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
-                                      CustomFeatures= <<"">>
+                                      CustomFeatures = <<"">>
                                     end,
       SubEls1 = lists:map(fun(G) ->
         [GID, CreatedDate, Vcard, Affiliation, ItemId, IsAdminBlocked] = G,
