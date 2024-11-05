@@ -58,6 +58,7 @@
   get_my_all_group_id_rosters/2,
   get_my_all_group_id/2,
   get_group_profile/3,
+  get_group_profile_type/2,
   set_last_t/2,
   set_last_o/3,
   clear_message/5,
@@ -1897,6 +1898,10 @@ get_callstatus(LServer,SocketId)->
 get_group_vcard(LServer,LUser) ->
   ejabberd_sql:sql_query(LServer,
     [<<"select vcard, created_at from vcard where username= '">>,LUser,<<"';">>]).
+
+get_group_profile_type(LServer,LUser)->
+ejabberd_sql:sql_query(LServer,
+[<<"SELECT v.history ,cs.message_mode,cs.access_mode,cs.custom_features FROM vcard_search v JOIN  channel_settings cs ON cs.channel = v.username WHERE  v.username= '">>,LUser,<<"';">>]).
 
 get_offline_message(LServer, LUser, LResource) ->
   ejabberd_sql:sql_query(LServer,
