@@ -1405,13 +1405,30 @@ process_get_group_vcard(From, _To, SubEl, IQ, RequestType) ->
     {selected, _, []} ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"No groups available for you">>});
     {selected, _, GroupIds} ->
+      case catch fly_mod_utils:get_group_profile_type(FServer,GroupId) of
+                                    {selected, _, []} ->
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    CustomFeatures= <<"">>;
+                                    {selected, _, [[GHistory ,GMessageMode,GAccessMode,GCustomFeatures]]} ->
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      CustomFeatures= GCustomFeatures;
+                                    _ ->
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      CustomFeatures= <<"">>
+                                    end,
       SubEls1 = lists:map(fun(G) ->
         [Vcard,CreatedDate] = G,
         VCard = case fxml_stream:parse_element(Vcard) of
                     {error, _Reason} -> [];
                     VCARD -> [VCARD]
                   end,
-        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GroupId }, {<<"createddate">>,  CreatedDate}],
+        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GroupId }, {<<"createddate">>,  CreatedDate},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
           children = VCard}
                           end,
         GroupIds),
@@ -1437,13 +1454,30 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
     {selected, _, []} ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"No groups available for you">>});
     {selected, _, GroupIds} ->
+      case catch fly_mod_utils:get_group_profile_type(FServer,FUser) of
+                                    {selected, _, []} ->
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    CustomFeatures= <<"">>;
+                                    {selected, _, [[GHistory ,GMessageMode,GAccessMode,GCustomFeatures]]} ->
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      CustomFeatures= GCustomFeatures;
+                                    _ ->
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      CustomFeatures= <<"">>
+                                    end,
       SubEls1 = lists:map(fun(G) ->
         [GID, CreatedDate, Vcard, Affiliation, ItemId, IsAdminBlocked] = G,
         VCard = case fxml_stream:parse_element(Vcard) of
                     {error, _Reason} -> [];
                     VCARD -> [VCARD]
                   end,
-        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}, {<<"is_admin_blocked">>,  IsAdminBlocked }],
+        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}, {<<"is_admin_blocked">>,  IsAdminBlocked },{<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
           children = VCard}
                           end,
         GroupIds),

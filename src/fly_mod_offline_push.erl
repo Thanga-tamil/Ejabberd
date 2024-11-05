@@ -2203,6 +2203,7 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
     binary_to_list(Message)},
     {group_name, binary_to_list(GroupName)},
     {user_id, binary_to_list(Owner)},
+    {chat_type, binary_to_list(<<"normal">>)},
     {updated_userid, binary_to_list(NewUser)},
     {user_name, binary_to_list(ReceiverUserName)},
     {updated_username, binary_to_list(NewUserName)},
