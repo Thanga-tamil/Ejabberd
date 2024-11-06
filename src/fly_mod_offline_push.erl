@@ -2105,7 +2105,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
                                       CustomFeatures = <<"">>
-                                    end
+                                    end,
           if Type =:= <<"added">> ->
           if NewUser =:= Members ->
             Content = <<UserNickName / binary, <<":">> / binary, UserName / binary, <<" added you">> / binary>>;
@@ -2223,7 +2223,7 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
                                       CustomFeatures = <<"">>
-                                    end
+                                    end,
   if Type =:= <<"added">> ->
           if NewUser =:= Members ->
             Message = <<GroupName / binary, <<":">> / binary, Owner / binary, <<" added you">> / binary>>;
