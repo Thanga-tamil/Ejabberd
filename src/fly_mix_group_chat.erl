@@ -1483,7 +1483,13 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
     {selected, _, []} ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"No groups available for you">>});
     {selected, _, GroupIds} ->
-      case catch fly_mod_utils:get_group_profile_type(FServer,FUser) of
+      SubEls1 = lists:map(fun(G) ->
+        [GID, CreatedDate, Vcard, Affiliation, ItemId, IsAdminBlocked] = G,
+        VCard = case fxml_stream:parse_element(Vcard) of
+                    {error, _Reason} -> [];
+                    VCARD -> [VCARD]
+                  end,
+                  case catch fly_mod_utils:get_group_profile_type(FServer,GID) of
                                     {selected, _, []} ->
                                     Status = <<"">>,
                                     History = <<"">>,
@@ -1506,12 +1512,6 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
                                       Description = <<"">>,
                                       CustomFeatures = <<"">>
                                     end,
-      SubEls1 = lists:map(fun(G) ->
-        [GID, CreatedDate, Vcard, Affiliation, ItemId, IsAdminBlocked] = G,
-        VCard = case fxml_stream:parse_element(Vcard) of
-                    {error, _Reason} -> [];
-                    VCARD -> [VCARD]
-                  end,
         #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"status">>,  Status},{<<"description">>,  Description}, {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}, {<<"is_admin_blocked">>,  IsAdminBlocked },{<<"history">>,  History },{<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
           children = VCard}
                           end,
