@@ -235,6 +235,29 @@ update_profile_service(From, To, SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Group Does Not exists">>});
     {selected, _, GroupMembers} ->
       JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
+      case catch fly_mod_utils:get_group_profile_type(FServer,Channel) of
+                                    {selected, _, []} ->
+                                    Status = <<"">>,
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    Description = <<"">>,
+                                    CustomFeatures = <<"">>;
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                      Status = GStatus,
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      Description = GDescription,
+                                      CustomFeatures = GCustomFeatures;
+                                    _ ->
+                                      Status = <<"">>,
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      Description = <<"">>,
+                                      CustomFeatures = <<"">>
+                                    end,
       lists:foreach(fun(ToJid) ->
         RouteToJid = jid:make(ToJid, FServer, <<>>),
         MessageId = <<(get_string()) / binary>>,
@@ -244,7 +267,7 @@ update_profile_service(From, To, SubEl, IQ) ->
           attrs = [{<<"from">>, jid:to_string(GroupJid)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
           children = [
             #xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],
-            children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, <<"group_profile_updated">>}, {<<"done_by">>, ActionDoneBy}], children = [VCard]}]},
+            children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, <<"group_profile_updated">>}, {<<"groupstatus">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures},{<<"done_by">>, ActionDoneBy}], children = [VCard]}]},
             #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, ""}]},
             #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}]}
           ]},
