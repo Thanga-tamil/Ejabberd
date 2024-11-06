@@ -2091,19 +2091,25 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
               end,
               case catch fly_mod_utils:get_group_profile_type(Server,Group) of
                                     {selected, _, []} ->
+                                    Status = <<"">>,
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
+                                    Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GHistory ,GMessageMode,GAccessMode,GCustomFeatures]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                      Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
+                                      Description = GDescription,
                                       CustomFeatures = GCustomFeatures;
                                     _ ->
+                                      Status = <<"">>,
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
+                                      Description = <<"">>,
                                       CustomFeatures = <<"">>
                                     end,
           if Type =:= <<"added">> ->
@@ -2134,6 +2140,8 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
             {<<"sent_from">>, binary_to_list(MsgFrom)},
             {<<"sent_to">>, binary_to_list(Touser)},
             {<<"user_name">>, binary_to_list(UserName)},
+            {<<"status">>, binary_to_list(Status)},
+            {<<"description">>, binary_to_list(Description)},
             {<<"added_user">>, binary_to_list(ReceiverUserName)},
             {<<"participant">>, binary_to_list(ParticipantJid)},
             {<<"publisher_profile">>, binary_to_list(PublisherVcard)},
@@ -2209,19 +2217,25 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
   {selected, [{GroupName}]} = fly_mod_utils:get_nickname(Server, Chan),
   case catch fly_mod_utils:get_group_profile_type(Server,Chan) of
                                     {selected, _, []} ->
+                                    Status = <<"">>,
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
+                                    Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GHistory ,GMessageMode,GAccessMode,GCustomFeatures]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                      Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
+                                      Description = GDescription,
                                       CustomFeatures = GCustomFeatures;
                                     _ ->
+                                      Status = <<"">>,
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
+                                      Description = <<"">>,
                                       CustomFeatures = <<"">>
                                     end,
   if Type =:= <<"added">> ->
@@ -2255,6 +2269,8 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
     {added_at, FlatTimeStamp},
     {userDomain, binary_to_list(Server)},
     {user_type, binary_to_list(UserType)},
+    {status, binary_to_list(Status)},
+    {description, binary_to_list(Description)},
     {push_from, binary_to_list(<<"MirrorFly">>)},
     {node_id, binary_to_list(NodeId)},
     {group_id, binary_to_list(Chan)}],
