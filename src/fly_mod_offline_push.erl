@@ -2089,6 +2089,23 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
                   <<"">>;
                 _ -> SVCARD = <<"">>, <<"">>
               end,
+              case catch fly_mod_utils:get_group_profile_type(Server,Group) of
+                                    {selected, _, []} ->
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    CustomFeatures = <<"">>;
+                                    {selected, _, [[GHistory ,GMessageMode,GAccessMode,GCustomFeatures]]} ->
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      CustomFeatures = GCustomFeatures;
+                                    _ ->
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      CustomFeatures = <<"">>
+                                    end,
           if Type =:= <<"added">> ->
           if NewUser =:= Members ->
             Content = <<UserNickName / binary, <<":">> / binary, UserName / binary, <<" added you">> / binary>>;
@@ -2109,6 +2126,10 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
             {<<"notify_id">>, binary_to_list(NotifyId)},
             {<<"message_time">>, FlatTimeStamp},
             {<<"node_id">>, binary_to_list(NodeId)},
+            {<<"history">>, binary_to_list(History)},
+            {<<"mesagemodde">>, binary_to_list(MessageMode)},
+            {<<"accessmode">>, binary_to_list(AccessMode)},
+            {<<"customfature">>, binary_to_list(CustomFeatures)},
             {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
             {<<"sent_from">>, binary_to_list(MsgFrom)},
             {<<"sent_to">>, binary_to_list(Touser)},
@@ -2186,6 +2207,23 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
   {selected, [{NewUserName}]} = fly_mod_utils:get_nickname(Server, NewUser),
   {selected, [{ReceiverUserName}]} = fly_mod_utils:get_nickname(Server, Owner),
   {selected, [{GroupName}]} = fly_mod_utils:get_nickname(Server, Chan),
+  case catch fly_mod_utils:get_group_profile_type(Server,Chan) of
+                                    {selected, _, []} ->
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    CustomFeatures = <<"">>;
+                                    {selected, _, [[GHistory ,GMessageMode,GAccessMode,GCustomFeatures]]} ->
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      CustomFeatures = GCustomFeatures;
+                                    _ ->
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      CustomFeatures = <<"">>
+                                    end,
   if Type =:= <<"added">> ->
           if NewUser =:= Members ->
             Message = <<GroupName / binary, <<":">> / binary, Owner / binary, <<" added you">> / binary>>;
@@ -2203,13 +2241,16 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
     binary_to_list(Message)},
     {group_name, binary_to_list(GroupName)},
     {user_id, binary_to_list(Owner)},
-    {chat_type, binary_to_list(<<"normal">>)},
     {updated_userid, binary_to_list(NewUser)},
     {user_name, binary_to_list(ReceiverUserName)},
     {updated_username, binary_to_list(NewUserName)},
     {sent_from, binary_to_list(MsgFrom)},
     {sent_to, binary_to_list(Touser)},
     {created_at, FlatTimeStamp},
+    {history, binary_to_list(History)},
+    {mesagemodde, binary_to_list(MessageMode)},
+    {accessmode, binary_to_list(AccessMode)},
+    {customfature, binary_to_list(CustomFeatures)},
     {notify_id, binary_to_list(NotifyId)},
     {added_at, FlatTimeStamp},
     {userDomain, binary_to_list(Server)},
