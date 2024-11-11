@@ -1599,35 +1599,12 @@ update_group_info_to_members(ActionUser, GroupFrom, Status, Data, Members, Notif
       ParticipantJid = <<Data / binary, $@,_AServer / binary>>,
       fly_mod_utils:update_group_count(_AServer, FUser),
       MessageId = <<(get_string()) / binary>>,
-      case catch fly_mod_utils:get_group_profile_type(_AServer,FUser) of
-                                    {selected, _, []} ->
-                                    Status = <<"">>,
-                                    History = <<"">>,
-                                    MessageMode = <<"">>,
-                                    AccessMode = <<"">>,
-                                    Description = <<"">>,
-                                    CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
-                                      Status = GStatus,
-                                      History = GHistory,
-                                      MessageMode = GMessageMode,
-                                      AccessMode = GAccessMode,
-                                      Description = GDescription,
-                                      CustomFeatures = GCustomFeatures;
-                                    _ ->
-                                      Status = <<"">>,
-                                      History = <<"">>,
-                                      MessageMode = <<"">>,
-                                      AccessMode = <<"">>,
-                                      Description = <<"">>,
-                                      CustomFeatures = <<"">>
-                                    end,
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
         #jid{user = TUser, lserver = TServer} = RouteToJid,
         fly_mod_utils:group_notify_message(ActionUser, RouteToJid, Data, FUser, Notification, Status, MessageId),
         Packet = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(GroupFrom)}, {<<"type">>, <<"normal">>}, {<<"id">>,MessageId}, {<<"to">>, jid:to_string(RouteToJid)}],
-          children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, Status}, {<<"done_by">>, ActionDoneBy}, {<<"new_admin">>, ParticipantJid},{<<"status">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}]}]},
+          children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, Status}, {<<"done_by">>, ActionDoneBy}, {<<"new_admin">>, ParticipantJid}]}]},
             #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}],
                 children = []}]},
         ejabberd_router:route(GroupFrom, RouteToJid, Packet),
@@ -1662,13 +1639,36 @@ Status == <<"remove_admin">> ->
     Status == <<"group_profile_updated">> ->
       fly_mod_utils:update_group_count(_AServer, FUser),
       MessageId = <<(get_string()) / binary>>,
+      case catch fly_mod_utils:get_group_profile_type(_AServer,FUser) of
+                                    {selected, _, []} ->
+                                    Status = <<"">>,
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    Description = <<"">>,
+                                    CustomFeatures = <<"">>;
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                      Status = GStatus,
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      Description = GDescription,
+                                      CustomFeatures = GCustomFeatures;
+                                    _ ->
+                                      Status = <<"">>,
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      Description = <<"">>,
+                                      CustomFeatures = <<"">>
+                                    end,
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
         #jid{user = TUser, lserver = TServer} = RouteToJid,
         fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId),
         Packet = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupFrom)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
-          children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}], children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, Status}, {<<"done_by">>, ActionDoneBy}], children = [Data]}]},
+          children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}], children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, Status}, {<<"done_by">>, ActionDoneBy},{<<"status">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}], children = [Data]}]},
             #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}]}]},
         ejabberd_router:route(GroupFrom, RouteToJid, Packet),
         carboncall_message(TUser, TServer,Packet,GroupFrom),
