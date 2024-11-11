@@ -1641,21 +1641,21 @@ Status == <<"remove_admin">> ->
       MessageId = <<(get_string()) / binary>>,
       case catch fly_mod_utils:get_group_profile_type(_AServer,FUser) of
                                     {selected, _, []} ->
-                                    Status = <<"">>,
+                                    TStatus = <<"">>,
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
                                     {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
-                                      Status = GStatus,
+                                      TStatus = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
                                       Description = GDescription,
                                       CustomFeatures = GCustomFeatures;
                                     _ ->
-                                      Status = <<"">>,
+                                      TStatus = <<"">>,
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
@@ -1668,7 +1668,7 @@ Status == <<"remove_admin">> ->
         fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId),
         Packet = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupFrom)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
-          children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}], children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, Status}, {<<"done_by">>, ActionDoneBy},{<<"status">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}], children = [Data]}]},
+          children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}], children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, Status}, {<<"done_by">>, ActionDoneBy},{<<"gstatus">>,  TStatus},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}], children = [Data]}]},
             #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}]}]},
         ejabberd_router:route(GroupFrom, RouteToJid, Packet),
         carboncall_message(TUser, TServer,Packet,GroupFrom),
