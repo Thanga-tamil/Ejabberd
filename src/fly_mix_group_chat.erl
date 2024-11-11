@@ -265,12 +265,9 @@ update_profile_service(From, To, SubEl, IQ) ->
         FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
         Packet = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupJid)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
-          children = [
-            #xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],
-            children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, <<"group_profile_updated">>}, {<<"groupstatus">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures},{<<"done_by">>, ActionDoneBy}], children = [VCard]}]},
-            #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, ""}]},
-            #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}]}
-          ]},
+          children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],
+          children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, <<"group_profile_updated">>}, {<<"groupstatus">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures},{<<"done_by">>, ActionDoneBy}], children = [VCard]}]},
+          #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, ""}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}]}]},
         ejabberd_router:route(GroupJid, RouteToJid, Packet),
         carboncall_message(ToJid, FServer,Packet,GroupJid),
         case fly_mod_utils:get_mobile_user_message(ToJid, FServer) of
