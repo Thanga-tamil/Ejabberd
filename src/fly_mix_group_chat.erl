@@ -325,11 +325,10 @@ channel_status_update(From, To, SubEl, IQ) ->
   Channel = fxml:get_path_s(SubEl, [{attr, <<"channel_id">>}]),
   Action = fxml:get_path_s(SubEl, [{attr, <<"action">>}]),
   GroupJid = jid:make(Channel, TServer),
-  _RequestType = <<"channel_status_update">>,
-  fly_mod_utils:update_vcard_date(FServer, Channel),
+  RequestType = <<"channel_status_update">>,
   case catch fly_mod_utils:get_group_users(FServer, Channel) of
     {selected, _, []} ->
-      fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Group Does Not exists">>});
+      fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Group Does Not exists">>});
     {selected, _, GroupMembers} ->
       JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
       lists:foreach(fun(Touser) ->
@@ -338,7 +337,7 @@ channel_status_update(From, To, SubEl, IQ) ->
         XmlBody = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupJid)}, {<<"to">>, jid:to_string(ToUser)}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
           children = [
-            #xmlel{name = <<"channel_status">>,attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"channel_id">>, Channel}, {<<"action">>, Action}, {<<"type">>, _RequestType}], children = []},
+            #xmlel{name = <<"channel_status">>,attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"channel_id">>, Channel}, {<<"action">>, Action}, {<<"type">>, RequestType}], children = []},
             #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, ""}]}
           ]},
         ejabberd_router:route(GroupJid, ToUser, XmlBody),
@@ -350,8 +349,7 @@ channel_status_update(From, To, SubEl, IQ) ->
             ok
         end
         end, JIDs),
-        fly_mod_utils:delete_group(FServer, Channel),
-        fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Notify to group members successfully">>})
+        fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify to group members successfully">>})
   end.
 
 make_admin_service(From, To, SubEl, IQ) ->
