@@ -317,7 +317,6 @@ user_delete_group_service(From, To, SubEl, IQ) ->
         fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Notify to group members successfully">>})
   end.
 
-
 channel_status_update(From, To, SubEl, IQ) ->
   #jid{lserver = TServer} = To,
   Host = To#jid.lserver,
