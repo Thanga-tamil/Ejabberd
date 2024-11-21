@@ -1901,7 +1901,7 @@ get_group_vcard(LServer,LUser) ->
 
 get_group_profile_type(LServer,LUser)->
 ejabberd_sql:sql_query(LServer,
-[<<"SELECT v.status, v.history ,cs.message_mode,cs.access_mode,IFNULL(json_unquote(cs.custom_features),'') as custom, IFNULL(cs.description,'') FROM vcard_search v JOIN  channel_settings cs ON cs.channel = v.username WHERE  v.username= '">>,LUser,<<"';">>]).
+[<<"SELECT v.status, v.history ,cs.message_mode,cs.access_mode,cs.status,FNULL(cs.invite_uri,''),IFNULL(json_unquote(cs.custom_features),'') as custom, IFNULL(cs.description,'') FROM vcard_search v JOIN  channel_settings cs ON cs.channel = v.username WHERE  v.username= '">>,LUser,<<"';">>]).
 
 get_offline_message(LServer, LUser, LResource) ->
   ejabberd_sql:sql_query(LServer,

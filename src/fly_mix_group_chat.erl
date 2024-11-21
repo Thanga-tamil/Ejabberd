@@ -1576,13 +1576,22 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
+                                    Status = <<"">>,
+                                    InviteUri = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
-                                      Status = GStatus,
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                      Status = case GStatus of
+                                                    <<"ACTIVE">> -> <<"1">>;
+                                                    <<"INACTIVE">> -> <<"0">>;
+                                                    <<"DELETED">> -> <<"-1">>;
+                                    _                -> <<"">>
+                                                    end,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
+                                      Status = GStatus,
+                                      InviteUri = GInviteUri,
                                       Description = GDescription,
                                       CustomFeatures = GCustomFeatures;
                                     _ ->
@@ -1590,10 +1599,12 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
+                                      Status = <<"">>,
+                                      InviteUri = <<"">>,
                                       Description = <<"">>,
                                       CustomFeatures = <<"">>
                                     end,
-        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"status">>,  Status},{<<"description">>,  Description}, {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}, {<<"is_admin_blocked">>,  IsAdminBlocked },{<<"history">>,  History },{<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
+        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"status">>,  Status},{<<"description">>,  Description}, {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}, {<<"is_admin_blocked">>,  IsAdminBlocked },{<<"history">>,  History },{<<"messagemode">>,  MessageMode},{<<"channel_status">>,  Status },{<<"invite_uri">>,  InviteUri },{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
           children = VCard}
                           end,
         GroupIds),
