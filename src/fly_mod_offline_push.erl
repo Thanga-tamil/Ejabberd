@@ -2229,7 +2229,7 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
-                                    ChannelStatus= <<"">>,
+                                    ChannelStatus = <<"">>,
                                     InviteUri = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
@@ -2247,7 +2247,7 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
-                                      ChannelStatus= <<"">>,
+                                      ChannelStatus = <<"">>,
                                       InviteUri = <<"">>,
                                       Description = <<"">>,
                                       CustomFeatures = <<"">>

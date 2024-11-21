@@ -1749,8 +1749,30 @@ Status == <<"remove_admin">> ->
         fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId),
         Packet = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupFrom)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
-          children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}], children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, Status}, {<<"done_by">>, ActionDoneBy},{<<"gstatus">>,  TStatus},{<<"description">>,  Description},{<<"history">>,  History }, {<<"channel_status", ChannelStatus>>},{<<"invite_uri">>, InviteUri}, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}], children = [Data]}]},
-            #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}]}]},
+          children = [
+        #xmlel{
+            name = <<"event">>,
+            attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],
+            children = [
+                #xmlel{
+                    name = <<"info">>,
+                    attrs = [
+                        {<<"status">>, Status},
+                        {<<"done_by">>, ActionDoneBy},
+                        {<<"gstatus">>, GStatus},
+                        {<<"description">>, Description},
+                        {<<"history">>, History},
+                        {<<"channel_status">>, ChannelStatus},
+                        {<<"invite_uri">>, InviteUri},
+                        {<<"messagemode">>, MessageMode},
+                        {<<"accessmode">>, AccessMode},
+                        {<<"customfeatures">>, CustomFeatures}
+                    ],
+                    children = [Data]
+                }
+            ]
+        },
+        #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}]}]},
         ejabberd_router:route(GroupFrom, RouteToJid, Packet),
         carboncall_message(TUser, TServer,Packet,GroupFrom),
         case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
