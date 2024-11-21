@@ -245,7 +245,7 @@ update_profile_service(From, To, SubEl, IQ) ->
                                     AccessMode = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
@@ -1346,7 +1346,7 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
         AccessMode = <<"">>,
         Description = <<"">>,
         CustomFeatures = <<"">>;
-        {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+        {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
           Status = GStatus,
           History = GHistory,
           MessageMode = GMessageMode,
@@ -1461,7 +1461,7 @@ process_get_group_profile(From, _To, SubEl, IQ, RequestType) ->
                                     AccessMode = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
@@ -1517,7 +1517,7 @@ process_get_group_vcard(From, _To, SubEl, IQ, RequestType) ->
                                     AccessMode = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
@@ -1576,16 +1576,16 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
-                                    Status = <<"">>,
+                                    ChannelStatus = <<"">>,
                                     InviteUri = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
-                                      Status = map_status(GStatus),
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                      Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
-                                      Status = GStatus,
+                                      ChannelStatus = map_status(GChannelStatus),
                                       InviteUri = GInviteUri,
                                       Description = GDescription,
                                       CustomFeatures = GCustomFeatures;
@@ -1594,12 +1594,12 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
-                                      Status = <<"">>,
+                                      ChannelStatus = <<"">>,
                                       InviteUri = <<"">>,
                                       Description = <<"">>,
                                       CustomFeatures = <<"">>
                                     end,
-        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"status">>,  Status},{<<"description">>,  Description}, {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}, {<<"is_admin_blocked">>,  IsAdminBlocked },{<<"history">>,  History },{<<"messagemode">>,  MessageMode},{<<"channel_status">>,  Status },{<<"invite_uri">>,  InviteUri },{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
+        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"status">>,  Status},{<<"description">>,  Description}, {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}, {<<"is_admin_blocked">>,  IsAdminBlocked },{<<"history">>,  History },{<<"messagemode">>,  MessageMode},{<<"channel_status">>,  ChannelStatus },{<<"invite_uri">>,  InviteUri },{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
           children = VCard}
                           end,
         GroupIds),
@@ -1698,7 +1698,7 @@ Status == <<"remove_admin">> ->
                                     AccessMode = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       TStatus = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
