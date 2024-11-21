@@ -2095,6 +2095,8 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
                                     {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
@@ -2102,6 +2104,8 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
+                                      ChannelStatus = fly_mix_group_chat:map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
                                       Description = GDescription,
                                       CustomFeatures = GCustomFeatures;
                                     _ ->
@@ -2109,6 +2113,8 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
                                       Description = <<"">>,
                                       CustomFeatures = <<"">>
                                     end,
@@ -2135,6 +2141,8 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
             {<<"history">>, binary_to_list(History)},
             {<<"messagemode">>, binary_to_list(MessageMode)},
             {<<"accessmode">>, binary_to_list(AccessMode)},
+            {<<"channel_status">>, binary_to_list(ChannelStatus)},
+            {<<"invite_uri">>, binary_to_list(InviteUri)},
             {<<"customfeature">>, binary_to_list(CustomFeatures)},
             {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
             {<<"sent_from">>, binary_to_list(MsgFrom)},
@@ -2221,6 +2229,8 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
+                                    ChannelStatus= <<"">>,
+                                    InviteUri = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
                                     {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
@@ -2228,6 +2238,8 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
+                                      ChannelStatus = fly_mix_group_chat:map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
                                       Description = GDescription,
                                       CustomFeatures = GCustomFeatures;
                                     _ ->
@@ -2235,6 +2247,8 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
+                                      ChannelStatus= <<"">>,
+                                      InviteUri = <<"">>,
                                       Description = <<"">>,
                                       CustomFeatures = <<"">>
                                     end,
@@ -2264,6 +2278,8 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
     {history, binary_to_list(History)},
     {messagemode, binary_to_list(MessageMode)},
     {accessmode, binary_to_list(AccessMode)},
+    {channel_status, binary_to_list(ChannelStatus)},
+    {invite_uri, binary_to_list(InviteUri)},
     {customfeature, binary_to_list(CustomFeatures)},
     {notify_id, binary_to_list(NotifyId)},
     {added_at, FlatTimeStamp},
