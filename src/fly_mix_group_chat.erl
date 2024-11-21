@@ -1759,7 +1759,7 @@ Status == <<"remove_admin">> ->
                     attrs = [
                         {<<"status">>, Status},
                         {<<"done_by">>, ActionDoneBy},
-                        {<<"gstatus">>, GStatus},
+                        {<<"gstatus">>, TStatus},
                         {<<"description">>, Description},
                         {<<"history">>, History},
                         {<<"channel_status">>, ChannelStatus},
