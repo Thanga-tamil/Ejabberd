@@ -20,7 +20,7 @@
 %% API
 -export([route/1]).
 -export([start/2, stop/1, depends/2, mod_options/1, mod_opt_type/1, process_set_group_info/5, update_group_info_to_members/7,
-  process_local_iq/1, init/1, carboncall_message/4, update_group_status/7]).
+  process_local_iq/1, init/1, carboncall_message/4, update_group_status/7, map_status/1]).
 -callback init(binary(), gen_mod:opts()) -> ok | {error, db_failure}.
 
 -include("logger.hrl").
@@ -1581,12 +1581,7 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
                                     {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
-                                      Status = case GStatus of
-                                                    <<"ACTIVE">> -> <<"1">>;
-                                                    <<"INACTIVE">> -> <<"0">>;
-                                                    <<"DELETED">> -> <<"-1">>;
-                                    _                -> <<"">>
-                                                    end,
+                                      Status = map_status(GStatus),
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
@@ -1611,6 +1606,14 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
       GroupXml = [#xmlel{name = <<"group">>, children = SubEls1}],
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType ,sub_els = GroupXml})
   end.
+
+map_status(StatusString) ->
+    case StatusString of
+        <<"ACTIVE">> -> <<"1">>;
+        <<"INACTIVE">> -> <<"0">>;
+        <<"DELETED">> -> <<"-1">>;
+        _ -> <<"">>
+    end.
 
 process_get_removed_user(From, _To, SubEl, IQ, _RequestType) ->
   #jid{ lserver = FServer} = From,
