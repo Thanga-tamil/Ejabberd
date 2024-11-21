@@ -245,7 +245,7 @@ update_profile_service(From, To, SubEl, IQ) ->
                                     AccessMode = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
@@ -1346,7 +1346,7 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
         AccessMode = <<"">>,
         Description = <<"">>,
         CustomFeatures = <<"">>;
-        {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+        {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
           Status = GStatus,
           History = GHistory,
           MessageMode = GMessageMode,
@@ -1461,7 +1461,7 @@ process_get_group_profile(From, _To, SubEl, IQ, RequestType) ->
                                     AccessMode = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
@@ -1517,7 +1517,7 @@ process_get_group_vcard(From, _To, SubEl, IQ, RequestType) ->
                                     AccessMode = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
@@ -1698,7 +1698,7 @@ Status == <<"remove_admin">> ->
                                     AccessMode = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       TStatus = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,

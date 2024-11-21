@@ -2097,7 +2097,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
                                     AccessMode = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
@@ -2223,7 +2223,7 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
                                     AccessMode = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
