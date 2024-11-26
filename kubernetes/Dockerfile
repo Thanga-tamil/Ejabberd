@@ -49,12 +49,21 @@ RUN rm -rf /tmp/es.rpm
 
 ### The application's jar file ###
 
-ARG JAR_FILE=ejabberdadmin.jar
+# ARG JAR_FILE=ejabberdadmin.jar
 
-###  Add the application's jar to the container ###
+# ###  Add the application's jar to the container ###
 
-ADD ${JAR_FILE} ejabberdadmin.jar
+# ADD ${JAR_FILE} ejabberdadmin.jar
 
 ###  Run the jar file ###
 
-ENTRYPOINT ["/tini", "--", "/entrypoint.sh"]
+# Copy the startup script into the container
+COPY cluster-join.sh /usr/local/bin/cluster-join.sh
+
+# Ensure the script is executable
+RUN chmod +x /usr/local/bin/cluster-join.sh
+
+# Set the script as the entrypoint or part of the command
+ENTRYPOINT ["/usr/local/bin/cluster-join.sh"]
+
+# ENTRYPOINT ["/tini", "--", "/entrypoint.sh"]
