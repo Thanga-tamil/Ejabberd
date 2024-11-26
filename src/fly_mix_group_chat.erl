@@ -20,7 +20,7 @@
 %% API
 -export([route/1]).
 -export([start/2, stop/1, depends/2, mod_options/1, mod_opt_type/1, process_set_group_info/5, update_group_info_to_members/7,
-  process_local_iq/1, init/1, carboncall_message/4, update_group_status/7]).
+  process_local_iq/1, init/1, carboncall_message/4, update_group_status/7, map_status/1]).
 -callback init(binary(), gen_mod:opts()) -> ok | {error, db_failure}.
 
 -include("logger.hrl").
@@ -243,13 +243,17 @@ update_profile_service(From, To, SubEl, IQ) ->
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
+                                      ChannelStatus = map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
                                       Description = GDescription,
                                       CustomFeatures = GCustomFeatures;
                                     _ ->
@@ -257,6 +261,8 @@ update_profile_service(From, To, SubEl, IQ) ->
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
                                       Description = <<"">>,
                                       CustomFeatures = <<"">>
                                     end,
@@ -268,7 +274,7 @@ update_profile_service(From, To, SubEl, IQ) ->
         Packet = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupJid)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
           children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],
-          children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, <<"group_profile_updated">>}, {<<"groupstatus">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures},{<<"done_by">>, ActionDoneBy}], children = [VCard]}]},
+          children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, <<"group_profile_updated">>}, {<<"groupstatus">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"channel_status">>,  ChannelStatus },{<<"invite_uri">>,  InviteUri }, {<<"customfeatures">>,  CustomFeatures},{<<"done_by">>, ActionDoneBy}], children = [VCard]}]},
           #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, ""}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}]}]},
         ejabberd_router:route(GroupJid, RouteToJid, Packet),
         carboncall_message(ToJid, FServer,Packet,GroupJid),
@@ -1344,13 +1350,17 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
         History = <<"">>,
         MessageMode = <<"">>,
         AccessMode = <<"">>,
+        ChannelStatus = <<"">>,
+        InviteUri = <<"">>,
         Description = <<"">>,
         CustomFeatures = <<"">>;
-        {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+        {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
           Status = GStatus,
           History = GHistory,
           MessageMode = GMessageMode,
           AccessMode = GAccessMode,
+          ChannelStatus = map_status(GChannelStatus),
+          InviteUri = GInviteUri,
           Description = GDescription,
           CustomFeatures = GCustomFeatures;
         _ ->
@@ -1358,11 +1368,13 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
           History = <<"">>,
           MessageMode = <<"">>,
           AccessMode = <<"">>,
+          ChannelStatus = <<"">>,
+          InviteUri = <<"">>,
           Description = <<"">>,
           CustomFeatures = <<"">>
         end,
 
-      GroupXml = [#xmlel{name = <<"groupinfo">>, attrs = [{<<"groupupdate">>,<<"0">>},{<<"status">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}], children = VCard}, #xmlel{name = <<"participants">>, attrs = [], children = SubEls1}],
+      GroupXml = [#xmlel{name = <<"groupinfo">>, attrs = [{<<"groupupdate">>,<<"0">>},{<<"status">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode}, {<<"channel_status">>, ChannelStatus}, {<<"invite_uri">>, InviteUri}, {<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}], children = VCard}, #xmlel{name = <<"participants">>, attrs = [], children = SubEls1}],
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType ,sub_els = GroupXml })
 
   end.
@@ -1459,13 +1471,17 @@ process_get_group_profile(From, _To, SubEl, IQ, RequestType) ->
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
+                                      ChannelStatus = map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
                                       Description = GDescription,
                                       CustomFeatures = GCustomFeatures;
                                     _ ->
@@ -1473,6 +1489,8 @@ process_get_group_profile(From, _To, SubEl, IQ, RequestType) ->
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
                                       Description = <<"">>,
                                       CustomFeatures = <<"">>
                                     end,
@@ -1482,7 +1500,7 @@ process_get_group_profile(From, _To, SubEl, IQ, RequestType) ->
                     {error, _Reason} -> [];
                     VCARD -> [VCARD]
                   end,
-        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"item_id">>, ItemId} , {<<"status">>,  Status},{<<"description">>,  Description},{<<"createddate">>,  CreatedDate},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
+        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"item_id">>, ItemId} , {<<"status">>,  Status},{<<"description">>,  Description},{<<"createddate">>,  CreatedDate},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"channel_status">>, ChannelStatus},{<<"invite_uri">>, InviteUri}, {<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
           children = VCard}
                           end,
         GroupIds),
@@ -1515,13 +1533,17 @@ process_get_group_vcard(From, _To, SubEl, IQ, RequestType) ->
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
+                                      ChannelStatus = map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
                                       Description = GDescription,
                                       CustomFeatures = GCustomFeatures;
                                     _ ->
@@ -1529,6 +1551,8 @@ process_get_group_vcard(From, _To, SubEl, IQ, RequestType) ->
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
                                       Description = <<"">>,
                                       CustomFeatures = <<"">>
                                     end,
@@ -1538,7 +1562,7 @@ process_get_group_vcard(From, _To, SubEl, IQ, RequestType) ->
                     {error, _Reason} -> [];
                     VCARD -> [VCARD]
                   end,
-        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GroupId }, {<<"status">>,  Status},{<<"description">>,  Description},{<<"createddate">>,  CreatedDate},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
+        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GroupId }, {<<"status">>,  Status},{<<"description">>,  Description},{<<"createddate">>,  CreatedDate},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode}, {<<"channel_status">>,  ChannelStatus },{<<"invite_uri">>,  InviteUri }, {<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
           children = VCard}
                           end,
         GroupIds),
@@ -1576,13 +1600,17 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       Status = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
+                                      ChannelStatus = map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
                                       Description = GDescription,
                                       CustomFeatures = GCustomFeatures;
                                     _ ->
@@ -1590,16 +1618,26 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
                                       Description = <<"">>,
                                       CustomFeatures = <<"">>
                                     end,
-        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"status">>,  Status},{<<"description">>,  Description}, {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}, {<<"is_admin_blocked">>,  IsAdminBlocked },{<<"history">>,  History },{<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
+        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"status">>,  Status},{<<"description">>,  Description}, {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}, {<<"is_admin_blocked">>,  IsAdminBlocked },{<<"history">>,  History },{<<"messagemode">>,  MessageMode},{<<"channel_status">>,  ChannelStatus },{<<"invite_uri">>,  InviteUri },{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
           children = VCard}
                           end,
         GroupIds),
       GroupXml = [#xmlel{name = <<"group">>, children = SubEls1}],
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType ,sub_els = GroupXml})
   end.
+
+map_status(StatusString) ->
+    case StatusString of
+        <<"ACTIVE">> -> <<"1">>;
+        <<"INACTIVE">> -> <<"0">>;
+        <<"DELETED">> -> <<"-1">>;
+        _ -> <<"">>
+    end.
 
 process_get_removed_user(From, _To, SubEl, IQ, _RequestType) ->
   #jid{ lserver = FServer} = From,
@@ -1682,13 +1720,17 @@ Status == <<"remove_admin">> ->
                                     History = <<"">>,
                                     MessageMode = <<"">>,
                                     AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
                                     Description = <<"">>,
                                     CustomFeatures = <<"">>;
-                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GCustomFeatures,GDescription]]} ->
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
                                       TStatus = GStatus,
                                       History = GHistory,
                                       MessageMode = GMessageMode,
                                       AccessMode = GAccessMode,
+                                      ChannelStatus = map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
                                       Description = GDescription,
                                       CustomFeatures = GCustomFeatures;
                                     _ ->
@@ -1696,6 +1738,8 @@ Status == <<"remove_admin">> ->
                                       History = <<"">>,
                                       MessageMode = <<"">>,
                                       AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
                                       Description = <<"">>,
                                       CustomFeatures = <<"">>
                                     end,
@@ -1705,8 +1749,30 @@ Status == <<"remove_admin">> ->
         fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId),
         Packet = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupFrom)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
-          children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}], children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, Status}, {<<"done_by">>, ActionDoneBy},{<<"gstatus">>,  TStatus},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}], children = [Data]}]},
-            #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}]}]},
+          children = [
+        #xmlel{
+            name = <<"event">>,
+            attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],
+            children = [
+                #xmlel{
+                    name = <<"info">>,
+                    attrs = [
+                        {<<"status">>, Status},
+                        {<<"done_by">>, ActionDoneBy},
+                        {<<"gstatus">>, TStatus},
+                        {<<"description">>, Description},
+                        {<<"history">>, History},
+                        {<<"channel_status">>, ChannelStatus},
+                        {<<"invite_uri">>, InviteUri},
+                        {<<"messagemode">>, MessageMode},
+                        {<<"accessmode">>, AccessMode},
+                        {<<"customfeatures">>, CustomFeatures}
+                    ],
+                    children = [Data]
+                }
+            ]
+        },
+        #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}]}]},
         ejabberd_router:route(GroupFrom, RouteToJid, Packet),
         carboncall_message(TUser, TServer,Packet,GroupFrom),
         case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
