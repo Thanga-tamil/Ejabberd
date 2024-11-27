@@ -991,7 +991,7 @@ update_mute_notification(From, RequestType, SubEl, IQ) ->
   ReceivedXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(ReceivedFlatTimeStamp)}],
     children = []},
   XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
-  % ejabberd_router:route(To, To, XmlBody1),
+  ejabberd_router:route(To, To, XmlBody1),
   store_offline_user_send(XmlBody1,To,To),
   case fly_mod_utils:get_mobile_user_message(ToUser, Server) of
           true ->
