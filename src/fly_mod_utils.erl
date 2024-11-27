@@ -1731,7 +1731,7 @@ get_message_status(#jid{lserver = FServer}, Msgid) ->
 
 get_groupmessage_status(#jid{luser = FUser, lserver = FServer}, Msgid) ->
   ejabberd_sql:sql_query(FServer,
-     [<<"SELECT COALESCE(( SELECT MIN(status) FROM message_status  WHERE to_user ='">>,FUser,<<"'  AND message_id = '">>,Msgid,<<"'  GROUP BY message_id ), 0) as status;">>]).
+      [<<"SELECT COALESCE(( SELECT MIN(status) FROM message_status  WHERE to_user ='">>,FUser,<<"'  AND message_id = '">>,Msgid,<<"'  GROUP BY message_id ), 0) as status;">>]).
 
 message_status(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
