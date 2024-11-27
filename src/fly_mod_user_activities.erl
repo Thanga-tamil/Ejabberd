@@ -224,6 +224,8 @@ process_iq_set(From, _To, RequestType, IQ) ->
       poll_update(From, RequestType, SubEl, IQ);
     <<"poll_delete">> ->
       poll_update(From, RequestType, SubEl, IQ);
+    <<"acknowledge">> ->
+      acknowledge(From, RequestType, SubEl, IQ);
     <<"poll_acknowledge">> ->
       poll_ack(From, RequestType, SubEl, IQ);
     no_such_subtag ->
@@ -715,6 +717,18 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   fly_mod_utils:remove_poll_offline(FServer, MResource,PollMsgId),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Ack successfully">>}).
 
+  acknowledge(From,RequestType,SubEl,IQ) ->
+  #jid{user = FUser, lserver = FServer,lresource = LResource} = From,
+  MsgId = fxml:get_path_s(SubEl, [{attr, <<"id">>}]),
+  Substring = string:str(binary_to_list(LResource),binary_to_list(<<"Mobile-">>)),
+  if Substring =:= 1 ->
+    MResource = fly_mod_utils:get_device_from_resource(LResource);
+  true ->
+    MResource = <<"">>
+  end,
+  fly_mod_utils:remove_poll_offline(FServer, MResource,MsgId),
+  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Ack successfully">>}).
+
 poll_update(From,RequestType,SubEl,IQ) ->
 #jid{user = FUser, lserver = FServer} = From,
 PollOptionId = fxml:get_path_s(SubEl, [{attr, <<"poll_option_id">>}]),
@@ -977,9 +991,14 @@ update_mute_notification(From, RequestType, SubEl, IQ) ->
   ReceivedXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(ReceivedFlatTimeStamp)}],
     children = []},
   XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
-  %ejabberd_router:route(To, To, XmlBody1),
+  ejabberd_router:route(To, To, XmlBody1),
   store_offline_user_send(XmlBody1,To,To),
-  mod_offline:store_packet({To,xmpp:decode(XmlBody1)}),
+  case fly_mod_utils:get_mobile_user_message(ToUser, Server) of
+          true ->
+            mod_offline:store_packet({To,xmpp:decode(XmlBody1)});
+          false ->
+            ok
+        end,
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Updated successfully">>}).
 
 update_archive_chat(FromJid, RequestType, SubEl, IQ) ->
