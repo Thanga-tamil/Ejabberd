@@ -1295,9 +1295,19 @@ update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
   %   Server,
   %   [<<"update message_status set status = 2, seen_at = NOW() where  to_user='">>,User,<<"' and from_user = (SELECT from_user FROM (select from_user from message_status where message_id='">>,MessageId,<<"' limit 1) s);">>]),
 
-  ejabberd_sql:sql_query(
+  
+    case catch ejabberd_sql:sql_query(
     Server,
-    [<<"update message_status set status =  2, seen_at = NOW() where  to_user='">>,User,<<"' and message_id='">>,MessageId,<<"' and  status != 2 ;">>]),
+    [<<"update message_status set status =  2, seen_at = NOW() where  to_user='">>,User,<<"' and message_id='">>,MessageId,<<"' and  status != 2 ;">>]) of
+    {updated,1} ->
+       ejabberd_sql:sql_query(
+    Server,
+    [<<"update chat_recent set unread =  unread - 1 where from_user ='">>,TUser, <<"' and to_user ='">>,User, <<"';">>]);
+    {updated,0}->
+      ok;
+    _ ->
+      ok
+  end,
 
   % ejabberd_sql:sql_query(
   %   Server,
@@ -1319,7 +1329,7 @@ update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
 
   ejabberd_sql:sql_query(
     Server,
-    [<<"update chat_recent set status = '">>,Status,<<"', unread =  0 where  to_user ='">>,TUser,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>]).
+    [<<"update chat_recent set status = '">>,Status,<<"' where  to_user ='">>,TUser,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>]).
 
 %% Update message delivery status
 %%
