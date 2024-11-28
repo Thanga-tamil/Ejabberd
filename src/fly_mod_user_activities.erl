@@ -226,6 +226,8 @@ process_iq_set(From, _To, RequestType, IQ) ->
       poll_update(From, RequestType, SubEl, IQ);
     <<"acknowledge">> ->
       acknowledge(From, RequestType, SubEl, IQ);
+    <<"read_all">> ->
+      read_all(From, RequestType, SubEl, IQ);
     <<"poll_acknowledge">> ->
       poll_ack(From, RequestType, SubEl, IQ);
     no_such_subtag ->
@@ -729,6 +731,12 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   fly_mod_utils:remove_poll_offline(FServer, MResource,MsgId),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Ack successfully">>}).
 
+read_all(From,RequestType,SubEl,IQ) ->
+  #jid{user = FUser, lserver = FServer,lresource = LResource} = From,
+  Readto = fxml:get_path_s(SubEl, [{attr, <<"to_user">>}]),
+  fly_mod_utils:read_all(FServer,FUser, Readto),
+  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Read successfully">>}).
+
 poll_update(From,RequestType,SubEl,IQ) ->
 #jid{user = FUser, lserver = FServer} = From,
 PollOptionId = fxml:get_path_s(SubEl, [{attr, <<"poll_option_id">>}]),
@@ -992,7 +1000,7 @@ update_mute_notification(From, RequestType, SubEl, IQ) ->
     children = []},
   XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
   ejabberd_router:route(To, To, XmlBody1),
-  store_offline_user_send(XmlBody1,To,To),
+  % store_offline_user_send(XmlBody1,To,To),
   case fly_mod_utils:get_mobile_user_message(ToUser, Server) of
           true ->
             mod_offline:store_packet({To,xmpp:decode(XmlBody1)});
