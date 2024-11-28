@@ -118,10 +118,10 @@ handle_call(stop, _From, State) ->
 handle_cast({pushnotification, <<"chat">>,
   {Sender, Recipient, ChatType, SubEl, Packet}},
     State) ->
-    %   case catch fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser,
-    %   Sender#jid.luser)
-    % of
-    %   {selected, _, []} ->
+      case catch fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser,
+      Sender#jid.luser)
+    of
+      {selected, _, []} ->
         case catch send_push_notifications(Sender, Recipient,
           ChatType, SubEl, Packet, State)
         of
@@ -130,10 +130,10 @@ handle_cast({pushnotification, <<"chat">>,
             ?INFO_MSG("push error ~p", [Error]), ok;
           _Exception ->
             ?INFO_MSG("push exception ~p", [_Exception]), ok
-      %   end;
-      % {selected, _, [[_T]]} ->
-      %   ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
-      %   ok
+        end;
+      {selected, _, [[_T]]} ->
+        ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
+        ok
       end,
   {noreply, State};
 handle_cast({queryexecution, <<"clear_all">>,
@@ -2089,6 +2089,35 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
                   <<"">>;
                 _ -> SVCARD = <<"">>, <<"">>
               end,
+              case catch fly_mod_utils:get_group_profile_type(Server,Group) of
+                                    {selected, _, []} ->
+                                    Status = <<"">>,
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
+                                    Description = <<"">>,
+                                    CustomFeatures = <<"">>;
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                      Status = GStatus,
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      ChannelStatus = fly_mix_group_chat:map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
+                                      Description = GDescription,
+                                      CustomFeatures = GCustomFeatures;
+                                    _ ->
+                                      Status = <<"">>,
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
+                                      Description = <<"">>,
+                                      CustomFeatures = <<"">>
+                                    end,
           if Type =:= <<"added">> ->
           if NewUser =:= Members ->
             Content = <<UserNickName / binary, <<":">> / binary, UserName / binary, <<" added you">> / binary>>;
@@ -2109,10 +2138,18 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
             {<<"notify_id">>, binary_to_list(NotifyId)},
             {<<"message_time">>, FlatTimeStamp},
             {<<"node_id">>, binary_to_list(NodeId)},
+            {<<"history">>, binary_to_list(History)},
+            {<<"messagemode">>, binary_to_list(MessageMode)},
+            {<<"accessmode">>, binary_to_list(AccessMode)},
+            {<<"channel_status">>, binary_to_list(ChannelStatus)},
+            {<<"invite_uri">>, binary_to_list(InviteUri)},
+            {<<"customfeatures">>, binary_to_list(CustomFeatures)},
             {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
             {<<"sent_from">>, binary_to_list(MsgFrom)},
             {<<"sent_to">>, binary_to_list(Touser)},
             {<<"user_name">>, binary_to_list(UserName)},
+            {<<"status">>, binary_to_list(Status)},
+            {<<"description">>, binary_to_list(Description)},
             {<<"added_user">>, binary_to_list(ReceiverUserName)},
             {<<"participant">>, binary_to_list(ParticipantJid)},
             {<<"publisher_profile">>, binary_to_list(PublisherVcard)},
@@ -2185,22 +2222,52 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
   [NewUser, _] = binary:split(ParticipantJid, <<"@">>),
   {selected, [{NewUserName}]} = fly_mod_utils:get_nickname(Server, NewUser),
   {selected, [{ReceiverUserName}]} = fly_mod_utils:get_nickname(Server, Owner),
+  {selected, [{GroupName}]} = fly_mod_utils:get_nickname(Server, Chan),
+  case catch fly_mod_utils:get_group_profile_type(Server,Chan) of
+                                    {selected, _, []} ->
+                                    Status = <<"">>,
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
+                                    Description = <<"">>,
+                                    CustomFeatures = <<"">>;
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                      Status = GStatus,
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      ChannelStatus = fly_mix_group_chat:map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
+                                      Description = GDescription,
+                                      CustomFeatures = GCustomFeatures;
+                                    _ ->
+                                      Status = <<"">>,
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
+                                      Description = <<"">>,
+                                      CustomFeatures = <<"">>
+                                    end,
   if Type =:= <<"added">> ->
           if NewUser =:= Members ->
-            Message = <<UserNickName / binary, <<":">> / binary, Owner / binary, <<" added you">> / binary>>;
+            Message = <<GroupName / binary, <<":">> / binary, Owner / binary, <<" added you">> / binary>>;
           true ->
-            Message = <<UserNickName / binary, <<":">> / binary, Owner / binary, <<" added ">> / binary, NewUser / binary>>
+            Message = <<GroupName / binary, <<":">> / binary, Owner / binary, <<" added ">> / binary, NewUser / binary>>
           end;
       true ->
         if NewUser =:= Members ->
-            Message = <<UserNickName / binary, <<":">> / binary, Owner / binary, <<" removed you">> / binary>>;
+            Message = <<GroupName / binary, <<":">> / binary, Owner / binary, <<" removed you">> / binary>>;
           true ->
-            Message = <<UserNickName / binary, <<":">> / binary,  Owner / binary, <<" removed ">> / binary, NewUser / binary>>
+            Message = <<GroupName / binary, <<":">> / binary,  Owner / binary, <<" removed ">> / binary, NewUser / binary>>
           end
         end,
   Args = [{message_content,
     binary_to_list(Message)},
-    {group_name, binary_to_list(UserNickName)},
+    {group_name, binary_to_list(GroupName)},
     {user_id, binary_to_list(Owner)},
     {updated_userid, binary_to_list(NewUser)},
     {user_name, binary_to_list(ReceiverUserName)},
@@ -2208,10 +2275,18 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
     {sent_from, binary_to_list(MsgFrom)},
     {sent_to, binary_to_list(Touser)},
     {created_at, FlatTimeStamp},
+    {history, binary_to_list(History)},
+    {messagemode, binary_to_list(MessageMode)},
+    {accessmode, binary_to_list(AccessMode)},
+    {channel_status, binary_to_list(ChannelStatus)},
+    {invite_uri, binary_to_list(InviteUri)},
+    {customfeatures, binary_to_list(CustomFeatures)},
     {notify_id, binary_to_list(NotifyId)},
     {added_at, FlatTimeStamp},
     {userDomain, binary_to_list(Server)},
     {user_type, binary_to_list(UserType)},
+    {status, binary_to_list(Status)},
+    {description, binary_to_list(Description)},
     {push_from, binary_to_list(<<"MirrorFly">>)},
     {node_id, binary_to_list(NodeId)},
     {group_id, binary_to_list(Chan)}],

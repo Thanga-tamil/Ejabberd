@@ -20,7 +20,7 @@
 %% API
 -export([route/1]).
 -export([start/2, stop/1, depends/2, mod_options/1, mod_opt_type/1, process_set_group_info/5, update_group_info_to_members/7,
-  process_local_iq/1, init/1, carboncall_message/4, update_group_status/7]).
+  process_local_iq/1, init/1, carboncall_message/4, update_group_status/7, map_status/1]).
 -callback init(binary(), gen_mod:opts()) -> ok | {error, db_failure}.
 
 -include("logger.hrl").
@@ -146,6 +146,8 @@ process_iq_set(From, To, SubEl, IQ) ->
       make_admin_service(From, To, SubEl, IQ);
     <<"delete_group_service">> ->
       user_delete_group_service(From, To, SubEl, IQ);
+    <<"channel_status_update">> ->
+      channel_status_update(From, To, SubEl, IQ);
     no_such_subtag ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = <<"no_such_subtag">>, result_type = <<"unknown request">>});
     empty_value ->
@@ -235,6 +237,35 @@ update_profile_service(From, To, SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Group Does Not exists">>});
     {selected, _, GroupMembers} ->
       JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
+      case catch fly_mod_utils:get_group_profile_type(FServer,Channel) of
+                                    {selected, _, []} ->
+                                    Status = <<"">>,
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
+                                    Description = <<"">>,
+                                    CustomFeatures = <<"">>;
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                      Status = GStatus,
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      ChannelStatus = map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
+                                      Description = GDescription,
+                                      CustomFeatures = GCustomFeatures;
+                                    _ ->
+                                      Status = <<"">>,
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
+                                      Description = <<"">>,
+                                      CustomFeatures = <<"">>
+                                    end,
       lists:foreach(fun(ToJid) ->
         RouteToJid = jid:make(ToJid, FServer, <<>>),
         MessageId = <<(get_string()) / binary>>,
@@ -242,12 +273,9 @@ update_profile_service(From, To, SubEl, IQ) ->
         FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
         Packet = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupJid)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
-          children = [
-            #xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],
-            children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, <<"group_profile_updated">>}, {<<"done_by">>, ActionDoneBy}], children = [VCard]}]},
-            #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, ""}]},
-            #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}]}
-          ]},
+          children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],
+          children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, <<"group_profile_updated">>}, {<<"groupstatus">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"accessmode">>,  AccessMode }, {<<"channel_status">>,  ChannelStatus },{<<"invite_uri">>,  InviteUri }, {<<"customfeatures">>,  CustomFeatures},{<<"done_by">>, ActionDoneBy}], children = [VCard]}]},
+          #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, ""}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}]}]},
         ejabberd_router:route(GroupJid, RouteToJid, Packet),
         carboncall_message(ToJid, FServer,Packet,GroupJid),
         case fly_mod_utils:get_mobile_user_message(ToJid, FServer) of
@@ -293,6 +321,41 @@ user_delete_group_service(From, To, SubEl, IQ) ->
         end, JIDs),
         fly_mod_utils:delete_group(FServer, Channel),
         fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Notify to group members successfully">>})
+  end.
+
+channel_status_update(From, To, SubEl, IQ) ->
+  #jid{lserver = TServer} = To,
+  Host = To#jid.lserver,
+  #jid{ lserver = FServer} = From,
+  _ServerHost = ejabberd_router:host_of_route(Host),
+  Channel = fxml:get_path_s(SubEl, [{attr, <<"channel_id">>}]),
+  Action = fxml:get_path_s(SubEl, [{attr, <<"action">>}]),
+  GroupJid = jid:make(Channel, TServer),
+  RequestType = <<"channel_status_update">>,
+  case catch fly_mod_utils:get_group_users(FServer, Channel) of
+    {selected, _, []} ->
+      fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Group Does Not exists">>});
+    {selected, _, GroupMembers} ->
+      JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
+      lists:foreach(fun(Touser) ->
+        ToUser = jid:make(Touser, FServer),
+        MessageId = <<(get_string()) / binary>>,
+        XmlBody = #xmlel{name = <<"message">>,
+          attrs = [{<<"from">>, jid:to_string(GroupJid)}, {<<"to">>, jid:to_string(ToUser)}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
+          children = [
+            #xmlel{name = <<"channel_status">>,attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"channel_id">>, Channel}, {<<"action">>, Action}, {<<"type">>, RequestType}], children = []},
+            #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, ""}]}
+          ]},
+        ejabberd_router:route(GroupJid, ToUser, XmlBody),
+        carboncall_message(Touser, FServer,XmlBody,GroupJid),
+        case fly_mod_utils:get_mobile_user_message(Touser, FServer) of
+          true ->
+            mod_offline:store_packet({ToUser,xmpp:decode(XmlBody)});
+          false ->
+            ok
+        end
+        end, JIDs),
+        fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Notify to group members successfully">>})
   end.
 
 make_admin_service(From, To, SubEl, IQ) ->
@@ -1281,7 +1344,37 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
 
       end, Members),
 
-      GroupXml = [#xmlel{name = <<"groupinfo">>, attrs = [{<<"groupupdate">>,<<"0">>}], children = VCard}, #xmlel{name = <<"participants">>, attrs = [], children = SubEls1}],
+      case catch fly_mod_utils:get_group_profile_type(Server,TUser) of
+        {selected, _, []} ->
+        Status = <<"">>,
+        History = <<"">>,
+        MessageMode = <<"">>,
+        AccessMode = <<"">>,
+        ChannelStatus = <<"">>,
+        InviteUri = <<"">>,
+        Description = <<"">>,
+        CustomFeatures = <<"">>;
+        {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+          Status = GStatus,
+          History = GHistory,
+          MessageMode = GMessageMode,
+          AccessMode = GAccessMode,
+          ChannelStatus = map_status(GChannelStatus),
+          InviteUri = GInviteUri,
+          Description = GDescription,
+          CustomFeatures = GCustomFeatures;
+        _ ->
+          Status = <<"">>,
+          History = <<"">>,
+          MessageMode = <<"">>,
+          AccessMode = <<"">>,
+          ChannelStatus = <<"">>,
+          InviteUri = <<"">>,
+          Description = <<"">>,
+          CustomFeatures = <<"">>
+        end,
+
+      GroupXml = [#xmlel{name = <<"groupinfo">>, attrs = [{<<"groupupdate">>,<<"0">>},{<<"status">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode}, {<<"channel_status">>, ChannelStatus}, {<<"invite_uri">>, InviteUri}, {<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}], children = VCard}, #xmlel{name = <<"participants">>, attrs = [], children = SubEls1}],
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType ,sub_els = GroupXml })
 
   end.
@@ -1372,13 +1465,42 @@ process_get_group_profile(From, _To, SubEl, IQ, RequestType) ->
     {selected, _, []} ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"No groups available for you">>});
     {selected, _, GroupIds} ->
+      case catch fly_mod_utils:get_group_profile_type(FServer,GroupId) of
+                                    {selected, _, []} ->
+                                    Status = <<"">>,
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
+                                    Description = <<"">>,
+                                    CustomFeatures = <<"">>;
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                      Status = GStatus,
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      ChannelStatus = map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
+                                      Description = GDescription,
+                                      CustomFeatures = GCustomFeatures;
+                                    _ ->
+                                      Status = <<"">>,
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
+                                      Description = <<"">>,
+                                      CustomFeatures = <<"">>
+                                    end,
       SubEls1 = lists:map(fun(G) ->
         [GID, CreatedDate, Vcard, Affiliation, ItemId] = G,
         VCard = case fxml_stream:parse_element(Vcard) of
                     {error, _Reason} -> [];
                     VCARD -> [VCARD]
                   end,
-        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}],
+        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"item_id">>, ItemId} , {<<"status">>,  Status},{<<"description">>,  Description},{<<"createddate">>,  CreatedDate},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode},{<<"channel_status">>, ChannelStatus},{<<"invite_uri">>, InviteUri}, {<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
           children = VCard}
                           end,
         GroupIds),
@@ -1405,13 +1527,42 @@ process_get_group_vcard(From, _To, SubEl, IQ, RequestType) ->
     {selected, _, []} ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"No groups available for you">>});
     {selected, _, GroupIds} ->
+      case catch fly_mod_utils:get_group_profile_type(FServer,GroupId) of
+                                    {selected, _, []} ->
+                                    Status = <<"">>,
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
+                                    Description = <<"">>,
+                                    CustomFeatures = <<"">>;
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                      Status = GStatus,
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      ChannelStatus = map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
+                                      Description = GDescription,
+                                      CustomFeatures = GCustomFeatures;
+                                    _ ->
+                                      Status = <<"">>,
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
+                                      Description = <<"">>,
+                                      CustomFeatures = <<"">>
+                                    end,
       SubEls1 = lists:map(fun(G) ->
         [Vcard,CreatedDate] = G,
         VCard = case fxml_stream:parse_element(Vcard) of
                     {error, _Reason} -> [];
                     VCARD -> [VCARD]
                   end,
-        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GroupId }, {<<"createddate">>,  CreatedDate}],
+        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GroupId }, {<<"status">>,  Status},{<<"description">>,  Description},{<<"createddate">>,  CreatedDate},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode}, {<<"channel_status">>,  ChannelStatus },{<<"invite_uri">>,  InviteUri }, {<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
           children = VCard}
                           end,
         GroupIds),
@@ -1443,13 +1594,50 @@ process_get_group_id(From, _To, _SubEl, IQ, RequestType) ->
                     {error, _Reason} -> [];
                     VCARD -> [VCARD]
                   end,
-        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}, {<<"is_admin_blocked">>,  IsAdminBlocked }],
+                  case catch fly_mod_utils:get_group_profile_type(FServer,GID) of
+                                    {selected, _, []} ->
+                                    Status = <<"">>,
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
+                                    Description = <<"">>,
+                                    CustomFeatures = <<"">>;
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                      Status = GStatus,
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      ChannelStatus = map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
+                                      Description = GDescription,
+                                      CustomFeatures = GCustomFeatures;
+                                    _ ->
+                                      Status = <<"">>,
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
+                                      Description = <<"">>,
+                                      CustomFeatures = <<"">>
+                                    end,
+        #xmlel{name = <<"groupdetails">>, attrs = [{<<"groupid">>,  GID }, {<<"affiliation">>,  Affiliation } , {<<"status">>,  Status},{<<"description">>,  Description}, {<<"createddate">>,  CreatedDate}, {<<"item_id">>, ItemId}, {<<"is_admin_blocked">>,  IsAdminBlocked },{<<"history">>,  History },{<<"messagemode">>,  MessageMode},{<<"channel_status">>,  ChannelStatus },{<<"invite_uri">>,  InviteUri },{<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}],
           children = VCard}
                           end,
         GroupIds),
       GroupXml = [#xmlel{name = <<"group">>, children = SubEls1}],
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType ,sub_els = GroupXml})
   end.
+
+map_status(StatusString) ->
+    case StatusString of
+        <<"ACTIVE">> -> <<"1">>;
+        <<"INACTIVE">> -> <<"0">>;
+        <<"DELETED">> -> <<"-1">>;
+        _ -> <<"">>
+    end.
 
 process_get_removed_user(From, _To, SubEl, IQ, _RequestType) ->
   #jid{ lserver = FServer} = From,
@@ -1526,14 +1714,65 @@ Status == <<"remove_admin">> ->
     Status == <<"group_profile_updated">> ->
       fly_mod_utils:update_group_count(_AServer, FUser),
       MessageId = <<(get_string()) / binary>>,
+      case catch fly_mod_utils:get_group_profile_type(_AServer,FUser) of
+                                    {selected, _, []} ->
+                                    TStatus = <<"">>,
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
+                                    Description = <<"">>,
+                                    CustomFeatures = <<"">>;
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                      TStatus = GStatus,
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      ChannelStatus = map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
+                                      Description = GDescription,
+                                      CustomFeatures = GCustomFeatures;
+                                    _ ->
+                                      TStatus = <<"">>,
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
+                                      Description = <<"">>,
+                                      CustomFeatures = <<"">>
+                                    end,
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
         #jid{user = TUser, lserver = TServer} = RouteToJid,
         fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId),
         Packet = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupFrom)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
-          children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}], children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, Status}, {<<"done_by">>, ActionDoneBy}], children = [Data]}]},
-            #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}]}]},
+          children = [
+        #xmlel{
+            name = <<"event">>,
+            attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],
+            children = [
+                #xmlel{
+                    name = <<"info">>,
+                    attrs = [
+                        {<<"status">>, Status},
+                        {<<"done_by">>, ActionDoneBy},
+                        {<<"gstatus">>, TStatus},
+                        {<<"description">>, Description},
+                        {<<"history">>, History},
+                        {<<"channel_status">>, ChannelStatus},
+                        {<<"invite_uri">>, InviteUri},
+                        {<<"messagemode">>, MessageMode},
+                        {<<"accessmode">>, AccessMode},
+                        {<<"customfeatures">>, CustomFeatures}
+                    ],
+                    children = [Data]
+                }
+            ]
+        },
+        #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}]}]},
         ejabberd_router:route(GroupFrom, RouteToJid, Packet),
         carboncall_message(TUser, TServer,Packet,GroupFrom),
         case fly_mod_utils:get_mobile_user_message(TUser, TServer) of

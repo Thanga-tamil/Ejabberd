@@ -58,6 +58,7 @@
   get_my_all_group_id_rosters/2,
   get_my_all_group_id/2,
   get_group_profile/3,
+  get_group_profile_type/2,
   set_last_t/2,
   set_last_o/3,
   clear_message/5,
@@ -179,6 +180,7 @@
   get_host/1,
   get_nick/2,
   get_recent_profile/3,
+  read_all/3,
   get_all_media_conversation/2,empty_from_user_to_chat_media/2,update_tousers_to_chat_media/3,
   revoke_media_permission/3, get_chat_media_by_messageid/2,
   get_all_media_conversation_with_filetoken/2,
@@ -1279,46 +1281,53 @@ update_offline(Server, MessageId, LResource) ->
   Server,
   [<<"update spool set admin_delivered = 1 where message_id='">>,MessageId,<<"' and (device_id = '">>,LResource,<<"' or device_id = '') ;">>]).
 
-
-%% Update message seen status
-%%
-%%
-%% &param Jid
-%% &param MessageId
-%% &param SeenStatus
-%% @return List
+read_all(Server, Fuser, Tuser)->
+  ejabberd_sql:sql_query(
+    Server,
+    [<<"update chat_recent set unread =  0 where from_user ='">>,Tuser, <<"' and to_user ='">>,Fuser,<<"';">>]).
 
 update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
 
-  % ejabberd_sql:sql_query(
-  %   Server,
-  %   [<<"update message_status set status = 2, seen_at = NOW() where  to_user='">>,User,<<"' and from_user = (SELECT from_user FROM (select from_user from message_status where message_id='">>,MessageId,<<"' limit 1) s);">>]),
-
-  ejabberd_sql:sql_query(
+    case catch ejabberd_sql:sql_query(
     Server,
-    [<<"update message_status set status =  2, seen_at = NOW() where  to_user='">>,User,<<"' and message_id='">>,MessageId,<<"' and  status != 2 ;">>]),
+    [<<"update message_status set status =  2, seen_at = NOW() where  to_user='">>,User,<<"' and message_id='">>,MessageId,<<"' and  status != 2 ;">>]) of
+    {updated,1} ->
+      if GroupId =/= <<"">> ->
+      ejabberd_sql:sql_query(
+    Server,
+    [<<"update chat_recent set unread =  unread - 1 where from_user ='">>,GroupId, <<"' and to_user ='">>,User, <<"';">>]);
+  true ->
+ejabberd_sql:sql_query(
+    Server,
+    [<<"update chat_recent set unread =  unread - 1 where from_user ='">>,TUser, <<"' and to_user ='">>,User, <<"';">>])
+end;
+    {updated,0}->
+      ok;
+    _ ->
+      ok
+  end,
 
   % ejabberd_sql:sql_query(
   %   Server,
   %   [<<"update chat_recent set unread =  0 where message_id='">>,MessageId,<<"' and to_user ='">>,User,<<"';">>]),
 
-  if GroupId =/= <<"">> ->
-    ToJid = jid:make(TUser, Server, <<>>),
-    case catch get_groupmessage_status(ToJid, MessageId) of
-        {selected, _, []} ->
-          Status = <<"2">>;
-        {selected, _, [[GroupStatus]]} ->
-          Status = GroupStatus;
-        _ ->
-          Status = <<"2">>
-      end;
-  true ->
-    Status = <<"2">>
-  end,
+  % if GroupId =/= <<"">> ->
+  %   ToJid = jid:make(TUser, Server, <<>>),
+  %   case catch get_groupmessage_status(ToJid, MessageId) of
+  %       {selected, _, []} ->
+  %         Status = <<"2">>;
+  %       {selected, _, [[GroupStatus]]} ->
+  %         Status = GroupStatus;
+  %       _ ->
+  %         Status = <<"2">>
+  %     end;
+  % true ->
+  %   Status = <<"2">>
+  % end,
 
   ejabberd_sql:sql_query(
     Server,
-    [<<"update chat_recent set status = '">>,Status,<<"', unread =  0 where  to_user ='">>,TUser,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>]).
+    [<<"update chat_recent set status = 2 where  to_user ='">>,TUser,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>]).
 
 %% Update message delivery status
 %%
@@ -1897,6 +1906,10 @@ get_callstatus(LServer,SocketId)->
 get_group_vcard(LServer,LUser) ->
   ejabberd_sql:sql_query(LServer,
     [<<"select vcard, created_at from vcard where username= '">>,LUser,<<"';">>]).
+
+get_group_profile_type(LServer,LUser)->
+ejabberd_sql:sql_query(LServer,
+[<<"SELECT v.status, v.history ,cs.message_mode,cs.access_mode,cs.status,IFNULL(cs.invite_uri,''),IFNULL(json_unquote(cs.custom_features),'') as custom, IFNULL(cs.description,'') FROM vcard_search v JOIN  channel_settings cs ON cs.channel = v.username WHERE  v.username= '">>,LUser,<<"';">>]).
 
 get_offline_message(LServer, LUser, LResource) ->
   ejabberd_sql:sql_query(LServer,
