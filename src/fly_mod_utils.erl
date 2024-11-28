@@ -1295,9 +1295,15 @@ update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
     Server,
     [<<"update message_status set status =  2, seen_at = NOW() where  to_user='">>,User,<<"' and message_id='">>,MessageId,<<"' and  status != 2 ;">>]) of
     {updated,1} ->
+      if GroupId =/= <<"">> ->
       ejabberd_sql:sql_query(
     Server,
-    [<<"update chat_recent set unread =  unread - 1 where from_user ='">>,TUser, <<"' and to_user ='">>,User, <<"';">>]);
+    [<<"update chat_recent set unread =  unread - 1 where from_user ='">>,GroupId, <<"' and to_user ='">>,User, <<"';">>]);
+  true ->
+ejabberd_sql:sql_query(
+    Server,
+    [<<"update chat_recent set unread =  unread - 1 where from_user ='">>,TUser, <<"' and to_user ='">>,User, <<"';">>])
+end;
     {updated,0}->
       ok;
     _ ->
