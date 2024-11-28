@@ -1281,17 +1281,8 @@ update_offline(Server, MessageId, LResource) ->
   Server,
   [<<"update spool set admin_delivered = 1 where message_id='">>,MessageId,<<"' and (device_id = '">>,LResource,<<"' or device_id = '') ;">>]).
 
-
-%% Update message seen status
-%%
-%%
-%% &param Jid
-%% &param MessageId
-%% &param SeenStatus
-%% @return List
-
 read_all(Server, Fuser, Tuser)->
- ejabberd_sql:sql_query(
+  ejabberd_sql:sql_query(
     Server,
     [<<"update chat_recent set unread =  0 where from_user ='">>,Tuser, <<"' and to_user ='">>,Fuser,<<"';">>]).
 
