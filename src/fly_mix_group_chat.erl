@@ -1314,13 +1314,15 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
 
     {selected, _, Members} ->
       ?INFO_MSG("TUser ~p",[TUser]),
-      case mod_vcard_sql:get_vcard(TUser, Server) of
-		{ok, Vcard} ->
-	    VCard = Vcard;
-	{error, _} ->
-	    VCard = []
-    end,
-      
+      ?INFO_MSG("Server ~p",[Server]),
+      VCard = case catch fly_mod_utils:get_vcard(Server, TUser) of
+            {selected, [{PVCARD, _CreatedTime}]} ->
+              PVCARD;
+            {selected, []} ->
+              [];
+            _ ->
+              []
+          end,      
       SubEls1 = lists:map(fun(G) ->
 
         [ItemId, JID, Affiliation,CreatedAt, IsAdminBlocked,SVCARD] = G,
