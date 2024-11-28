@@ -1313,23 +1313,23 @@ update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
   %   Server,
   %   [<<"update chat_recent set unread =  0 where message_id='">>,MessageId,<<"' and to_user ='">>,User,<<"';">>]),
 
-  if GroupId =/= <<"">> ->
-    ToJid = jid:make(TUser, Server, <<>>),
-    case catch get_groupmessage_status(ToJid, MessageId) of
-        {selected, _, []} ->
-          Status = <<"2">>;
-        {selected, _, [[GroupStatus]]} ->
-          Status = GroupStatus;
-        _ ->
-          Status = <<"2">>
-      end;
-  true ->
-    Status = <<"2">>
-  end,
+  % if GroupId =/= <<"">> ->
+  %   ToJid = jid:make(TUser, Server, <<>>),
+  %   case catch get_groupmessage_status(ToJid, MessageId) of
+  %       {selected, _, []} ->
+  %         Status = <<"2">>;
+  %       {selected, _, [[GroupStatus]]} ->
+  %         Status = GroupStatus;
+  %       _ ->
+  %         Status = <<"2">>
+  %     end;
+  % true ->
+  %   Status = <<"2">>
+  % end,
 
   ejabberd_sql:sql_query(
     Server,
-    [<<"update chat_recent set status = '">>,Status,<<"' where  to_user ='">>,TUser,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>]).
+    [<<"update chat_recent set status = 2 where  to_user ='">>,TUser,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>]).
 
 %% Update message delivery status
 %%
