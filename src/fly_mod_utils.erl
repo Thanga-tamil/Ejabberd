@@ -180,6 +180,7 @@
   get_host/1,
   get_nick/2,
   get_recent_profile/3,
+  read_all/3,
   get_all_media_conversation/2,empty_from_user_to_chat_media/2,update_tousers_to_chat_media/3,
   revoke_media_permission/3, get_chat_media_by_messageid/2,
   get_all_media_conversation_with_filetoken/2,
@@ -1288,6 +1289,11 @@ update_offline(Server, MessageId, LResource) ->
 %% &param MessageId
 %% &param SeenStatus
 %% @return List
+
+read_all(Server, Fuser, Tuser)->
+ ejabberd_sql:sql_query(
+    Server,
+    [<<"update chat_recent set unread =  0 where from_user ='">>,Tuser, <<"' and to_user ='">>,Fuser,<<"';">>]).
 
 update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
 

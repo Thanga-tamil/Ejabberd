@@ -226,6 +226,8 @@ process_iq_set(From, _To, RequestType, IQ) ->
       poll_update(From, RequestType, SubEl, IQ);
     <<"acknowledge">> ->
       acknowledge(From, RequestType, SubEl, IQ);
+    <<"read_all">> ->
+      read_all(From, RequestType, SubEl, IQ);
     <<"poll_acknowledge">> ->
       poll_ack(From, RequestType, SubEl, IQ);
     no_such_subtag ->
@@ -728,6 +730,13 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   end,
   fly_mod_utils:remove_poll_offline(FServer, MResource,MsgId),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Ack successfully">>}).
+
+ read_all(From,RequestType,SubEl,IQ) ->
+  #jid{user = FUser, lserver = FServer,lresource = LResource} = From,
+  Readto = fxml:get_path_s(SubEl, [{attr, <<"to_user">>}]),
+  fly_mod_utils:read_all(FServer,FUser, Readto),
+  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Read successfully">>}).
+
 
 poll_update(From,RequestType,SubEl,IQ) ->
 #jid{user = FUser, lserver = FServer} = From,
