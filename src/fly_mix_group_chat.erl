@@ -1313,7 +1313,8 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"No Participants Exists">>});
 
     {selected, _, Members} ->
-      
+      ?INFO_MSG("TUser ~p",[TUser]),
+      ?INFO_MSG("Server ~p",[Server]),
       VCard = case catch fly_mod_utils:get_vcard(Server, TUser) of
             {selected, [{PVCARD, _CreatedTime}]} ->
               PVCARD;
@@ -1345,46 +1346,43 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
 
         VcardElement = #xmlel{name = <<"user_profile">>, attrs = [],
           children = [UserVCard]},
-         ?INFO_MSG("VcardElement ~p",[VcardElement]),
 
         #xmlel{name = <<"participant">>, attrs = [],
           children = [JidElement, AffiliationElement, ItemIdElement, CreatedElement, IsAdminBlockedElement, VcardElement]}
 
       end, Members),
-      ?INFO_MSG("TUser ~p",[TUser]),
-      ?INFO_MSG("SubEls1 ~p",[SubEls1]),
-      % case catch fly_mod_utils:get_group_profile_type(Server,TUser) of
-      %   {selected, _, []} ->
-      %   Status = <<"">>,
-      %   History = <<"">>,
-      %   MessageMode = <<"">>,
-      %   AccessMode = <<"">>,
-      %   ChannelStatus = <<"">>,
-      %   InviteUri = <<"">>,
-      %   Description = <<"">>,
-      %   CustomFeatures = <<"">>;
-      %   {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
-      %     Status = GStatus,
-      %     History = GHistory,
-      %     MessageMode = GMessageMode,
-      %     AccessMode = GAccessMode,
-      %     ChannelStatus = map_status(GChannelStatus),
-      %     InviteUri = GInviteUri,
-      %     Description = GDescription,
-      %     CustomFeatures = GCustomFeatures;
-      %   _ ->
-      %     Status = <<"">>,
-      %     History = <<"">>,
-      %     MessageMode = <<"">>,
-      %     AccessMode = <<"">>,
-      %     ChannelStatus = <<"">>,
-      %     InviteUri = <<"">>,
-      %     Description = <<"">>,
-      %     CustomFeatures = <<"">>
-      %   end,
+
+      case catch fly_mod_utils:get_group_profile_type(Server,TUser) of
+        {selected, _, []} ->
+        Status = <<"">>,
+        History = <<"">>,
+        MessageMode = <<"">>,
+        AccessMode = <<"">>,
+        ChannelStatus = <<"">>,
+        InviteUri = <<"">>,
+        Description = <<"">>,
+        CustomFeatures = <<"">>;
+        {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+          Status = GStatus,
+          History = GHistory,
+          MessageMode = GMessageMode,
+          AccessMode = GAccessMode,
+          ChannelStatus = map_status(GChannelStatus),
+          InviteUri = GInviteUri,
+          Description = GDescription,
+          CustomFeatures = GCustomFeatures;
+        _ ->
+          Status = <<"">>,
+          History = <<"">>,
+          MessageMode = <<"">>,
+          AccessMode = <<"">>,
+          ChannelStatus = <<"">>,
+          InviteUri = <<"">>,
+          Description = <<"">>,
+          CustomFeatures = <<"">>
+        end,
       
-      %GroupXml = [#xmlel{name = <<"groupinfo">>, attrs = [{<<"groupupdate">>,<<"0">>},{<<"status">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode}, {<<"channel_status">>, ChannelStatus}, {<<"invite_uri">>, InviteUri}, {<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}], children = VCard}, #xmlel{name = <<"participants">>, attrs = [], children = SubEls1}],
-      GroupXml = [#xmlel{name = <<"groupinfo">>, attrs = [{<<"groupupdate">>,<<"0">>}], children = VCard}, #xmlel{name = <<"participants">>, attrs = [], children = SubEls1}],
+      GroupXml = [#xmlel{name = <<"groupinfo">>, attrs = [{<<"groupupdate">>,<<"0">>},{<<"status">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode}, {<<"channel_status">>, ChannelStatus}, {<<"invite_uri">>, InviteUri}, {<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}], children = VCard}, #xmlel{name = <<"participants">>, attrs = [], children = SubEls1}],
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType ,sub_els = GroupXml })
 
   end.
