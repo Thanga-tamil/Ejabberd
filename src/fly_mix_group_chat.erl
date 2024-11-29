@@ -1314,14 +1314,8 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
 
     {selected, _, Members} ->
       
-      VCard = case catch fly_mod_utils:get_vcard(Server, TUser) of
-            {selected, [{PVCARD, _CreatedTime}]} ->
-              PVCARD;
-            {selected, []} ->
-              [];
-            _ ->
-              []
-          end,   
+       {ok,VCard} = mod_vcard_sql:get_vcard(TUser, Server),
+          
       SubEls1 = lists:map(fun(G) ->
 
         [ItemId, JID, Affiliation,CreatedAt, IsAdminBlocked,SVCARD] = G,
@@ -1381,7 +1375,7 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
           CustomFeatures = <<"">>
         end,
       
-      GroupXml = [#xmlel{name = <<"groupinfo">>, attrs = [{<<"groupupdate">>,<<"0">>}], children = VCard}, #xmlel{name = <<"participants">>, attrs = [], children = SubEls1}],
+      GroupXml = [#xmlel{name = <<"groupinfo">>, attrs = [{<<"groupupdate">>,<<"0">>},{<<"status">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode}, {<<"channel_status">>, ChannelStatus}, {<<"invite_uri">>, InviteUri}, {<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}], children = VCard}, #xmlel{name = <<"participants">>, attrs = [], children = SubEls1}],
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType ,sub_els = GroupXml })
 
   end.
