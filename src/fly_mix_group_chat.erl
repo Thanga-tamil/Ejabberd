@@ -1322,7 +1322,7 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
               [];
             _ ->
               []
-          end,      
+          end,   
       SubEls1 = lists:map(fun(G) ->
 
         [ItemId, JID, Affiliation,CreatedAt, IsAdminBlocked,SVCARD] = G,
@@ -1363,14 +1363,22 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
         Description = <<"">>,
         CustomFeatures = <<"">>;
         {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
-          Status = GStatus,
-          History = GHistory,
-          MessageMode = GMessageMode,
-          AccessMode = GAccessMode,
-          ChannelStatus = map_status(GChannelStatus),
-          InviteUri = GInviteUri,
-          Description = GDescription,
-          CustomFeatures = GCustomFeatures;
+          % Status = GStatus,
+          % History = GHistory,
+          % MessageMode = GMessageMode,
+          % AccessMode = GAccessMode,
+          % ChannelStatus = map_status(GChannelStatus),
+          % InviteUri = GInviteUri,
+          % Description = GDescription,
+          % CustomFeatures = GCustomFeatures;
+          Status = <<"">>,
+        History = <<"">>,
+        MessageMode = <<"">>,
+        AccessMode = <<"">>,
+        ChannelStatus = <<"">>,
+        InviteUri = <<"">>,
+        Description = <<"">>,
+        CustomFeatures = <<"">>;
         _ ->
           Status = <<"">>,
           History = <<"">>,

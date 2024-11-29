@@ -684,10 +684,19 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   ToJid = jid:from_string(MessageTo),
   #jid{user = FUser, lserver = FServer} = FromJid,
   #jid{user = TUser, lserver = TServer} = ToJid,
+   fly_mod_utils:update_seen(FromJid, FUser, MessageId, GroupId),
+  case catch fly_mod_utils:message_status(FServer, MessageId, FUser) of
+                                    {selected, _, []} ->
+                                      GStatus = <<"0">>;
+                                    {selected, _, [[GroupStatus]]} ->
+                                      GStatus = GroupStatus;
+                                    _ ->
+                                      GStatus = <<"0">>
+                                  end,
   XmlBody = #xmlel{name = <<"message">>,
     attrs = [{<<"from">>, MessageFrom}, {<<"to">>, MessageTo}, {<<"type">>, <<"chat">>}, {<<"id">>, Messageid}],
       children = [#xmlel{name = <<"seen">>,
-      attrs = [{<<"xmlns">>, <<"urn:xmpp:receipts">>}, {<<"group_id">>, GroupId},{<<"id">>, MessageId}],
+      attrs = [{<<"xmlns">>, <<"urn:xmpp:receipts">>}, {<<"message_status">>, GStatus},{<<"group_id">>, GroupId},{<<"id">>, MessageId}],
       children = []}]},
   ReceivedTimestamp = now_to_microseconds(erlang:now()),
   ReceivedFlatTimeStamp = lists:flatten(io_lib:format("~p", [ReceivedTimestamp])),
@@ -703,8 +712,6 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
     false ->
       ok
   end,
-
-  fly_mod_utils:update_seen(FromJid, FUser, MessageId, GroupId),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>}).
 
   poll_ack(From,RequestType,SubEl,IQ) ->
