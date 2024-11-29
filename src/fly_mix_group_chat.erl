@@ -1384,7 +1384,7 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
       %   end,
       
       %GroupXml = [#xmlel{name = <<"groupinfo">>, attrs = [{<<"groupupdate">>,<<"0">>},{<<"status">>,  Status},{<<"description">>,  Description},{<<"history">>,  History }, {<<"messagemode">>,  MessageMode}, {<<"channel_status">>, ChannelStatus}, {<<"invite_uri">>, InviteUri}, {<<"accessmode">>,  AccessMode }, {<<"customfeatures">>,  CustomFeatures}], children = VCard}, #xmlel{name = <<"participants">>, attrs = [], children = SubEls1}],
-      GroupXml = [#xmlel{name = <<"groupinfo">>, attrs = [{<<"groupupdate">>,<<"0">>},{<<"status">>,  Status}], children = VCard}, #xmlel{name = <<"participants">>, attrs = [], children = SubEls1}],
+      GroupXml = [#xmlel{name = <<"groupinfo">>, attrs = [{<<"groupupdate">>,<<"0">>}], children = VCard}, #xmlel{name = <<"participants">>, attrs = [], children = SubEls1}],
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType ,sub_els = GroupXml })
 
   end.
