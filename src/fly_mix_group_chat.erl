@@ -1322,7 +1322,7 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
               [];
             _ ->
               []
-          end,      
+          end,   
       SubEls1 = lists:map(fun(G) ->
 
         [ItemId, JID, Affiliation,CreatedAt, IsAdminBlocked,SVCARD] = G,
