@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -m
 
-EJABBERDCTL=$HOME/bin/ejabberdctl
+EJABBERDCTL=$HOME/sbin/ejabberdctl
 HOSTNAME_S=$(hostname -s) # ejabberd-0
 HOSTNAME_F=$(hostname -f) # ejabberd-0.ejabberd.default.svc.cluster.local
 HEADLESS_SERVICE="${HOSTNAME_F/$HOSTNAME_S./}" # ejabberd.default.svc.cluster.local
