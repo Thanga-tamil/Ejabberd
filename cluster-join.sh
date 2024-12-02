@@ -6,6 +6,8 @@ EJABBERDCTL="/opt/ejabberd/bin/ejabberdctl"
 # Start ejabberd service
 $EJABBERDCTL start
 
+echo "$(hostname)"
+
 # If this is the first pod (ejabberd-0), it's the seed node
 if [ "$(hostname)" = "ejabberd-0" ]; then
   echo "This is the seed node. No need to join the cluster."
