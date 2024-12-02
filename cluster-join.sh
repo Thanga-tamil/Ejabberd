@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Path to ejabberdctl
-EJABBERDCTL="/opt/ejabberd/bin/ejabberdctl"
+EJABBERDCTL="/opt/ejabberd/sbin/ejabberdctl"
 
 # Start ejabberd service
 $EJABBERDCTL start
