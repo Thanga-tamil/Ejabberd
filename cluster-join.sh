@@ -14,7 +14,7 @@ if [ "$(hostname)" = "chatservice-headless-0" ]; then
 else
   # Join the cluster using the seed node (ejabberd-0)
   echo "Joining the cluster..."
-  $EJABBERDCTL -no-timeout join_cluster ejabberd@chatservice-headless-0.chatservice-headless.uikit-dev.svc.cluster.local
+  $EJABBERDCTL -no-timeout join_cluster ejabberd@chatservice-headless-0.chatservice-headless-hl.uikit-dev.svc.cluster.local
 fi
 
 #Define cleanup procedure
@@ -22,7 +22,7 @@ cleanup() {
 
   # Join the cluster using the seed node (ejabberd-0)
   echo "Container stopped, performing cleanup..."
-  $EJABBERDCTL leave_cluster ejabberd@chatservice-headless-0.chatservice-headless.uikit-dev.svc.cluster.local
+  $EJABBERDCTL leave_cluster ejabberd@chatservice-headless-0.chatservice-headless-hl.uikit-dev.svc.cluster.local
   $EJABBERDCTL stop
 
 }
