@@ -684,7 +684,7 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   ToJid = jid:from_string(MessageTo),
   #jid{user = FUser, lserver = FServer} = FromJid,
   #jid{user = TUser, lserver = TServer} = ToJid,
-   fly_mod_utils:update_seen(FromJid, FUser, MessageId, GroupId),
+  fly_mod_utils:update_seen(FromJid, FUser, MessageId, GroupId),
   case catch fly_mod_utils:message_status(FServer, MessageId, FUser) of
                                     {selected, _, []} ->
                                       GStatus = <<"0">>;
