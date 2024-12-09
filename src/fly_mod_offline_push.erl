@@ -122,6 +122,17 @@ handle_cast({pushnotification, <<"chat">>,
       Sender#jid.luser)
     of
       {selected, _, []} ->
+        Call = true;
+      {selected, _, [[_T]]} ->
+       if ChatType =:= <<"call">> ->
+        Call = true;
+        true ->
+          Call = false,
+        ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
+        ok
+      end
+      end,
+      if Call =:= true ->
         case catch send_push_notifications(Sender, Recipient,
           ChatType, SubEl, Packet, State)
         of
@@ -131,10 +142,10 @@ handle_cast({pushnotification, <<"chat">>,
           _Exception ->
             ?INFO_MSG("push exception ~p", [_Exception]), ok
         end;
-      {selected, _, [[_T]]} ->
+      true ->
         ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
         ok
-      end,
+        end,
   {noreply, State};
 handle_cast({queryexecution, <<"clear_all">>,
   {From, Last_Msg_Id, Delete_Type, XMLBody}},
