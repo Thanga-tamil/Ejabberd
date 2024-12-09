@@ -124,7 +124,7 @@ handle_cast({pushnotification, <<"chat">>,
       {selected, _, []} ->
         Call = true;
       {selected, _, [[_T]]} ->
-       if ChatType =:= <<"call">> ->
+      if ChatType =:= <<"call">> ->
         Call = true;
         true ->
           Call = false,
