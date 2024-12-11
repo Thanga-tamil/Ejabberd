@@ -525,14 +525,8 @@ handle_authenticated_packet(Pkt, #{lserver := LServer, jid := JID,
 		false ->
 			case fxml:get_subtag(xmpp:encode(Pkt),<<"gone">>) of
 			false ->
-			#jid{user = _FUser, lserver = ServerHost} = _From,
-			SentTo = jid:to_string(_To),
-			XmlBody = #xmlel{name = <<"acknowledge">>,
-			attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"id">>, SubmissionID}, {<<"sent_to">>, SentTo}, {<<"type">>, <<"acknowledge">>}],
-			children = []},
-
-			Msg = #message{from = _To, to = _From, type = chat, sub_els = [XmlBody]},
-                        fly_mod_push:send_ack(ServerHost, Msg);
+				fly_mod_stanza_ack:send_ack_response(_From, _To, SubmissionID, <<"acknowledge">>);
+				% spawn(fly_mod_stanza_ack, send_ack_response, [_From, _To, SubmissionID, <<"acknowledge">>]);
 			_ ->
 				ok
 			end;

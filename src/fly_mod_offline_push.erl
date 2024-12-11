@@ -14,7 +14,7 @@
 -define(EJABBERD_DEBUG, true).
 
 %% gen_mod callbacks
--export([send_offline_message/1, send_ack/2, groupcreationfunction/9, queryexecfunction/5, queryexecfunctions/5, queryfunction/6,queryfunctions/6, groupcreationfunction/10, has_more_resources/2, send_bulk_group_push/7, send_own_offline_message/3, start/2, start_link/2, depends/2,
+-export([send_offline_message/1, groupcreationfunction/9, queryexecfunction/5, queryexecfunctions/5, queryfunction/6,queryfunctions/6, groupcreationfunction/10, has_more_resources/2, send_bulk_group_push/7, send_own_offline_message/3, start/2, start_link/2, depends/2,
   stop/1]).
 
 -export([code_change/3, handle_call/3, handle_cast/2, handle_info/2, init/1, mod_opt_type/1, terminate/2, mod_options/1]).
@@ -171,9 +171,6 @@ handle_cast({groupcreationexecutions, <<"group_creation">>,
   group_create_query(From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes, State),
 
   {noreply, State};
-handle_cast({process_message,Packet},State)->
-  ejabberd_router:route(Packet),
-    {noreply, State};
 handle_cast({own_pushnotification, <<"chat">>,
   {Sender, Recipient, ChatType, SubEl, Packet}},
     State) ->
@@ -224,10 +221,6 @@ push(Proc, Type, Sender, Recipient, ChatType, SubEl,
   gen_server:cast(Proc,
     {pushnotification, Type,
       {Sender, Recipient, ChatType, SubEl, Packet}}).
-
-sendack(Proc,  Packet) ->
-  gen_server:cast(Proc,
-    {process_message, Packet}).
 
 ownpush(Proc, Type, Sender, Recipient, ChatType, SubEl,
     Packet) ->
@@ -1885,9 +1878,6 @@ groupcreationfunction(From, groupcreation, Participants, Channel, GroupJID, SubE
   Server = gen_mod:get_module_proc(From#jid.lserver,
     ?PROCNAME),
 groupcreationfunction(Server,<<"group_creation">>, From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes).
-
-send_ack(Server, Packet)->
-  sendack(Server,  Packet).
 
 send_own_offline_message(Sender, Recipient, Packet) ->
   ChatType = fxml:get_attr_s(<<"type">>, Packet#xmlel.attrs),
