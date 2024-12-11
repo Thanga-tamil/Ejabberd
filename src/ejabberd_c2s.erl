@@ -525,7 +525,14 @@ handle_authenticated_packet(Pkt, #{lserver := LServer, jid := JID,
 		false ->
 			case fxml:get_subtag(xmpp:encode(Pkt),<<"gone">>) of
 			false ->
-			gen_server:call(fly_mod_stanza_ack, {send_ack_response, [_From, _To, SubmissionID, <<"acknowledge">>]});
+			#jid{user = _FUser, lserver = ServerHost} = _From,
+			Proc = gen_mod:get_module_proc(ServerHost, ?MODULE),
+			SentTo = jid:to_string(_To),
+			XmlBody = #xmlel{name = <<"acknowledge">>,
+			attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"id">>, SubmissionID}, {<<"sent_to">>, SentTo}, {<<"type">>, <<"acknowledge">>}],
+			children = []},
+			Msg = #message{from = _To, to = _From, type = chat, sub_els = [XmlBody]},
+                        gen_server:call(?MODULE, {process_message, Msg});
 			_ ->
 				ok
 			end;
@@ -643,6 +650,13 @@ handle_call(get_presence, From, #{jid := JID} = State) ->
 handle_call({set_presence, Pres}, From, State) ->
     reply(From, ok),
     process_self_presence(State, Pres);
+
+handle_call({process_message, Msg}, _From, State) ->
+    ejabberd_router:route(Msg),
+    
+    %% Return the processing result
+    {reply, ok, State};
+
 handle_call(Request, From, #{lserver := LServer} = State) ->
     ejabberd_hooks:run_fold(
       c2s_handle_call, LServer, State, [Request, From]).
