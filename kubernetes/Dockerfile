@@ -58,12 +58,12 @@ RUN rm -rf /tmp/es.rpm
 ###  Run the jar file ###
 
 # Copy the startup script into the container
-COPY cluster-join.sh /usr/local/bin/cluster-join.sh
+COPY cluster-join-leave.sh /usr/local/bin/cluster-join-leave.sh
 
 # Ensure the script is executable
-RUN chmod +x /usr/local/bin/cluster-join.sh
+RUN chmod +x /usr/local/bin/cluster-join-leave.sh
 
 # Set the script as the entrypoint or part of the command
-ENTRYPOINT ["/usr/local/bin/cluster-join.sh"]
+ENTRYPOINT ["/usr/local/bin/cluster-join-leave.sh"]
 
 # ENTRYPOINT ["/tini", "--", "/entrypoint.sh"]
