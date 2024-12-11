@@ -1,8 +1,8 @@
 #!/bin/bash
 
-NAMESPACE="default"  # Set your Kubernetes namespace here
-POD_LABEL_SELECTOR="app=ejabberd"  # Adjust this to your ejabberd pod label
-EJABBERDCTL="/opt/ejabberd/bin/ejabberdctl"
+NAMESPACE="uikit-dev"  # Set your Kubernetes namespace here
+POD_LABEL_SELECTOR="app=chatservice-headless-hl"  # Adjust this to your ejabberd pod label
+EJABBERDCTL="/opt/ejabberd/sbin/ejabberdctl"
 POD_NAME=$(hostname)  # Use the hostname as the pod name in StatefulSet
 SLEEP_INTERVAL=30  # Interval in seconds to check the status
 
@@ -46,7 +46,7 @@ monitor_ejabberd() {
     echo "Current pod: $POD_NAME"
 
     # If this is the headless pod (ejabberd-0), no need to join the cluster
-    if [[ "$POD_NAME" == "ejabberd-0" ]]; then
+    if [[ "$POD_NAME" == "chatservice-headless-0" ]]; then
         echo "This is the headless/primary node, no need to join the cluster."
         exit 0
     fi
