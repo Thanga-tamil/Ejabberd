@@ -460,6 +460,7 @@ send_ack_response(From, To, ReceiptId, Type) ->
   XmlBody = #xmlel{name = <<"acknowledge">>,
       attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"id">>, ReceiptId}, {<<"sent_to">>, SentTo}, {<<"type">>, Type}],
       children = []},
+  ?INFO_MSG("Ack send ~p",[XmlBody]),
   Proc = gen_mod:get_module_proc(ServerHost, ?MODULE),
   Msg = #message{from = To, to = From, type = chat, sub_els = [XmlBody]},
   gen_server:cast(Proc, {send_ack,Msg}).
