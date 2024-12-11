@@ -231,7 +231,6 @@ process_info(#{lserver := LServer} = State, {route, Packet}) ->
 			 #presence{} ->
 			     process_presence_in(State, Packet);
 			 #message{} ->
-			     ?INFO_MSG("message received ~p",[Packet]),
 			     process_message_in(State, Packet);
 			 #iq{} ->
 			     process_iq_in(State, Packet)
@@ -526,8 +525,7 @@ handle_authenticated_packet(Pkt, #{lserver := LServer, jid := JID,
 		false ->
 			case fxml:get_subtag(xmpp:encode(Pkt),<<"gone">>) of
 			false ->
-				?INFO_MSG("message spawn ~p",[Pkt]),
-				spawn(fly_mod_stanza_ack, send_ack_response, [_From, _To, SubmissionID, <<"acknowledge">>]);
+			gen_server:call(fly_mod_stanza_ack, {send_ack_response, [_From, _To, SubmissionID, <<"acknowledge">>]});
 			_ ->
 				ok
 			end;
