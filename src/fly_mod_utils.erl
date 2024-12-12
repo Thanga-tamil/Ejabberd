@@ -1306,11 +1306,9 @@ end;
 %% @return List
 
 update_delivery(#jid{luser = User,lserver = Server}, TUser,  MessageId, GroupId) ->
-  ejabberd_sql:sql_query(
-    Server,
-    [<<"update message_status set status =  1, received_at = NOW() where   to_user='">>,User,<<"' and message_id='">>,MessageId,<<"' and status = 0;">>]),
-
-  if GroupId =/= <<"">> ->
+  case catch ejabberd_sql:sql_query( Server,[<<"update message_status set status =  1, received_at = NOW() where   to_user='">>,User,<<"' and message_id='">>,MessageId,<<"' and status = 0;">>]) of
+    {updated,_} ->
+      if GroupId =/= <<"">> ->
     ToJid = jid:make(TUser, Server, <<>>),
     case catch get_groupmessage_status(ToJid, MessageId) of
         {selected, _, []} ->
@@ -1326,7 +1324,12 @@ update_delivery(#jid{luser = User,lserver = Server}, TUser,  MessageId, GroupId)
 
   ejabberd_sql:sql_query(
     Server,
-    [<<"update chat_recent set status = '">>,Status,<<"' where  (from_user = '">>,TUser,<<"' or  to_user ='">>,TUser,<<"') and message_id='">>,MessageId,<<"' and status = 0;">>]).
+    [<<"update chat_recent set status = '">>,Status,<<"' where  (from_user = '">>,TUser,<<"' or  to_user ='">>,TUser,<<"') and message_id='">>,MessageId,<<"' and status = 0;">>]);
+    _ ->
+      ok
+  end.
+  
+  
 
 update_delivery_offline(Server, User) ->
 
@@ -1979,6 +1982,7 @@ get_not_delivered_message(Server,LUser) ->
     [<<"SELECT from_user,message_id,chat_type,from_notification FROM message_status where to_user = '">>,LUser, <<"' and from_notification != '">>,FromNotification, <<"'  and status = 0 and recall_status =0 and message_notification = 0 and blocked = 0 ;">>]).
 
 update_delivered_status(Server,LUser) ->
+  
 ejabberd_sql:sql_query(
     Server,
     [<<"update chat_recent set status =  1 where from_user ='">>,LUser,<<"' and status = 0 ;">>]).
