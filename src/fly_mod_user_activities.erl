@@ -2057,7 +2057,6 @@ message_stanza_result(Result) ->
       children = [{xmlcdata, EditStatus}]},
     MessageTypeElements = #xmlel{name = <<"Message_type">>, attrs = [],
       children = [{xmlcdata, Message_type}]},
-    ?INFO_MSG("MessageTag ~p",[MessageTag]),
     if MessageTag =:= <<"">> ->
       MessageElement = #xmlel{name = <<"message ">>, attrs = [],
       children = [{xmlcdata, MessageContentTag}]};

@@ -664,7 +664,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 				end,
 				if (EditMsgId =:= MessageId) or (EditMsgId =:= <<"">>) ->
 				InsertStatement = <<"insert into message_status (from_user,to_user,status, recent,message_id, edit_message_id, message_type,txt,chat_type,from_notification, message_time,to_notification,message_notification,received_at,seen_at, meta_data) values ">>,
-			   RecentInsert = <<"insert into chat_recent (from_user, to_user,  message_id, message_from, txt, chat_type, message_type,  notification_to, unread, message_time,meta_data) values ">>,
+			        RecentInsert = <<"insert into chat_recent (from_user, to_user,  message_id, message_from, txt, chat_type, message_type,  notification_to, unread, message_time,meta_data) values ">>,
 				FromUserStr = binary_to_list(FromUser),
 				MessageIdStr = binary_to_list(MessageId),
 				EditMsgIdStr = binary_to_list(EditMsgId),
