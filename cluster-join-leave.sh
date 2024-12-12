@@ -5,7 +5,7 @@ POD_LABEL_SELECTOR="app=chatservice-headless-hl"  # Adjust this to your ejabberd
 EJABBERDCTL="/opt/ejabberd/sbin/ejabberdctl"
 POD_NAME=$(hostname)  # Use the hostname as the pod name in StatefulSet
 SLEEP_INTERVAL=30  # Interval in seconds to check the status
-
+$EJABBERDCTL start
 # Function to check ejabberd pod status
 check_ejabberd_status() {
     PODS_RUNNING=$(kubectl get pods -n $NAMESPACE -l $POD_LABEL_SELECTOR --field-selector=status.phase=Running --no-headers | wc -l)
@@ -59,6 +59,7 @@ monitor_ejabberd() {
         if [[ $CURRENT_STATUS -eq 1 && "$PREVIOUS_STATUS" == "0" ]]; then
             echo "ejabberd stopped, leaving the cluster..."
             leave_cluster
+            $EJABBERDCTL start
         fi
 
         # If ejabberd has started running, join the cluster
