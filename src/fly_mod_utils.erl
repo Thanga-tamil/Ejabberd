@@ -110,7 +110,7 @@
   get_roster_nick/3,
   get_callstatus/2,
   get_group_vcard/2,
-   get_offline_message/3,
+  get_offline_message/3,
   insert_group_count/2,
   update_group_count/2,
   update_media_call_status/4,

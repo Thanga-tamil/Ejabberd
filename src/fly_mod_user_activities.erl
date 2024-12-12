@@ -1596,7 +1596,7 @@ delete_message(FromUser, RequestType, SubEl, IQ) ->
             {selected, _, []} ->
               Body = <<"">>;
             {selected, _, [[Txt,Msg]]} ->
-               if Txt =:= <<"">> ->
+              if Txt =:= <<"">> ->
                 Body = Msg;
               true ->
                 Body = Txt
