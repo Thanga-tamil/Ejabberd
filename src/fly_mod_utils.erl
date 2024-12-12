@@ -1321,25 +1321,18 @@ update_delivery(#jid{luser = User,lserver = Server}, TUser,  MessageId, GroupId)
   true ->
     Status = <<"1">>
   end,
-
   ejabberd_sql:sql_query(
     Server,
     [<<"update chat_recent set status = '">>,Status,<<"' where  (from_user = '">>,TUser,<<"' or  to_user ='">>,TUser,<<"') and message_id='">>,MessageId,<<"' and status = 0;">>]);
     _ ->
       ok
   end.
-  
-  
 
 update_delivery_offline(Server, User) ->
-
   FromNotification = list_to_binary(binary_to_list(User) ++ "@" ++ binary_to_list(Server)),
   ejabberd_sql:sql_query(
     Server,
     [<<"update message_status set status =  1, received_at = NOW() where  to_user='">>,User,<<"' and status = 0;">>]).
-% ejabberd_sql:sql_query(
-%     Server,
-%     [<<"update message_status set status =  1, received_at = NOW() where status = 0 and chat_type = 'normal' and from_notification != '">>,FromNotification,<<"' and to_user='">>,User,<<"';">>]).
 
 clear_call_log(#jid{luser = User,lserver = Server},RoomId) ->
   if RoomId =:= <<"">> ->
@@ -1982,7 +1975,6 @@ get_not_delivered_message(Server,LUser) ->
     [<<"SELECT from_user,message_id,chat_type,from_notification FROM message_status where to_user = '">>,LUser, <<"' and from_notification != '">>,FromNotification, <<"'  and status = 0 and recall_status =0 and message_notification = 0 and blocked = 0 ;">>]).
 
 update_delivered_status(Server,LUser) ->
-  
 ejabberd_sql:sql_query(
     Server,
     [<<"update chat_recent set status =  1 where from_user ='">>,LUser,<<"' and status = 0 ;">>]).
