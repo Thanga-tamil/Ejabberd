@@ -673,7 +673,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 				MetaDataStr = binary_to_list(MetaData),
 				
 
-				[ValueStatement,RecentValueStatement] = lists:map(fun(Part) ->
+				[{ValueStatement,RecentValueStatement}] = lists:map(fun(Part) ->
 					#jid{luser = ToUser} = Part,
 					if ToUser =:= SUser ->
 						Unread = <<"0">>;
