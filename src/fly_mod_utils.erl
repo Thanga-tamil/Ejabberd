@@ -1263,11 +1263,11 @@ update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
       if GroupId =/= <<"">> ->
       ejabberd_sql:sql_query(
     Server,
-    [<<"update chat_recent set unread =  unread - 1 where from_user ='">>,GroupId, <<"' and to_user ='">>,User, <<"';">>]);
+    [<<"UPDATE chat_recent SET unread = CASE  WHEN unread > 0 THEN unread - 1  ELSE 0  END WHERE from_user ='">>,GroupId, <<"' and to_user ='">>,User, <<"';">>]);
   true ->
 ejabberd_sql:sql_query(
     Server,
-    [<<"update chat_recent set unread =  unread - 1 where from_user ='">>,TUser, <<"' and to_user ='">>,User, <<"';">>])
+    [<<"UPDATE chat_recent SET unread = CASE  WHEN unread > 0 THEN unread - 1  ELSE 0 END WHERE from_user ='">>,TUser, <<"' and to_user ='">>,User, <<"';">>])
 end;
     {updated,0}->
       ok;
@@ -1590,7 +1590,7 @@ get_single_chat_media_messages(#jid{luser = FUser, lserver = FServer}, TUser, Ms
 if Topicid =:= <<"">> ->
   if MsgId =:= <<"">> ->
     ejabberd_sql:sql_query(FServer,
-      [<<"SELECT txt, message_status.message_id, message_status.edit_message_id, message_time,  topic_id,IFNULL(json_unquote(message_status.meta_data),'') as meta,chat_message_edit_history.msg  FROM  message_status USE INDEX (from_user,to_user) left join chat_message_edit_history on message_status.message_id=chat_message_edit_history.message_id   WHERE ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and message_type !='text' AND message_status.chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND recall_status =0 AND blocked != '">>, FUser, <<"' GROUP BY message_id ORDER BY message_status.created_at DESC LIMIT 0,3;">>]);
+      [<<"SELECT txt, message_status.message_id, message_status.edit_message_id, message_time,  topic_id,IFNULL(json_unquote(message_status.meta_data),'') as meta,chat_message_edit_history.msg  FROM  message_status USE INDEX (from_user,to_user) left join chat_message_edit_history on message_status.message_id=chat_message_edit_history.message_id   WHERE ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and message_type !='text' AND message_status.chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND recall_status =0 AND blocked != '">>, FUser, <<"' GROUP BY message_id ORDER BY message_status.created_at DESC LIMIT 0,3;">>]);
     true->
       case catch get_id(FServer, MsgId) of
         {selected, _, []} ->
@@ -1605,7 +1605,7 @@ if Topicid =:= <<"">> ->
 true ->
   if MsgId =:= <<"">> ->
     ejabberd_sql:sql_query(FServer,
-      [<<"SELECT txt, message_status.message_id, message_status.edit_message_id, message_time,  topic_id,IFNULL(json_unquote(message_status.meta_data),'') as meta  FROM  message_status USE INDEX (from_user,to_user)  left join chat_message_edit_history on message_status.message_id=chat_message_edit_history.message_id  WHERE ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (fmessage_status.rom_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and message_type !='text' AND message_status.chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND recall_status =0 AND blocked != '">>, FUser, <<"' and topic_id = '">>, Topicid, <<"' GROUP BY message_id ORDER BY message_status.created_at DESC LIMIT 0,3;">>]);
+      [<<"SELECT txt, message_status.message_id, message_status.edit_message_id, message_time,  topic_id,IFNULL(json_unquote(message_status.meta_data),'') as meta  FROM  message_status USE INDEX (from_user,to_user)  left join chat_message_edit_history on message_status.message_id=chat_message_edit_history.message_id  WHERE ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and message_type !='text' AND message_status.chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND recall_status =0 AND blocked != '">>, FUser, <<"' and topic_id = '">>, Topicid, <<"' GROUP BY message_id ORDER BY message_status.created_at DESC LIMIT 0,3;">>]);
     true->
       case catch get_id(FServer, MsgId) of
         {selected, _, []} ->
