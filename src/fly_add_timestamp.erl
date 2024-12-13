@@ -48,7 +48,7 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
                             NewXMl = XML;
                             true ->
                             {seen,Id,_,_Time, GroupId} = Seen,
-                             case catch fly_mod_utils:update_seen(From, TUser, Id, GroupId) of
+                            case catch fly_mod_utils:update_seen(From, TUser, Id, GroupId) of
                               {updated,_} ->
                             case catch fly_mod_utils:message_status(LServer, Id, TUser) of
                                     {selected, _, []} ->
