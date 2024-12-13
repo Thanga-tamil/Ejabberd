@@ -58,7 +58,7 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
                                     _ ->
                                       GStatus = <<"0">>
                                   end;
-                           _ ->
+                          _ ->
                           GStatus = <<"0">>
                           end,
                           XMLNewTag = #xmlel{name = <<"seen">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:receipts">>}, {<<"id">>, Id},{<<"message_status">>, GStatus}, {<<"group_id">>, GroupId}],
