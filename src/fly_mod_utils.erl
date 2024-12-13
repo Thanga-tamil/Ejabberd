@@ -164,7 +164,6 @@
   get_user_from_string_jid/1,
   get_device_from_resource/1,
   check_blockeduser/3,
-  get_messagestatus/2,
   getuserBlockedList/1,
   jid_to_string/1,
   get_host/1,
@@ -1088,7 +1087,7 @@ clear_message(#jid{luser = User,lserver = Server}, ToUser, Favourite, Delete_Typ
 updategroup_clear(#jid{luser = User,lserver = Server}, ToUser)->
   ejabberd_sql:sql_query(
     Server,
-    [<<"update message_status set deleted_status =0, deleted_by='0' where id = (select * from (select min(id) as id from message_status WHERE from_user = '">>, ToUser, <<"' AND to_user = '">>, User, <<"'  and message_type='0' and chat_type='normal')tmp);">>]).
+    [<<"update message_status set deleted_status =0, deleted_by='0' where id = (select * from (select id from message_status WHERE from_user = '">>, ToUser, <<"' AND to_user = '">>, User, <<"'  and message_type='0' and chat_type='normal' order by id asc limit 1)tmp);">>]).
 
 %% clear all the messages between users
 %%
@@ -1678,11 +1677,11 @@ get_message_status(#jid{lserver = FServer}, Msgid) ->
 
 get_groupmessage_status(#jid{luser = FUser, lserver = FServer}, Msgid) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT MIN(status) as status FROM message_status WHERE to_user !='">>,FUser,<<"' and  message_id ='">>,Msgid,<<"' group by message_id;">>]).
+    [<<"SELECT status as status FROM message_status WHERE to_user !='">>,FUser,<<"' and  message_id ='">>,Msgid,<<"'  order by status asc limit 1;">>]).
 
 message_status(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT MIN(status) as status FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id ='">>,Msgid,<<"' group by message_id;">>]).
+    [<<"SELECT status as status FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id ='">>,Msgid,<<"' order by status asc limit 1;">>]).
 
 message_status_new(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
@@ -1887,10 +1886,6 @@ NewString.
 jid_to_string(Jid) ->
   #jid{user = User, lserver = Server} = Jid,
   <<User / binary, $@,Server / binary>>.
-
-get_messagestatus(LServer,MessageId)->
-  ejabberd_sql:sql_query(LServer,
-    [<<"SELECT min(status) as status FROM message_status WHERE message_id='">>,MessageId,<<"';">>]).
 
 get_nick(LServer, Channel) ->
   ejabberd_sql:sql_query(
