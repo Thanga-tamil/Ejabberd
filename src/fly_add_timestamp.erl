@@ -48,7 +48,8 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
                             NewXMl = XML;
                             true ->
                             {seen,Id,_,_Time, GroupId} = Seen,
-                            fly_mod_utils:update_seen(From, TUser, Id, GroupId),
+                            case catch fly_mod_utils:update_seen(From, TUser, Id, GroupId) of
+                              {updated,_} ->
                             case catch fly_mod_utils:message_status(LServer, Id, TUser) of
                                     {selected, _, []} ->
                                       GStatus = <<"0">>;
@@ -56,7 +57,10 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
                                       GStatus = GroupStatus;
                                     _ ->
                                       GStatus = <<"0">>
-                                  end,
+                                  end;
+                          _ ->
+                          GStatus = <<"0">>
+                          end,
                           XMLNewTag = #xmlel{name = <<"seen">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:receipts">>}, {<<"id">>, Id},{<<"message_status">>, GStatus}, {<<"group_id">>, GroupId}],
                             children = []},
                           NewSeenXMl = fxml:replace_subtag( xmpp:encode(XMLNewTag),xmpp:encode(XML)),
@@ -64,15 +68,19 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
                           end;
                           true ->
                           {delivered,Id,_,_Time,GroupId} = Delivered,
-                          fly_mod_utils:update_delivery(From, TUser, Id, GroupId),
-                          case catch fly_mod_utils:message_status_new(LServer, Id, TUser) of
+                          case catch  fly_mod_utils:update_delivery(From, TUser, Id, GroupId) of
+                            {updated,_} ->
+                                    case catch fly_mod_utils:message_status_new(LServer, Id, TUser) of
                                     {selected, _, []} ->
                                       DGStatus = <<"0">>;
                                     {selected, _, [[DGroupStatus, _RowId]]} ->
                                       DGStatus = DGroupStatus;
                                     _ ->
                                       DGStatus = <<"0">>
-                                    end,
+                                    end;
+                            _ ->
+                          DGStatus = <<"0">>
+                          end,
                           XMLNewTag = #xmlel{name = <<"delivered">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:receipts">>}, {<<"id">>, Id},{<<"message_status">>, DGStatus}, {<<"group_id">>, GroupId}],
                             children = []},
                           NewDeliveyXMl = fxml:replace_subtag( xmpp:encode(XMLNewTag),xmpp:encode(XML)),
