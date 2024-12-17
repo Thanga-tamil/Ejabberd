@@ -1966,7 +1966,7 @@ get_group_chat_messages( From, RequestType, SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"No chats available">>});
     {selected, _, Result} ->
       SubEls1 = lists:map(fun(G) ->
-        [RowId, MessageUser, MessageTag, Time, MsgId, EditMsgId, Status, FromUser, MsgType, RecallStatus, FavouriteStatus, FavouriteBy, ToNotification, MessageNotification, MessageTime, EditStatus, MetaData] = G,
+        [RowId, MessageUser, MessageTag, Time, MsgId, EditMsgId, Status, FromUser, MsgType, RecallStatus, FavouriteStatus, FavouriteBy, ToNotification, MessageNotification, MessageTime, EditStatus, MetaData, MessageContentTag] = G,
         RowIdElement = #xmlel{name = <<"row_id">>, attrs = [],
           children = [{xmlcdata, RowId}]},
         UserElements = #xmlel{name = <<"user">>, attrs = [],
@@ -1991,8 +1991,13 @@ get_group_chat_messages( From, RequestType, SubEl, IQ) ->
           children = [{xmlcdata, FavouriteStatus}]},
         FavouriteByElement = #xmlel{name = <<"favouriteby ">>, attrs = [],
           children = [{xmlcdata, FavouriteBy}]},
-        BodyElement = #xmlel{name = <<"body">>, attrs = [],
-          children = [{xmlcdata, MessageTag}]},
+        if MessageTag =:= <<"">> ->
+            BodyElement = #xmlel{name = <<"body ">>, attrs = [],
+            children = [{xmlcdata, MessageContentTag}]};
+          true ->
+          BodyElement = #xmlel{name = <<"body ">>, attrs = [],
+            children = [{xmlcdata, MessageTag}]}
+          end,            
         ToNotificationElement = #xmlel{name = <<"to_notification">>, attrs = [],
           children = [{xmlcdata, ToNotification}]},
         EditStatusElement = #xmlel{name = <<"edit_msg_status ">>, attrs = [],
