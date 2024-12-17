@@ -1997,8 +1997,8 @@ get_group_chat_messages( From, RequestType, SubEl, IQ) ->
           true ->
           BodyElement = #xmlel{name = <<"body ">>, attrs = [],
             children = [{xmlcdata, MessageTag}]}
-          end,            
-        ToNotificationElement = #xmlel{name = <<"to_notification">>, attrs = [],
+          end,
+          ToNotificationElement = #xmlel{name = <<"to_notification">>, attrs = [],
           children = [{xmlcdata, ToNotification}]},
         EditStatusElement = #xmlel{name = <<"edit_msg_status ">>, attrs = [],
           children = [{xmlcdata, EditStatus}]},
