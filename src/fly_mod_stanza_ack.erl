@@ -140,7 +140,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
     MessageId = Packet#message.id,
   ContentAcknowledge = xmpp:get_subtag(Packet, #chatcontent{}),
   if (ContentAcknowledge =:= false) or (Type =:= normal)  ->
-      ok;
+      UpdatedPacket = Packet;
     true ->
       case should_acknowledge_on_send(Packet) of
         S when (S == message_acknowledge) ->
@@ -170,16 +170,35 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           send_ack_response(From, To, IdValue, <<"acknowledge">>),
           NewPacket = xmpp:set_from_to(Packet,From, To),
           GetTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
-          if GetTimestamp =:= false ->
-            Timestamp = now_to_microseconds(erlang:now()),
-            FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
-            XMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}],
-              children = []},
-            TimeStampedPacket = fxml:append_subtags(NewPacket, [XMLTag]);
-            true ->
-              {_, _, FlatTimeStamp} = GetTimestamp,
-              TimeStampedPacket = NewPacket
+          GetTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
+          Timestamp = now_to_microseconds(erlang:now()),
+          FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
+          if EditMsgid =/= MessageId ->
+            case catch fly_mod_utils:get_message_time(FServer, MessageId) of
+              {selected, _, [[MessageTime]]} ->
+                NewTimestamp = MessageTime;
+              _ ->
+                NewTimestamp = list_to_binary(FlatTimeStamp)
+              end;
+          true ->
+                NewTimestamp = list_to_binary(FlatTimeStamp)
           end,
+              if GetTimestamp =:= false ->
+              XMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, NewTimestamp}],
+                children = []},
+              UpdatedPacket = fxml:append_subtags(NewPacket, [XMLTag]);
+              true ->
+                if EditMsgid =/= MessageId ->
+                XMLNewTag =  #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, NewTimestamp}],
+                children = []},
+                NewTimestampPacket = fxml:replace_subtag( xmpp:encode(XMLNewTag),xmpp:encode(Packet)),
+                UpdatedPacket = xmpp:decode(NewTimestampPacket);
+              true ->
+                {_, _, FlatTimeStamp} = GetTimestamp,
+                UpdatedPacket = NewPacket
+              end
+            end,
+          
           if MetaData =:= <<>> ->
             Metadata = <<"{}">>;
           MetaData =:= <<"">> ->
@@ -192,13 +211,13 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
         if BlockUser == <<"0">> ->
           case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
             true ->
-              mod_offline:store_packet({TimeStampedPacket ,xmpp:decode(TimeStampedPacket)});
+              mod_offline:store_packet({UpdatedPacket ,xmpp:decode(UpdatedPacket)});
             false ->
               ok
           end,
             case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
             true ->
-            fly_mod_offline_push:send_offline_message({_C2SState,TimeStampedPacket});
+            fly_mod_offline_push:send_offline_message({_C2SState,UpdatedPacket});
             false ->
               ok
             end;
@@ -206,7 +225,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           ok
         end;
         S when (S == false) ->
-          ok
+          UpdatedPacket = Packet
       end
   end,
   %%Save the Message to temp storage for 10 sec when server
@@ -323,7 +342,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
     _ ->
       ok
   end,
-  {Packet,_C2SState};
+  {UpdatedPacket,_C2SState};
 true ->
     {drop,_C2SState}
 end;
