@@ -1682,7 +1682,7 @@ get_groupmessage_status(#jid{luser = FUser, lserver = FServer}, Msgid) ->
 
 get_message_time(FServer , Msgid) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT ,essage_time FROM message_status WHERE  message_id ='">>,Msgid,<<"'  order by status asc limit 1;">>]).
+    [<<"SELECT message_time FROM message_status WHERE  message_id ='">>,Msgid,<<"'  order by id asc limit 1;">>]).
 
 message_status(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
