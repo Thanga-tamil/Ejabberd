@@ -177,20 +177,20 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
               {selected, _, [[MessageTime]]} ->
                 NewTimestamp = MessageTime;
               _ ->
-                NewTimestamp = NewTimeStamp
+                NewTimestamp = list_to_binary(NewTimeStamp)
               end;
           true ->
-                NewTimestamp = NewTimeStamp
+                NewTimestamp = list_to_binary(NewTimeStamp)
           end,
               if GetTimestamp =:= false ->
                 FlatTimeStamp = NewTimestamp,
-              XMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(NewTimestamp)}],
+              XMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, NewTimestamp}],
                 children = []},
               UpdatedPacket = fxml:append_subtags(NewPacket, [XMLTag]);
               true ->
                 if EditMsgid =/= MessageId ->
                 FlatTimeStamp = NewTimestamp,
-                XMLNewTag =  #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(NewTimestamp)}],
+                XMLNewTag =  #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, NewTimestamp}],
                 children = []},
                 NewTimestampPacket = fxml:replace_subtag( xmpp:encode(XMLNewTag),xmpp:encode(Packet)),
                 UpdatedPacket = xmpp:decode(NewTimestampPacket);
