@@ -78,6 +78,7 @@
   update_recall/2,
   insert_status/12,
   insert_status/2,
+  get_message_time/2,
   set_favourite_message/3,
   get_favourite_message/3,
   update_favourite_message/3,
@@ -1678,6 +1679,11 @@ get_message_status(#jid{lserver = FServer}, Msgid) ->
 get_groupmessage_status(#jid{luser = FUser, lserver = FServer}, Msgid) ->
   ejabberd_sql:sql_query(FServer,
     [<<"SELECT status as status FROM message_status WHERE to_user !='">>,FUser,<<"' and  message_id ='">>,Msgid,<<"'  order by status asc limit 1;">>]).
+
+get_message_time(FServer , Msgid) ->
+  ejabberd_sql:sql_query(FServer,
+    [<<"SELECT ,essage_time FROM message_status WHERE  message_id ='">>,Msgid,<<"'  order by status asc limit 1;">>]).
+
 
 message_status(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
