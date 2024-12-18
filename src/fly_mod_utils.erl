@@ -1835,7 +1835,7 @@ get_offline_message(LServer, LUser, LResource) ->
 
 get_single_message(FServer,  MsgId ,_OldMsgId) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT txt, message_status.message_id, message_status.edit_message_id, message_status.from_user, message_status.chat_type, deleted_by, deleted_status, status, from_notification, to_notification, to_user, message_time, message_notification, recall_status, message_status.created_at, topic_id,  edit_status, updated_at, IFNULL(json_unquote(message_status.meta_data),'') as meta,IFNULL(chat_message_edit_history.msg,'') AS msg  FROM message_status left join chat_message_edit_history on message_status.message_id=chat_message_edit_history.message_id  WHERE message_status.message_id = '">>, MsgId, <<"' limit 1">>]).
+    [<<"SELECT txt, message_status.message_id, message_status.edit_message_id, message_status.from_user, message_status.chat_type, deleted_by, deleted_status, status, from_notification, to_notification, message_status.to_user, message_time, message_notification, recall_status, message_status.created_at, topic_id,  edit_status, updated_at, IFNULL(json_unquote(message_status.meta_data),'') as meta,IFNULL(chat_message_edit_history.msg,'') AS msg  FROM message_status left join chat_message_edit_history on message_status.message_id=chat_message_edit_history.message_id  WHERE message_status.message_id = '">>, MsgId, <<"' limit 1">>]).
 
 get_reply_message(FServer,  MsgId) ->
   ejabberd_sql:sql_query(FServer,
