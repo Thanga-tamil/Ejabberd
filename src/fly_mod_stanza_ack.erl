@@ -170,26 +170,27 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           send_ack_response(From, To, IdValue, <<"acknowledge">>),
           NewPacket = xmpp:set_from_to(Packet,From, To),
           GetTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
-          GetTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
           Timestamp = now_to_microseconds(erlang:now()),
-          FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
+          NewTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
           if EditMsgid =/= MessageId ->
             case catch fly_mod_utils:get_message_time(FServer, MessageId) of
               {selected, _, [[MessageTime]]} ->
                 NewTimestamp = MessageTime;
               _ ->
-                NewTimestamp = list_to_binary(FlatTimeStamp)
+                NewTimestamp = NewTimeStamp
               end;
           true ->
-                NewTimestamp = list_to_binary(FlatTimeStamp)
+                NewTimestamp = NewTimeStamp
           end,
               if GetTimestamp =:= false ->
-              XMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, NewTimestamp}],
+                FlatTimeStamp = NewTimestamp,
+              XMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(NewTimestamp)}],
                 children = []},
               UpdatedPacket = fxml:append_subtags(NewPacket, [XMLTag]);
               true ->
                 if EditMsgid =/= MessageId ->
-                XMLNewTag =  #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, NewTimestamp}],
+                FlatTimeStamp = NewTimestamp,
+                XMLNewTag =  #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(NewTimestamp)}],
                 children = []},
                 NewTimestampPacket = fxml:replace_subtag( xmpp:encode(XMLNewTag),xmpp:encode(Packet)),
                 UpdatedPacket = xmpp:decode(NewTimestampPacket);
