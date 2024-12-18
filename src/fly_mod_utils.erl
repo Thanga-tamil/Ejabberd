@@ -1684,7 +1684,6 @@ get_message_time(FServer , Msgid) ->
   ejabberd_sql:sql_query(FServer,
     [<<"SELECT ,essage_time FROM message_status WHERE  message_id ='">>,Msgid,<<"'  order by status asc limit 1;">>]).
 
-
 message_status(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
     [<<"SELECT status as status FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id ='">>,Msgid,<<"' order by status asc limit 1;">>]).
