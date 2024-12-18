@@ -198,7 +198,6 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
                 UpdatedPacket = NewPacket
               end
             end,
-          
           if MetaData =:= <<>> ->
             Metadata = <<"{}">>;
           MetaData =:= <<"">> ->
