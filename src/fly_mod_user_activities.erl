@@ -1582,9 +1582,7 @@ delete_message(FromUser, RequestType, SubEl, IQ) ->
             {selected, _, []} ->
               Body = <<"">>;
             {selected, _, [[Txt]]} ->
-             
                 Body = Txt
- 
           end,
           MessageType = Message_type,
           MsgContent = Body;
@@ -1594,9 +1592,7 @@ delete_message(FromUser, RequestType, SubEl, IQ) ->
             {selected, _, []} ->
               Body = <<"">>;
             {selected, _, [[Txt]]} ->
-             
                 Body = Txt
-
           end,
           MsgContent = Body;
           Message_type =:= <<"0">> ->
@@ -2105,10 +2101,8 @@ get_group_chat_media_messages( From, RequestType,  SubEl, IQ) ->
           BodyElement = #xmlel{name = <<"body">>, attrs = [],
             children = []};
           true ->
-
             BodyElement = #xmlel{name = <<"body">>, attrs = [],
               children = [{xmlcdata, MessageTag}]}
-           
         end,
         MessageId = #xmlel{name = <<"msgid">>, attrs = [],
           children = [{xmlcdata, MsgId}]},
@@ -2192,7 +2186,6 @@ get_message_status(From, RequestType,  SubEl, IQ) ->
           children = [{xmlcdata, Update_at}]},
         CreatedAt = #xmlel{name = <<"created_at">>, attrs = [],
           children = [{xmlcdata, Created_At}]},
-
         #xmlel{name = <<"chat">>, attrs = [],
           children = [MsgIdElement, DeletedByElement, EditStatusElement, EditStatusElement, TimeElements, DeletedStatusElement, MetaDataElement, TopicIdElement, ChatTypeElement, ReplyUserElement, Message, MessageStatus, FromNotificationElement, ToNotification, ToUser, MessageTime, MessageNotification, RecallStatus, CreatedAt]}
                           end,
@@ -2223,10 +2216,8 @@ get_group_chat_fullmedia_messages( From, RequestType,  SubEl, IQ) ->
           BodyElement = #xmlel{name = <<"body">>, attrs = [],
             children = []};
           true ->
-            
             BodyElement = #xmlel{name = <<"body">>, attrs = [],
               children = [{xmlcdata, MessageTag}]}
-
         end,
         MessageId = #xmlel{name = <<"msgid">>, attrs = [],
           children = [{xmlcdata, MsgId}]},
