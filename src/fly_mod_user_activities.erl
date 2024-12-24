@@ -1328,7 +1328,7 @@ get_call_status(From, RequestType,  SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Message Not Available">>});
       true ->
       SubEls1 = lists:map(fun(G) ->
-        [MessageTag, MessageId, EditMsgId, MessageFrom, Chat_Type, DeletedBy, DeletedStatus, MsgStatus, From_Notification, To_Notification, To_User, Message_Time, Message_Notification, Recall_Status, Created_At, TopicId, EditStatus, Update_at, MetaData, MessageContentTag] = G,
+        [MessageTag, MessageId, EditMsgId, MessageFrom, Chat_Type, DeletedBy, DeletedStatus, MsgStatus, From_Notification, To_Notification, To_User, Message_Time, Message_Notification, Recall_Status, Created_At, TopicId, EditStatus, Update_at, MetaData] = G,
         MsgIdElement = #xmlel{name = <<"msgid">>, attrs = [],
           children = [{xmlcdata, MessageId}]},
         EMsgidElement = #xmlel{name = <<"editmsgid">>, attrs = [],
@@ -1343,13 +1343,8 @@ get_call_status(From, RequestType,  SubEl, IQ) ->
           children = [{xmlcdata, From_Notification}]},
         ReplyUserElement = #xmlel{name = <<"replyfromuser">>, attrs = [],
           children = [{xmlcdata, MessageFrom}]},
-        if MessageTag =:= <<"">> ->
-          Message = #xmlel{name = <<"body">>, attrs = [],
-          children = [{xmlcdata, MessageContentTag}]};
-        true ->
         Message = #xmlel{name = <<"body">>, attrs = [],
-          children = [{xmlcdata, MessageTag}]}
-        end,
+          children = [{xmlcdata, MessageTag}]},
         MessageStatus = #xmlel{name = <<"status">>, attrs = [],
           children = [{xmlcdata, MsgStatus}]},
         ToNotification = #xmlel{name = <<"to_notification">>, attrs = [],
