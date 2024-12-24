@@ -1839,7 +1839,7 @@ get_single_message(FServer,  MsgId ,_OldMsgId) ->
 
 get_reply_message(FServer,  MsgId) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT msg, message_id, edit_message_id, from_user, chat_type, 0 as deleted_by, 0 as deleted_status, 0 as status, '' as from_notification, '' as to_notification, to_user, created_at, '' as message_notification, 0 as recall_status, created_at, '' as topic_id,  0 as edit_status, created_at, IFNULL(json_unquote(meta_data),'') as meta, msg FROM chat_message_edit_history WHERE edit_message_id = '">>, MsgId, <<"' limit 1">>]).
+    [<<"SELECT msg, message_id, edit_message_id, from_user, chat_type, 0 as deleted_by, 0 as deleted_status, 0 as status, '' as from_notification, '' as to_notification, to_user, created_at, '' as message_notification, 0 as recall_status, created_at, '' as topic_id,  0 as edit_status, created_at, IFNULL(json_unquote(meta_data),'') as meta FROM chat_message_edit_history WHERE edit_message_id = '">>, MsgId, <<"' limit 1">>]).
 
 delete_favourite_message(FServer, FUser) ->
   ejabberd_sql:sql_query(
