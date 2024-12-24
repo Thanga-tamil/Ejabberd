@@ -1,4 +1,4 @@
--module(mod_kafka_integration).
+-module(fly_mod_kafka_integration).
 -author("Venkatesh").
 
 %% Every ejabberd module implements the gen_mod behavior

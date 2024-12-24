@@ -379,24 +379,20 @@ create_msg(From, To, ReasonMsg, ReplyId,Packet)->
           case catch fly_mod_utils:get_message(FServer, ChatType, Message_id) of
             {selected, _, []} ->
               Body = <<"">>;
-            {selected, _, [[Txt,Msg]]} ->
-               if Txt =:= <<"">> ->
-                Body = Msg;
-              true ->
+            {selected, _, [[Txt]]} ->
+              
                 Body = Txt
-              end
+
           end,
           MsgContent = Body;
         Message_type =:= <<"auto_text">> ->
           case catch fly_mod_utils:get_message(FServer, ChatType, Message_id) of
             {selected, _, []} ->
               Body = <<"">>;
-            {selected, _, [[Txt,Msg]]} ->
-               if Txt =:= <<"">> ->
-                Body = Msg;
-              true ->
+            {selected, _, [[Txt]]} ->
+              
                 Body = Txt
-              end
+
           end,
           MsgContent = Body;
           Message_type =:= <<"0">> ->

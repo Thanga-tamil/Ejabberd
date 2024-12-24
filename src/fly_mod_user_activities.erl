@@ -1581,12 +1581,10 @@ delete_message(FromUser, RequestType, SubEl, IQ) ->
           case catch fly_mod_utils:get_message(Server, ChatType, Message_id) of
             {selected, _, []} ->
               Body = <<"">>;
-            {selected, _, [[Txt,Msg]]} ->
-              if Txt =:= <<"">> ->
-                Body = Msg;
-              true ->
+            {selected, _, [[Txt]]} ->
+             
                 Body = Txt
-              end
+ 
           end,
           MessageType = Message_type,
           MsgContent = Body;
@@ -1595,12 +1593,10 @@ delete_message(FromUser, RequestType, SubEl, IQ) ->
           case catch fly_mod_utils:get_message(Server, ChatType, Message_id) of
             {selected, _, []} ->
               Body = <<"">>;
-            {selected, _, [[Txt,Msg]]} ->
-              if Txt =:= <<"">> ->
-                Body = Msg;
-              true ->
+            {selected, _, [[Txt]]} ->
+             
                 Body = Txt
-              end
+
           end,
           MsgContent = Body;
           Message_type =:= <<"0">> ->
@@ -1921,18 +1917,13 @@ get_single_chat_media_messages( From, RequestType,  SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"No Media, Links and Docs">>});
     {selected, _, Result} ->
       SubEls1 = lists:map(fun(G) ->
-        [MessageTag, MessageId, EditMsgId,  MessageTime, TopicId, MetaData,MessageContentTag ] = G,
+        [MessageTag, MessageId, EditMsgId,  MessageTime, TopicId, MetaData ] = G,
         MsgIdElement = #xmlel{name = <<"msgid">>, attrs = [],
           children = [{xmlcdata, MessageId}]},
         EMsgidElement = #xmlel{name = <<"editmsgid">>, attrs = [],
           children = [{xmlcdata, EditMsgId}]},
-        if MessageTag =:= <<"">>->
         MessageElement = #xmlel{name = <<"message ">>, attrs = [],
-          children = [{xmlcdata, MessageContentTag}]};
-        true ->
-        MessageElement = #xmlel{name = <<"message ">>, attrs = [],
-          children = [{xmlcdata, MessageTag}]}
-        end,
+          children = [{xmlcdata, MessageTag}]},
         TopicIdElement = #xmlel{name = <<"topic_id ">>, attrs = [],
           children = [{xmlcdata, TopicId}]},
         MetaDataElement = #xmlel{name = <<"meta_data ">>, attrs = [],
@@ -1966,7 +1957,7 @@ get_group_chat_messages( From, RequestType, SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"No chats available">>});
     {selected, _, Result} ->
       SubEls1 = lists:map(fun(G) ->
-        [RowId, MessageUser, MessageTag, Time, MsgId, EditMsgId, Status, FromUser, MsgType, RecallStatus, FavouriteStatus, FavouriteBy, ToNotification, MessageNotification, MessageTime, EditStatus, MetaData, MessageContentTag] = G,
+        [RowId, MessageUser, MessageTag, Time, MsgId, EditMsgId, Status, FromUser, MsgType, RecallStatus, FavouriteStatus, FavouriteBy, ToNotification, MessageNotification, MessageTime, EditStatus, MetaData] = G,
         RowIdElement = #xmlel{name = <<"row_id">>, attrs = [],
           children = [{xmlcdata, RowId}]},
         UserElements = #xmlel{name = <<"user">>, attrs = [],
@@ -1991,13 +1982,8 @@ get_group_chat_messages( From, RequestType, SubEl, IQ) ->
           children = [{xmlcdata, FavouriteStatus}]},
         FavouriteByElement = #xmlel{name = <<"favouriteby ">>, attrs = [],
           children = [{xmlcdata, FavouriteBy}]},
-        if MessageTag =:= <<"">> ->
-            BodyElement = #xmlel{name = <<"body ">>, attrs = [],
-            children = [{xmlcdata, MessageContentTag}]};
-          true ->
-          BodyElement = #xmlel{name = <<"body ">>, attrs = [],
-            children = [{xmlcdata, MessageTag}]}
-          end,
+        BodyElement = #xmlel{name = <<"body ">>, attrs = [],
+            children = [{xmlcdata, MessageTag}]},
           ToNotificationElement = #xmlel{name = <<"to_notification">>, attrs = [],
           children = [{xmlcdata, ToNotification}]},
         EditStatusElement = #xmlel{name = <<"edit_msg_status ">>, attrs = [],
@@ -2033,7 +2019,7 @@ get_group_chat_messages( From, RequestType, SubEl, IQ) ->
 
 message_stanza_result(Result) ->
   SubEl = lists:map(fun(G) ->
-    [RowId, MessageUser, Message_type, MessageTag, Time, MsgId, EditMsgId, Status, RecallStatus, FavouriteStatus, FavouriteBy, MessageTime, TopicId, EditStatus,  MetaData, MessageContentTag] = G,
+    [RowId, MessageUser, Message_type, MessageTag, Time, MsgId, EditMsgId, Status, RecallStatus, FavouriteStatus, FavouriteBy, MessageTime, TopicId, EditStatus,  MetaData] = G,
     RowIdElement = #xmlel{name = <<"row_id">>, attrs = [],
       children = [{xmlcdata, RowId}]},
     UserElements = #xmlel{name = <<"user">>, attrs = [],
@@ -2062,14 +2048,8 @@ message_stanza_result(Result) ->
       children = [{xmlcdata, EditStatus}]},
     MessageTypeElements = #xmlel{name = <<"Message_type">>, attrs = [],
       children = [{xmlcdata, Message_type}]},
-    if MessageTag =:= <<"">> ->
-      MessageElement = #xmlel{name = <<"message ">>, attrs = [],
-      children = [{xmlcdata, MessageContentTag}]};
-    true ->
     MessageElement = #xmlel{name = <<"message ">>, attrs = [],
-      children = [{xmlcdata, MessageTag}]}
-    end,
-
+      children = [{xmlcdata, MessageTag}]},
     #xmlel{name = <<"chat">>, attrs = [],
       children = [MessageTimeElements, UserElements, EditStatusElement, EMsgidElement, MessageTypeElements, StatusElements,  TimeElements, MessageElement, MsgidElement, RecallElement, FavouriteElement, FavouriteByElement, TopicIdElement, MetaDataElement, RowIdElement]}
                       end,
@@ -2077,7 +2057,7 @@ message_stanza_result(Result) ->
 
     meta_message_stanza_result(Result) ->
       SubEl = lists:map(fun(G) ->
-        [RowId, MessageUser, MessageTo, Message_type, MessageTag, MsgId, EditMsgId, Status, RecallStatus, MessageTime, MetaData, MessageContentTag] = G,
+        [RowId, MessageUser, MessageTo, Message_type, MessageTag, MsgId, EditMsgId, Status, RecallStatus, MessageTime, MetaData] = G,
         RowIdElement = #xmlel{name = <<"row_id">>, attrs = [],
           children = [{xmlcdata, RowId}]},
         UserElements = #xmlel{name = <<"user">>, attrs = [],
@@ -2098,14 +2078,8 @@ message_stanza_result(Result) ->
           children = [{xmlcdata, RecallStatus}]},
         MetaDataElement = #xmlel{name = <<"meta_data ">>, attrs = [],
           children = [{xmlcdata, MetaData}]},
-        if MessageTag =:= <<"">> ->
         MessageElement = #xmlel{name = <<"message ">>, attrs = [],
-          children = [{xmlcdata, MessageContentTag}]};
-        true ->
-        MessageElement = #xmlel{name = <<"message ">>, attrs = [],
-          children = [{xmlcdata, MessageTag}]}
-        end,
-
+          children = [{xmlcdata, MessageTag}]},
         #xmlel{name = <<"chat">>, attrs = [],
           children = [UserElements, UserToElements, MessageTypeElements, StatusElements, EMsgidElement,  TimeElements, MessageElement, MsgidElement, RecallElement,MetaDataElement, RowIdElement]}
                           end,
@@ -2126,18 +2100,15 @@ get_group_chat_media_messages( From, RequestType,  SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"No Media, Links and Docs">>});
     {selected, _, Result} ->
       SubEls1 = lists:map(fun(G) ->
-        [MessageTag, MsgId, EditMsgId, MessageTime, MessageContentTag] = G,
+        [MessageTag, MsgId, EditMsgId, MessageTime] = G,
         if (MsgId == <<"0">>) ->
           BodyElement = #xmlel{name = <<"body">>, attrs = [],
             children = []};
           true ->
-            if MessageTag =:= <<"">> ->
-              BodyElement = #xmlel{name = <<"body">>, attrs = [],
-              children = [{xmlcdata, MessageContentTag}]};
-            true ->
+
             BodyElement = #xmlel{name = <<"body">>, attrs = [],
               children = [{xmlcdata, MessageTag}]}
-            end
+           
         end,
         MessageId = #xmlel{name = <<"msgid">>, attrs = [],
           children = [{xmlcdata, MsgId}]},
@@ -2247,18 +2218,15 @@ get_group_chat_fullmedia_messages( From, RequestType,  SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"No Media, Links and Docs">>});
     {selected, _, Result} ->
       SubEls1 = lists:map(fun(G) ->
-        [MessageTag, MsgId, EditMsgId, MessageTime, MessageContentTag] = G,
+        [MessageTag, MsgId, EditMsgId, MessageTime] = G,
         if (MsgId == <<"0">>) ->
           BodyElement = #xmlel{name = <<"body">>, attrs = [],
             children = []};
           true ->
-            if MessageTag =:= <<"">> ->
-              BodyElement = #xmlel{name = <<"body">>, attrs = [],
-              children = [{xmlcdata, MessageContentTag}]};
-              true->
+            
             BodyElement = #xmlel{name = <<"body">>, attrs = [],
               children = [{xmlcdata, MessageTag}]}
-            end
+
         end,
         MessageId = #xmlel{name = <<"msgid">>, attrs = [],
           children = [{xmlcdata, MsgId}]},
@@ -2293,20 +2261,17 @@ get_single_chat_fullmedia_messages( From, RequestType,  SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"No Media, Links and Docs">>});
     {selected, _, Result} ->
       SubEls1 = lists:map(fun(G) ->
-        [MessageTag, MessageId, EditMsgId, MessageTime, MessageContentTag] = G,
+        [MessageTag, MessageId, EditMsgId, MessageTime] = G,
         MsgIdElement = #xmlel{name = <<"msgid">>, attrs = [],
           children = [{xmlcdata, MessageId}]},
         CurrentMsgIdElement = #xmlel{name = <<"msg_id">>, attrs = [],
           children = [{xmlcdata, Message_ID}]},
         EMsgidElement = #xmlel{name = <<"editmsgid">>, attrs = [],
           children = [{xmlcdata, EditMsgId}]},
-        if MessageTag =:= <<"">> ->
-          MessageElement = #xmlel{name = <<"message ">>, attrs = [],
-          children = [{xmlcdata, MessageContentTag}]};
-        true->
+
         MessageElement = #xmlel{name = <<"message ">>, attrs = [],
-          children = [{xmlcdata, MessageTag}]}
-        end,
+          children = [{xmlcdata, MessageTag}]},
+
         MessageTimeElements = #xmlel{name = <<"message_time">>, attrs = [],
           children = [{xmlcdata, MessageTime}]},
         #xmlel{name = <<"chat">>, attrs = [],
