@@ -18,11 +18,8 @@ if [[ -z "$NODE_STATUS" ]]; then
 else
  echo "Node ejabberd@$ERLANG_NODE_ARG is not running. Starting it..."
   # # echo "launching in foreground"
- $EJABBERDCTL -n $ERLANG_NODE_ARG foreground &
-
-# #Wait
- wait $!
-
+ $EJABBERDCTL -n $ERLANG_NODE_ARG foreground 
+ sleep 10
 fi
 
 while true; do
