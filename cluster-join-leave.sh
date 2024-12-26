@@ -10,9 +10,13 @@ ERLANG_NODE=$ERLANG_NODE_ARG
 echo $EJABBERDCTL
 echo $HEADLESS_SERVICE
 echo $ERLANG_NODE_ARG
-
+$EJABBERDCTL -n $ERLANG_NODE_ARG start
+$EJABBERDCTL -n $ERLANG_NODE_ARG started
 IPS=$(nslookup $HEADLESS_SERVICE | tail -n +3 | grep "Address:" | sed -E 's/^Address: (.*)$/\1/')
 echo "IPS: $IPS"
+if [ $HOSTNAME_S = "chatservice-headless-0" ]; then
+  echo "This is the seed node. No need to join the cluster."
+else
 for IP in ${IPS}
 do
     echo "looking up hostname for: $IP"
@@ -26,10 +30,9 @@ do
     echo "HOSTNAME: $HOSTNAME"
     echo "HOSTNAME_F: $HOSTNAME_F"
     echo "HOSTNAME_S: $HOSTNAME_S"
-    $EJABBERDCTL -n $ERLANG_NODE_ARG start
-    $EJABBERDCTL -n $ERLANG_NODE_ARG started
-    echo "trying to connect to node with hostname $HOSTNAME.$HEADLESS_SERVICE"
-    $EJABBERDCTL -n $ERLANG_NODE_ARG join_cluster "ejabberd@$HOSTNAME.$HEADLESS_SERVICE"
+    
+    echo "trying to connect to node with hostname $HOSTNAME_S.$HEADLESS_SERVICE"
+    $EJABBERDCTL -n $ERLANG_NODE_ARG join_cluster "ejabberd@$HOSTNAME_S.$HEADLESS_SERVICE"
     CLUSTERING_RESULT=$?
     $EJABBERDCTL -n $ERLANG_NODE_ARG list_cluster
     $EJABBERDCTL -n $ERLANG_NODE_ARG stop
@@ -41,6 +44,7 @@ do
         echo "failed to join, trying next";
     fi
 done
+fi
 
 #Define cleanup procedure
 cleanup() {
