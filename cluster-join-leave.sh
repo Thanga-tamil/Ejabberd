@@ -15,15 +15,18 @@ $EJABBERDCTL -n $ERLANG_NODE_ARG status
 NODE_STATUS=$($EJABBERDCTL -n $ERLANG_NODE_ARG status | grep "Failed RPC connection to the node")
 Cluster_STATUS=$($EJABBERDCTL -n $ERLANG_NODE_ARG status | grep "Failed RPC connection to the node")
 echo "NODE_STATUS ++$NODE_STATUS"
-echo "NODE_STATUS ++$Cluster_STATUS"
+echo "Cluster_STATUS ++$Cluster_STATUS"
 if [[ -z "$NODE_STATUS" ]]; then
 # If the node is not running, start it
   echo "Node ejabberd@$ERLANG_NODE_ARG is already running."
 else
  echo "Node ejabberd@$ERLANG_NODE_ARG is not running. Starting it..."
-  $EJABBERDCTL -n $ERLANG_NODE_ARG start 
-  $EJABBERDCTL -n $ERLANG_NODE_ARG started
- 
+  # # echo "launching in foreground"
+ $EJABBERDCTL -n $ERLANG_NODE_ARG foreground &
+
+# #Wait
+ wait $!
+
 fi
 
 if [ $HOSTNAME_S == "chatservice-headless-0" ]; then
@@ -49,8 +52,8 @@ cleanup() {
 #Trap SIGTERM
 trap 'cleanup' SIGTERM
 
-# echo "launching in foreground"
+# # echo "launching in foreground"
 # $EJABBERDCTL -n $ERLANG_NODE_ARG foreground &
 
-#Wait
-wait $!
+# #Wait
+# wait $!
