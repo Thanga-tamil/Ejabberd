@@ -15,12 +15,13 @@ $EJABBERDCTL -n $ERLANG_NODE_ARG status
 NODE_STATUS=$($EJABBERDCTL -n $ERLANG_NODE_ARG status | grep "Failed RPC connection to the node")
 
 if [[ -z "$NODE_STATUS" ]]; then
+ echo "Node ejabberd@$ERLANG_NODE_ARG is already running."
+ 
+else
   # If the node is not running, start it
   echo "Node ejabberd@$ERLANG_NODE_ARG is not running. Starting it..."
   $EJABBERDCTL -n $ERLANG_NODE_ARG start 
   $EJABBERDCTL -n $ERLANG_NODE_ARG started
-else
-  echo "Node ejabberd@$ERLANG_NODE_ARG is already running."
 fi
 
 if [ $HOSTNAME_S == "chatservice-headless-0" ]; then
@@ -29,13 +30,13 @@ else
 Cluster_STATUS=$($EJABBERDCTL -n $ERLANG_NODE_ARG list_cluster | grep "Failed RPC connection to the node")
 
 if [[ -z "$Cluster_STATUS" ]]; then
-  # If the node is not running, start it
+  echo "already in cluster"
+  
+else
   echo "Clusert Not added"
   IPS=$(nslookup $HEADLESS_SERVICE | tail -n +3 | grep "Address:" | sed -E 's/^Address: (.*)$/\1/')
 echo "IPS: $IPS"
-if [ $HOSTNAME_S == "chatservice-headless-0" ]; then
-  echo "This is the seed node. No need to join the cluster."
-else
+
 for IP in ${IPS}
 do
     echo "looking up hostname for: $IP"
@@ -66,11 +67,7 @@ do
     fi
 done
 fi
-
-else
-  echo "already in cluster"
 fi
-
 
 #Define cleanup procedure
 cleanup() {
