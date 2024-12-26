@@ -1,13 +1,12 @@
 #!/bin/bash
 
-EJABBERDCTL=$HOME/sbin/ejabberdctl
+EJABBERDCTL=/opt/ejabberd/sbin/ejabberdctl
 HOSTNAME_S=$(hostname -s) # ejabberd-0
 HOSTNAME_F=$(hostname -f) # ejabberd-0.ejabberd.default.svc.cluster.local
 HEADLESS_SERVICE="${HOSTNAME_F/$HOSTNAME_S./}" # ejabberd.default.svc.cluster.local
 ERLANG_NODE_ARG="ejabberd@$HOSTNAME_F" # ejabberd@ejabberd-0.ejabberd.default.svc.cluster.local
 ERLANG_NODE=$ERLANG_NODE_ARG
 
-echo $HOME
 echo $EJABBERDCTL
 echo $HEADLESS_SERVICE
 echo $ERLANG_NODE_ARG
