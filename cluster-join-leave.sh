@@ -1,81 +1,56 @@
-#!/bin/bash
+#!/bin/sh
 
-NAMESPACE="uikit-dev"  # Set your Kubernetes namespace here
-POD_LABEL_SELECTOR="app=chatservice-headless-hl"  # Adjust this to your ejabberd pod label
-EJABBERDCTL="/opt/ejabberd/sbin/ejabberdctl"
-POD_NAME=$(hostname)  # Use the hostname as the pod name in StatefulSet
-SLEEP_INTERVAL=30  # Interval in seconds to check the status
-# Function to check ejabberd pod status
-check_ejabberd_status() {
-    # PODS_RUNNING=$(kubectl get pods -n $NAMESPACE -l $POD_LABEL_SELECTOR --field-selector=status.phase=Running --no-headers | wc -l)
-    # if [ "$PODS_RUNNING" -gt 0 ]; then
-    #     return 0  # ejabberd is running
-    # else
-    #     return 1  # ejabberd is not running
-    # fi
-    return 0
-}
+set -m
 
-# Function to leave the ejabberd cluster
-leave_cluster() {
-    echo "Attempting to leave the cluster..."
-    $EJABBERDCTL leave_cluster
-    if [ $? -eq 0 ]; then
-        echo "Left the cluster successfully."
+EJABBERDCTL=$HOME/sbin/ejabberdctl
+HOSTNAME_S=$(hostname -s) # ejabberd-0
+HOSTNAME_F=$(hostname -f) # ejabberd-0.ejabberd.default.svc.cluster.local
+HEADLESS_SERVICE="${HOSTNAME_F/$HOSTNAME_S./}" # ejabberd.default.svc.cluster.local
+ERLANG_NODE_ARG="ejabberd@$HOSTNAME_F" # ejabberd@ejabberd-0.ejabberd.default.svc.cluster.local
+ERLANG_NODE=$ERLANG_NODE_ARG
+
+echo $HOME
+echo $EJABBERDCTL
+echo $HEADLESS_SERVICE
+echo $ERLANG_NODE_ARG
+
+IPS=$(nslookup $HEADLESS_SERVICE | tail -n +3 | grep "Address:" | sed -E 's/^Address: (.*)$/\1/')
+for IP in ${IPS}
+do
+    echo "looking up hostname for: $IP"
+    HOSTNAME=$(nslookup $IP | tail -n +3 | grep -E '[^=]*= (.*).'"$HEADLESS_SERVICE"'$'  | sed -E 's/[^=]*= (.*).'"$HEADLESS_SERVICE"'$/\1/')
+    if [[ "$HOSTNAME_S" == "$HOSTNAME" ]] ; then
+        echo "found own hostname, skipping"
+        continue
+    fi
+    $EJABBERDCTL -n $ERLANG_NODE_ARG start
+    $EJABBERDCTL -n $ERLANG_NODE_ARG started
+    echo "trying to connect to node with hostname $HOSTNAME.$HEADLESS_SERVICE"
+    $EJABBERDCTL -n $ERLANG_NODE_ARG join_cluster "ejabberd@$HOSTNAME.$HEADLESS_SERVICE"
+    CLUSTERING_RESULT=$?
+    $EJABBERDCTL -n $ERLANG_NODE_ARG list_cluster
+    $EJABBERDCTL -n $ERLANG_NODE_ARG stop
+    $EJABBERDCTL -n $ERLANG_NODE_ARG stopped
+    if [[ $? -eq 0 ]] ; then
+        echo "successfully joined";
+        break
     else
-        echo "Failed to leave the cluster."
+        echo "failed to join, trying next";
     fi
+done
+
+#Define cleanup procedure
+cleanup() {
+    echo "Container stopped, performing cleanup..."
+    $EJABBERDCTL -n $ERLANG_NODE_ARG leave_cluster "$ERLANG_NODE_ARG"
+    $EJABBERDCTL -n $ERLANG_NODE_ARG stop
 }
 
-# Function to join the ejabberd cluster
-join_cluster() {
-    TARGET_NODE="ejabberd@node_name"  # Replace with the actual cluster node name
-    echo "Attempting to join the cluster at $TARGET_NODE..."
-    $EJABBERDCTL join_cluster $TARGET_NODE
-    if [ $? -eq 0 ]; then
-        echo "Joined the cluster successfully."
-    else
-        echo "Failed to join the cluster."
-    fi
-}
+#Trap SIGTERM
+trap 'cleanup' SIGTERM
 
-# Main loop to monitor ejabberd status
-monitor_ejabberd() {
-    PREVIOUS_STATUS="unknown"
+echo "launching in foreground"
+$EJABBERDCTL -n $ERLANG_NODE_ARG foreground &
 
-    echo "Current pod: $POD_NAME"
-
-    # If this is the headless pod (ejabberd-0), no need to join the cluster
-    if [[ "$POD_NAME" == "chatservice-headless-0" ]]; then
-        echo "This is the headless/primary node, no need to join the cluster and started the ejabberd."
-        $EJABBERDCTL start
-        exit 0
-    fi
-
-    while true; do
-        check_ejabberd_status
-        CURRENT_STATUS=$?
-
-        # If ejabberd has stopped running, leave the cluster
-        if [[ $CURRENT_STATUS -eq 1 && "$PREVIOUS_STATUS" == "0" ]]; then
-            echo "ejabberd stopped, leaving the cluster..."
-            leave_cluster
-            $EJABBERDCTL start
-        fi
-
-        # If ejabberd has started running, join the cluster
-        if [[ $CURRENT_STATUS -eq 0 && "$PREVIOUS_STATUS" == "1" ]]; then
-            echo "ejabberd started, joining the cluster..."
-            join_cluster
-        fi
-
-        # Update the previous status
-        PREVIOUS_STATUS=$CURRENT_STATUS
-
-        # Sleep for the defined interval
-        sleep $SLEEP_INTERVAL
-    done
-}
-
-# Start monitoring ejabberd
-monitor_ejabberd
+#Wait
+wait $!
