@@ -10,7 +10,6 @@ ERLANG_NODE=$ERLANG_NODE_ARG
 echo $EJABBERDCTL
 echo $HEADLESS_SERVICE
 echo $ERLANG_NODE_ARG
-$EJABBERDCTL -n $ERLANG_NODE_ARG status 
 # Check if the node is already running
 NODE_STATUS=$($EJABBERDCTL -n $ERLANG_NODE_ARG status | grep "Failed RPC connection to the node")
 Cluster_STATUS=$($EJABBERDCTL -n $ERLANG_NODE_ARG status | grep "Failed RPC connection to the node")
@@ -35,9 +34,11 @@ else
     if [[ -z "$Cluster_STATUS" ]]; then
     # If the node is not running, start it
     
-echo "Already clustered"
+     echo "Already clustered"
     else
     echo "CLuster need to join"
+     $EJABBERDCTL -n $ERLANG_NODE_ARG join_cluster "ejabberd@chatservice-headless-0.$HEADLESS_SERVICE"
+    echo "cluster Joined"
     fi
 fi
 
