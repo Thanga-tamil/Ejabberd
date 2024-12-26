@@ -39,7 +39,6 @@ echo "Already clustered"
     else
     echo "CLuster need to join"
     fi
-   
 fi
 
 #Define cleanup procedure
