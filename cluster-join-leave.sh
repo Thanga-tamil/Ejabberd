@@ -14,14 +14,16 @@ $EJABBERDCTL -n $ERLANG_NODE_ARG status
 # Check if the node is already running
 NODE_STATUS=$($EJABBERDCTL -n $ERLANG_NODE_ARG status | grep "Failed RPC connection to the node")
 Cluster_STATUS=$($EJABBERDCTL -n $ERLANG_NODE_ARG status | grep "Failed RPC connection to the node")
-
+echo "NODE_STATUS ++$NODE_STATUS"
+echo "NODE_STATUS ++$Cluster_STATUS"
 if [[ -z "$NODE_STATUS" ]]; then
 # If the node is not running, start it
-  echo "Node ejabberd@$ERLANG_NODE_ARG is not running. Starting it..."
+  echo "Node ejabberd@$ERLANG_NODE_ARG is already running."
+else
+ echo "Node ejabberd@$ERLANG_NODE_ARG is not running. Starting it..."
   $EJABBERDCTL -n $ERLANG_NODE_ARG start 
   $EJABBERDCTL -n $ERLANG_NODE_ARG started
-else
-  echo "Node ejabberd@$ERLANG_NODE_ARG is already running."
+ 
 fi
 
 if [ $HOSTNAME_S == "chatservice-headless-0" ]; then
@@ -29,10 +31,10 @@ if [ $HOSTNAME_S == "chatservice-headless-0" ]; then
 else
     if [[ -z "$Cluster_STATUS" ]]; then
     # If the node is not running, start it
-    echo "CLuster need to join"
-
+    
+echo "Already clustered"
     else
-    echo "Already clustered"
+    echo "CLuster need to join"
     fi
    
 fi
@@ -51,4 +53,4 @@ trap 'cleanup' SIGTERM
 # $EJABBERDCTL -n $ERLANG_NODE_ARG foreground &
 
 #Wait
-#wait $!
+wait $!
