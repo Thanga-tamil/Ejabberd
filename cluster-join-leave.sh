@@ -12,9 +12,6 @@ echo $HEADLESS_SERVICE
 echo $ERLANG_NODE_ARG
 # Check if the node is already running
 NODE_STATUS=$($EJABBERDCTL -n $ERLANG_NODE_ARG status | grep "Failed RPC connection to the node")
-Cluster_STATUS=$($EJABBERDCTL -n $ERLANG_NODE_ARG status | grep "Failed RPC connection to the node")
-echo "NODE_STATUS ++$NODE_STATUS"
-echo "Cluster_STATUS ++$Cluster_STATUS"
 if [[ -z "$NODE_STATUS" ]]; then
 # If the node is not running, start it
   echo "Node ejabberd@$ERLANG_NODE_ARG is already running."
@@ -28,9 +25,13 @@ else
 
 fi
 
+while true; do
+
+Cluster_STATUS=$($EJABBERDCTL -n $ERLANG_NODE_ARG status | grep "Failed RPC connection to the node")
 if [ $HOSTNAME_S == "chatservice-headless-0" ]; then
  echo "This is the seed node. No need to join the cluster."
 else
+
     if [[ -z "$Cluster_STATUS" ]]; then
     # If the node is not running, start it
     
@@ -42,6 +43,8 @@ else
     fi
 fi
 
+sleep 30
+done
 #Define cleanup procedure
 cleanup() {
     echo "Container stopped, performing cleanup..."
