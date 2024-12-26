@@ -34,7 +34,7 @@ trap 'cleanup' SIGTERM
 while true; do
     # Check the cluster status
     Cluster_STATUS=$($EJABBERDCTL -n $ERLANG_NODE_ARG list_cluster | grep "Failed RPC connection to the node")
-
+     echo "Cluster_STATUS: $Cluster_STATUS"
     if [[ "$HOSTNAME_S" == "chatservice-headless-0" ]]; then
         echo "This is the seed node. No need to join the cluster."
     else
