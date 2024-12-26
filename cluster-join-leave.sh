@@ -1,7 +1,5 @@
 #!/bin/sh
 
-set -m
-
 EJABBERDCTL=$HOME/sbin/ejabberdctl
 HOSTNAME_S=$(hostname -s) # ejabberd-0
 HOSTNAME_F=$(hostname -f) # ejabberd-0.ejabberd.default.svc.cluster.local
