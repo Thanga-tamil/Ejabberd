@@ -10,28 +10,36 @@ ERLANG_NODE=$ERLANG_NODE_ARG
 echo $EJABBERDCTL
 echo $HEADLESS_SERVICE
 echo $ERLANG_NODE_ARG
-$EJABBERDCTL -n $ERLANG_NODE_ARG start
-$EJABBERDCTL -n $ERLANG_NODE_ARG started
-# Namespace where your StatefulSet is deployed
-NAMESPACE="uikit-dev"
-#NAMESPACE=$(kubectl config view --minify --output 'jsonpath={..namespace}')
-# Get the list of pod names in the chatservice-headless StatefulSet, excluding the current pod
-NODES=($(kubectl get pods -n $NAMESPACE -l app=chatservice-headless -o custom-columns=":metadata.name" | grep "chatservice-headless"))
-echo "NODES: $NODES"
+$EJABBERDCTL -n $ERLANG_NODE_ARG status 
+# Check if the node is already running
+NODE_STATUS=$($EJABBERDCTL -n $ERLANG_NODE_ARG status | grep "$ERLANG_NODE_ARG")
+
+if [[ -z "$NODE_STATUS" ]]; then
+  # If the node is not running, start it
+  echo "Node ejabberd@$ERLANG_NODE_ARG is not running. Starting it..."
+  $EJABBERDCTL -n $ERLANG_NODE_ARG foreground 
+  $EJABBERDCTL -n $ERLANG_NODE_ARG started
+else
+  echo "Node ejabberd@$ERLANG_NODE_ARG is already running."
+fi
+
+Cluster_STATUS=$($EJABBERDCTL -n $ERLANG_NODE_ARG list_cluster | grep "$ERLANG_NODE_ARG")
+
+
 IPS=$(nslookup $HEADLESS_SERVICE | tail -n +3 | grep "Address:" | sed -E 's/^Address: (.*)$/\1/')
 echo "IPS: $IPS"
-if [ $HOSTNAME_S = "chatservice-headless-0" ]; then
+if [ $HOSTNAME_S == "chatservice-headless-0" ]; then
   echo "This is the seed node. No need to join the cluster."
 else
 for IP in ${IPS}
 do
     echo "looking up hostname for: $IP"
-    # HOSTNAMES=$(nslookup $IP | grep 'name =' | awk '{print $4}' | sed 's/\.$//' | awk -F '.' '{print $1}')
-    # echo "Resolved Hostname: $HOSTNAMES"
+    HOSTNAMES=$(nslookup $IP | grep 'name =' | awk '{print $4}' | sed 's/\.$//' | awk -F '.' '{print $1}')
+    echo "Resolved Hostname: $HOSTNAMES"
      echo "HOSTNAME: $HOSTNAME"
     echo "HOSTNAME_F: $HOSTNAME_F"
     echo "HOSTNAME_S: $HOSTNAME_S"
-   if [[ "$HOSTNAME_S" == "$HOSTNAME" ]] ; then
+   if [[ "$HOSTNAME_S" == "$HOSTNAMES" ]] ; then
         echo "found own hostname, skipping"
         continue
     fi
@@ -64,8 +72,8 @@ cleanup() {
 #Trap SIGTERM
 trap 'cleanup' SIGTERM
 
-echo "launching in foreground"
-$EJABBERDCTL -n $ERLANG_NODE_ARG foreground &
+# echo "launching in foreground"
+# $EJABBERDCTL -n $ERLANG_NODE_ARG foreground &
 
 #Wait
 wait $!
