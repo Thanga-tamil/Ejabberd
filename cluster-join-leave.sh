@@ -20,10 +20,9 @@ else
 for IP in ${IPS}
 do
     echo "looking up hostname for: $IP"
-    HOSTNAMES=$(nslookup $IP | grep 'name =' | awk '{print $4}' | sed 's/\.$//')
+    HOSTNAMES=$(nslookup $IP | grep 'name =' | awk '{print $4}' | sed 's/\.$//' | awk -F '.' '{print $1}')
     echo "Resolved Hostname: $HOSTNAMES"
-    HOSTNAME=$(nslookup $IP | tail -n +3 | grep -E '[^=]*= (.*).'"$HEADLESS_SERVICE"'$'  | sed -E 's/[^=]*= (.*).'"$HEADLESS_SERVICE"'$/\1/')
-    if [[ "$HOSTNAME_S" == "$HOSTNAME" ]] ; then
+   if [[ "$HOSTNAME_S" == "$HOSTNAMES" ]] ; then
         echo "found own hostname, skipping"
         continue
     fi
