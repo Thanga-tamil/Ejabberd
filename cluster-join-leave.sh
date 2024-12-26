@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 EJABBERDCTL=$HOME/sbin/ejabberdctl
 HOSTNAME_S=$(hostname -s) # ejabberd-0
