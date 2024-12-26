@@ -11,7 +11,7 @@ COPY .erlang.cookie /root
 RUN chmod -R 600 /home/ejabberd/.erlang.cookie /root/.erlang.cookie
 RUN chown -R ejabberd:ejabberd /home/ejabberd/.erlang.cookie /root/.erlang.cookie
 RUN mkdir /opt/ejabberd
-RUN apt-get update && apt-get install -y dnsutils
+RUN apt-get update && apt-get install -y dnsutils vim
 #COPY MirrorFly.py /opt/ejabberd/
 COPY MirrorFly.py /opt/ejabberd/MirrorFly.py
 
