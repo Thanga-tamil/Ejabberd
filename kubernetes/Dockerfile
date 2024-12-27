@@ -19,8 +19,9 @@ RUN chmod +x /opt/ejabberd/MirrorFly.py
 
 RUN mkdir -p /opt/ejabberd/certs
 COPY limits.conf /etc/security/limits.conf
+### for kafka ###
+### RUN apt-get update && apt-get install -y libsasl2-dev liblz4-dev libzstd-dev
 ### Move Source code files  and Install ###
-
 COPY . /tmp/ejabberd/
 RUN chmod -R 755 /opt/
 RUN cd /tmp/ejabberd; ./autogen.sh; ./configure --with-rebar=rebar --enable-user=ejabberd --enable-mysql --prefix=/opt/ejabberd
