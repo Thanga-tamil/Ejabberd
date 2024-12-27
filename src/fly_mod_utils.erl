@@ -1392,11 +1392,11 @@ end,
   if EditMsgId =:= MessageId ->
     if Topicid =:= <<"">> ->
       ejabberd_sql:sql_query( ToServer, [<<"insert into message_status (from_user,to_user,status, recent,message_id, edit_message_id, message_type,  topic_id, meta_data, txt,chat_type,from_notification,blocked,message_time,to_notification,message_notification,received_at,seen_at) values
-      ('">>, User, <<"', '">>, ToUser, <<"', 0,1, '">>, MessageId, <<"',  '">>, EditMsgId, <<"', '">>, MessageType, <<"', '">>, Topicid, <<"', '">>, MetaData, <<"', '', '">>, ChatType, <<"','">>, SentFrom, <<"', '">>, BlockUser, <<"', '">>, MsgTime, <<"',
+        ('">>, User, <<"', '">>, ToUser, <<"', 0,1, '">>, MessageId, <<"',  '">>, EditMsgId, <<"', '">>, MessageType, <<"', '">>, Topicid, <<"', '">>, MetaData, <<"', '', '">>, ChatType, <<"','">>, SentFrom, <<"', '">>, BlockUser, <<"', '">>, MsgTime, <<"',
       '',0,'0000-00-00 00:00:00','0000-00-00 00:00:00') ON DUPLICATE KEY UPDATE to_user = '">>, ToUser, <<"',message_id = '">>, MessageId, <<"' ;">>]);
       true ->
       ejabberd_sql:sql_query( ToServer, [<<"insert into message_status (from_user,to_user,status, recent,message_id, edit_message_id, message_type, topic_id, meta_data, txt,chat_type,from_notification,blocked,message_time,to_notification,message_notification,received_at,seen_at) values
-      ('">>, User, <<"', '">>, ToUser, <<"', 0,1, '">>, MessageId, <<"',  '">>, EditMsgId, <<"', '">>, MessageType, <<"', '">>, Topicid, <<"', '">>, MetaData, <<"', '', '">>, ChatType, <<"','">>, SentFrom, <<"', '">>, BlockUser, <<"', '">>, MsgTime, <<"',
+        ('">>, User, <<"', '">>, ToUser, <<"', 0,1, '">>, MessageId, <<"',  '">>, EditMsgId, <<"', '">>, MessageType, <<"', '">>, Topicid, <<"', '">>, MetaData, <<"', '', '">>, ChatType, <<"','">>, SentFrom, <<"', '">>, BlockUser, <<"', '">>, MsgTime, <<"',
       '',0,'0000-00-00 00:00:00','0000-00-00 00:00:00') ON DUPLICATE KEY UPDATE to_user = '">>, ToUser, <<"',message_id = '">>, MessageId, <<"' ;">>])
       end;
     true ->
