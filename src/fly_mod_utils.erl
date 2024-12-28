@@ -118,6 +118,7 @@
   update_media_call_status/6,
   insert_media_call_status/11,
   insert_call_log_status/13,
+  get_admin_user/2,
   get_call_user_list/2,
   get_call_initiator/2,
   get_call_calling_status/2,
@@ -536,6 +537,10 @@ get_participants_update(LServer, NodeHost, ParticipantData) ->
   ejabberd_sql:sql_query(
     LServer,
     [<<"update mix_pam  SET affiliation='o'  where channel = '">>,NodeHost,<<"' and username = '">>,ParticipantData,<<"';">>]).
+
+get_admin_user(LServer, User) ->
+  ejabberd_sql:sql_query(LServer,
+    [<<"select username from users where username='">>,User,<<"' is_admin = 1 limit 1;">>]).
 
 get_admin_update(LServer, NodeHost, ParticipantData) ->
 
@@ -1392,11 +1397,11 @@ end,
   if EditMsgId =:= MessageId ->
     if Topicid =:= <<"">> ->
       ejabberd_sql:sql_query( ToServer, [<<"insert into message_status (from_user,to_user,status, recent,message_id, edit_message_id, message_type,  topic_id, meta_data, txt,chat_type,from_notification,blocked,message_time,to_notification,message_notification,received_at,seen_at) values
-      ('">>, User, <<"', '">>, ToUser, <<"', 0,1, '">>, MessageId, <<"',  '">>, EditMsgId, <<"', '">>, MessageType, <<"', '">>, Topicid, <<"', '">>, MetaData, <<"', '', '">>, ChatType, <<"','">>, SentFrom, <<"', '">>, BlockUser, <<"', '">>, MsgTime, <<"',
+        ('">>, User, <<"', '">>, ToUser, <<"', 0,1, '">>, MessageId, <<"',  '">>, EditMsgId, <<"', '">>, MessageType, <<"', '">>, Topicid, <<"', '">>, MetaData, <<"', '', '">>, ChatType, <<"','">>, SentFrom, <<"', '">>, BlockUser, <<"', '">>, MsgTime, <<"',
       '',0,'0000-00-00 00:00:00','0000-00-00 00:00:00') ON DUPLICATE KEY UPDATE to_user = '">>, ToUser, <<"',message_id = '">>, MessageId, <<"' ;">>]);
       true ->
       ejabberd_sql:sql_query( ToServer, [<<"insert into message_status (from_user,to_user,status, recent,message_id, edit_message_id, message_type, topic_id, meta_data, txt,chat_type,from_notification,blocked,message_time,to_notification,message_notification,received_at,seen_at) values
-      ('">>, User, <<"', '">>, ToUser, <<"', 0,1, '">>, MessageId, <<"',  '">>, EditMsgId, <<"', '">>, MessageType, <<"', '">>, Topicid, <<"', '">>, MetaData, <<"', '', '">>, ChatType, <<"','">>, SentFrom, <<"', '">>, BlockUser, <<"', '">>, MsgTime, <<"',
+        ('">>, User, <<"', '">>, ToUser, <<"', 0,1, '">>, MessageId, <<"',  '">>, EditMsgId, <<"', '">>, MessageType, <<"', '">>, Topicid, <<"', '">>, MetaData, <<"', '', '">>, ChatType, <<"','">>, SentFrom, <<"', '">>, BlockUser, <<"', '">>, MsgTime, <<"',
       '',0,'0000-00-00 00:00:00','0000-00-00 00:00:00') ON DUPLICATE KEY UPDATE to_user = '">>, ToUser, <<"',message_id = '">>, MessageId, <<"' ;">>])
       end;
     true ->
@@ -2024,6 +2029,7 @@ update_license_lookup(LServer) ->
       ets:insert(ClientName, {expiry, 0});
 
     {selected, _, [[Lkey]]} ->
+      ?INFO_MSG("Lkey: ~p ", [Lkey]),
       DecryptedMessage = fly_mod_security:aes_decrpyt_license(list_to_binary(ClientKeyValue++ClientKeyValue++ClientKeyValue), <<"k%$/@B[jqAx}>8H@">>, binary_to_list(Lkey)),
       {ParsedMessageJson} = jiffy:decode(http_uri:decode(binary_to_list(DecryptedMessage))),
       AvailableModules = proplists:get_value(<<"modulesPurchased">>, ParsedMessageJson),
