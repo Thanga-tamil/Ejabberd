@@ -540,7 +540,7 @@ get_participants_update(LServer, NodeHost, ParticipantData) ->
 
 get_admin_user(LServer, User) ->
   ejabberd_sql:sql_query(LServer,
-    [<<"select username from users where username='">>,User,<<"' is_admin = 1 limit 1;">>]).
+    [<<"select username from users where username='">>,User,<<"' and is_admin = 1 limit 1;">>]).
 
 get_admin_update(LServer, NodeHost, ParticipantData) ->
 
