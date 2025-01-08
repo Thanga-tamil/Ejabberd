@@ -358,9 +358,7 @@ store_in_table(FServer, BarePeer, SUser, MessageId, MsgContent, SType, MessageTy
                 _ ->
                   ok
               end,
-              ClientName = gen_mod:get_module_opt(FServer, fly_mod_user_activities, client_name),
-              [[Interception]] = ets:match(ClientName, {interception, '$1'}),
-          if (BlockUser == <<"0">>  orelse BlockUser == <<>>) andalso Interception =:= <<"0">> ->
+          if (BlockUser == <<"0">>  orelse BlockUser == <<>>) ->
             case catch fly_mod_utils:update_recent_chat(FServer,SUser,BarePeer,MessageId,SUser,MsgContent,SType,MessageType,Topicid, MetaData, <<"1">>,EditMsgid, FlatTimeStamp) of
               {updated,1} ->
                 ok;
@@ -393,9 +391,7 @@ if Metadata =:= <<>> ->
             _ ->
               ok
           end,
-          ClientName = gen_mod:get_module_opt(FServer, fly_mod_user_activities, client_name),
-          [[Interception]] = ets:match(ClientName, {interception, '$1'}),
-      if (BlockUser == <<"0">>  orelse BlockUser == <<>>) andalso Interception =:= <<"0">> ->
+      if (BlockUser == <<"0">>  orelse BlockUser == <<>>)->
         case catch fly_mod_utils:update_recent_chat_topic(FServer,SUser,BarePeer,MessageId,SUser,MsgContent,SType,MessageType,Topicid, MetaData, <<"1">>,FlatTimeStamp) of
           {updated,1} ->
             ok;
