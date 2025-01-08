@@ -14,7 +14,7 @@
 -define(EJABBERD_DEBUG, true).
 
 %% gen_mod callbacks
--export([send_offline_message/1, groupcreationfunction/9, queryexecfunction/5, queryexecfunctions/5, queryfunction/6,queryfunctions/6, groupcreationfunction/10, has_more_resources/2, send_bulk_group_push/7, send_own_offline_message/3, start/2, start_link/2, depends/2,
+-export([send_offline_message/1, groupcreationfunction/9, queryexecfunction/5, queryfunction/6, groupcreationfunction/10, has_more_resources/2, send_bulk_group_push/7, send_own_offline_message/3, start/2, start_link/2, depends/2,
   stop/1]).
 
 -export([code_change/3, handle_call/3, handle_cast/2, handle_info/2, init/1, mod_opt_type/1, terminate/2, mod_options/1]).
@@ -157,14 +157,7 @@ handle_cast({queryexecution, <<"clear_all">>,
 handle_cast({queryexecution, <<"call_log">>,
   {From, Chat_Type, Delete_Type, XMLBody}},
     State) ->
-
   clear_call_log(From, Chat_Type, Delete_Type, XMLBody, State),
-
-  {noreply, State};
-handle_cast({groupqueryexecutions, <<"group_insert">>,
-  {LServer,From, MsgContent, Subscribers}},State) ->
-  group_insert_query(LServer, From, MsgContent, Subscribers, State),
-
   {noreply, State};
 handle_cast({groupcreationexecutions, <<"group_creation">>,
   {From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes}},State) ->
@@ -247,12 +240,6 @@ queryfunction(Proc, Type, From, Chat_Type, Delete_Type, XMLBody) ->
   gen_server:cast(Proc,
     {queryexecution, Type,
       { From, Chat_Type, Delete_Type,XMLBody}}).
-
-queryfunctions(Proc, Type, From, MsgContent, Subscribers,LServer) ->
-
-  gen_server:cast(Proc,
-    {groupqueryexecutions, Type,
-      {LServer, From, MsgContent, Subscribers}}).
 
 groupcreationfunction(Proc, Type, From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes) ->
   gen_server:cast(Proc,
@@ -420,57 +407,23 @@ get_string() ->
   VCard = fxml:get_subtag(Profile, <<"vCard">>),
   NickName = fxml:get_subtag(VCard, <<"nickName">>),
   GroupName = fxml:get_tag_cdata(NickName),
-  fly_mod_utils:group_notify_message(From, From, FUser, Channel, <<"1">>, <<"create_group">>, MessageId1),
+  fly_mod_utils:group_notify_message(From, From, FUser, Channel, <<"1">>, <<"create_group">>, MessageId1,<<"">>),
   % Adds Participant
   lists:foreach(fun(Participant) ->
     ParticipantData = fxml:get_tag_cdata(Participant),
     FromJID = jid:make(fly_mod_utils:get_user_from_string_jid(ParticipantData),FServer,<<"">>),
     MessageID = <<(get_string()) / binary>>,
     GroupCreateID = <<(get_string()) / binary>>,
+    #jid{user = PUser} = FromJID,
+    fly_mod_utils:group_notify_message(From, FromJID, PUser, Channel, <<"1">>, <<"create_group">>, GroupCreateID,<<"">>),
+    timer:sleep(1000),
     mod_mix_pam:process_iq(#iq{from = FromJID, to = FromJID,type = set,id = MessageID,
       sub_els = [#mix_client_join{channel = GroupJID,  xmlns = <<"urn:xmpp:mix:pam:0">>,affiliation = <<"n">>,
       join = #mix_join{owner = jid:to_string(From),message_id = MessageID, nick = GroupName, group_create = <<"y">>, custom_attributes = #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, xmlns = <<"urn:xmpp:mix:core:0">>, subscribe = [<<"urn:xmpp:mix:nodes:messages">>,<<"urn:xmpp:mix:nodes:presence">>,
         <<"urn:xmpp:mix:nodes:participants">>,<<"urn:xmpp:mix:nodes:info">>,<<"urn:xmpp:mix:nodes:config">>]}}]}),
-
-    #jid{user = PUser} = FromJID,
-    timer:sleep(1000),
-    fly_mod_utils:group_notify_message(From, FromJID, PUser, Channel, <<"1">>, <<"create_group">>, GroupCreateID),
+    
     fly_mix_group_chat:update_group_status(From, GroupJID, SubEl, IQ, <<"2">>, Participant, MessageID)
   end, Participants#xmlel.children).
-
-group_insert_query(LServer,From, MsgContent, Subscribers, State) ->
-
-  TimestampNew = fly_add_timestamp:now_to_microseconds(erlang:now()),
-  FlatTimeStampNew = lists:flatten(io_lib:format("~p", [TimestampNew])),
-  InsertStatement = <<"insert into message_status (from_user,to_user,status, recent,message_id,message_type,txt,chat_type,from_notification, message_time,to_notification,message_notification,received_at,seen_at,meta_data) values ">>,
-  RecentInsert = <<"insert into chat_recent (from_user, to_user,  message_id, message_from, txt, chat_type, message_type,  notification_to, unread, message_time,meta_data) values ">>,
-  [MessageType, MessageId, MesssageSend, _GroupName, MsgData ] = MsgContent,
-  #jid{luser = FromUser} = From,
-  ValueStatement = lists:map(fun(Part) ->
-  #jid{luser = ToUser} = Part,
-  string:concat("", ", ('" ++ binary_to_list(FromUser) ++ "', '" ++ binary_to_list(ToUser) ++ "', 0,1, '" ++ binary_to_list(MessageId) ++ "', '" ++ binary_to_list(MessageType) ++ "', '" ++ binary_to_list(MsgData) ++"', 'normal', '" ++ binary_to_list(MesssageSend) ++ "', '" ++ FlatTimeStampNew ++ "','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00','{}')")
-  end, Subscribers),
-
-      RecentValueStatement = lists:map(fun(Part) ->
-      #jid{luser = ToUser} = Part,
-      SUser = fly_mod_utils:get_user_from_string_jid(MesssageSend),
-      if ToUser =:= SUser ->
-      Unread = <<"0">>;
-      true ->
-      Unread = <<"1">>
-      end,
-    string:concat("", ", ('" ++ binary_to_list(FromUser) ++ "', '" ++ binary_to_list(ToUser) ++ "', '" ++ binary_to_list(MessageId) ++ "', '"  ++ binary_to_list(SUser) ++ "', '"  ++ binary_to_list(MsgData) ++ "', 'normal', '" ++ binary_to_list(MessageType) ++ "', '', '" ++ binary_to_list(Unread) ++ "','" ++ FlatTimeStampNew ++ "','{}')")
-    end, Subscribers),
-
-    DuplicateStatement = "ON DUPLICATE KEY UPDATE to_user = values(to_user), message_id = '" ++ binary_to_list(MessageId) ++"' ;",
-    RecentDuplicateStatement = " ON DUPLICATE KEY UPDATE message_id = values(message_id), message_from = values(message_from), txt = values(txt), chat_type = values(chat_type), message_type = values(message_type),  notification_to = values(notification_to), unread = unread + values(unread), status = 0, recall_status = 0, favourite_status = 0, created_at = NOW();",
-    [_|NewVal] = re:replace(ValueStatement, ",", ""),
-    [_|RecentNewVal] = re:replace(RecentValueStatement, ",", ""),
-
-    FinalQuery = binary_to_list(InsertStatement) ++ binary_to_list(NewVal) ++ DuplicateStatement,
-    RecentFinalQuery = binary_to_list(RecentInsert) ++ binary_to_list(RecentNewVal) ++ RecentDuplicateStatement,
-    ejabberd_sql:sql_query(LServer, [FinalQuery]),
-    ejabberd_sql:sql_query(LServer, [RecentFinalQuery]).
 
 %% send_push_notifications
 %%
@@ -1868,11 +1821,6 @@ queryexecfunction(From, calllog, Chat_Type, Delete_Type, XMLBody)->
     ?PROCNAME),
 
   queryfunction(Server,<<"call_log">>, From, Chat_Type, Delete_Type, XMLBody).
-
-queryexecfunctions(Lserver, <<"group_insert">>, From, MsgContent, Subscribers)->
-  Server = gen_mod:get_module_proc(Lserver,
-    ?PROCNAME),
-  queryfunctions(Server,<<"group_insert">>, From, MsgContent, Subscribers,Lserver).
 
 groupcreationfunction(From, groupcreation, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes)->
   Server = gen_mod:get_module_proc(From#jid.lserver,

@@ -73,7 +73,7 @@ start_link() ->
     Return.
 
 init([Host, _Opts]) ->
-    ejabberd_hooks:add(user_send_packet, Host, ?MODULE, on_user_send_packet, 100),
+    ejabberd_hooks:add(user_send_packet, Host, ?MODULE, on_user_send_packet, 80),
     {ok, #state{server_host = Host}}.
 
 handle_call(stop, _From, State) ->
@@ -93,7 +93,7 @@ terminate(_Reason, State) ->
     %% and might be registered within a module on another virtual host
     Host = State#state.server_host,
 
-    ejabberd_hooks:delete(user_send_packet, Host, ?MODULE, on_user_send_packet, 100).
+    ejabberd_hooks:delete(user_send_packet, Host, ?MODULE, on_user_send_packet, 80).
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -135,12 +135,12 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
         MResource = <<"">>
       end,
   #jid{user = TUser, lserver = TServer} = To,
-  IsValid = fly_mod_utils:validate_license(FServer, true, <<"chat">>),
-  if IsValid =:= true ->
+
     MessageId = Packet#message.id,
   ContentAcknowledge = xmpp:get_subtag(Packet, #chatcontent{}),
   if (ContentAcknowledge =:= false) or (Type =:= normal)  ->
-      UpdatedPacket = Packet;
+    BlockUser = <<"0">>,
+      ok;
     true ->
       case should_acknowledge_on_send(Packet) of
         S when (S == message_acknowledge) ->
@@ -156,10 +156,19 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           end,
           case catch fly_mod_utils:check_blockeduser(FServer, FUser, TUser) of
             {selected, _, []} ->
-              BlockUser = <<"0">>;
+              UserBlocked = <<"0">>;
             {selected, _, _ResultSet} ->
-              BlockUser = TUser
+              UserBlocked = TUser
           end,
+          if UserBlocked =:= <<"0">> ->
+          case catch fly_mod_utils:check_singlechatenabled(FServer, TUser) of
+            {selected, _, []} ->
+              UserDisabled = <<"0">>;
+            {selected, _, _Result} ->
+              UserDisabled = TUser
+          end
+        end,
+        BlockUser = UserDisabled,
           SUser = case Type of
                     chat -> FUser;
                     groupchat -> ok
@@ -170,62 +179,47 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           send_ack_response(From, To, IdValue, <<"acknowledge">>),
           NewPacket = xmpp:set_from_to(Packet,From, To),
           GetTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
-          Timestamp = now_to_microseconds(erlang:now()),
-          NewTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
-          if EditMsgid =/= MessageId ->
-            case catch fly_mod_utils:get_message_time(FServer, MessageId) of
-              {selected, _, [[MessageTime]]} ->
-                NewTimestamp = MessageTime;
-              _ ->
-                NewTimestamp = list_to_binary(NewTimeStamp)
-              end;
-          true ->
-                NewTimestamp = list_to_binary(NewTimeStamp)
+          if GetTimestamp =:= false ->
+            Timestamp = now_to_microseconds(erlang:now()),
+            FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
+            XMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}],
+              children = []},
+            TimeStampedPacket = fxml:append_subtags(NewPacket, [XMLTag]);
+            true ->
+              {_, _, FlatTimeStamp} = GetTimestamp,
+              TimeStampedPacket = NewPacket
           end,
-              if GetTimestamp =:= false ->
-                FlatTimeStamp = NewTimestamp,
-              XMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, NewTimestamp}],
-                children = []},
-              UpdatedPacket = fxml:append_subtags(NewPacket, [XMLTag]);
-              true ->
-                if EditMsgid =/= MessageId ->
-                FlatTimeStamp = NewTimestamp,
-                XMLNewTag =  #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, NewTimestamp}],
-                children = []},
-                NewTimestampPacket = fxml:replace_subtag( xmpp:encode(XMLNewTag),xmpp:encode(Packet)),
-                UpdatedPacket = xmpp:decode(NewTimestampPacket);
-              true ->
-                {_, _, FlatTimeStamp} = GetTimestamp,
-                UpdatedPacket = NewPacket
-              end
-            end,
-          if MetaData =:= <<>> ->
+          store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, MetaData,BlockUser, EditMsgid, FlatTimeStamp),
+
+        if BlockUser == <<"0">> ->
+          case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
+            true ->
+              mod_offline:store_packet({TimeStampedPacket ,xmpp:decode(TimeStampedPacket)});
+            false ->
+              ok
+          end,
+            case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
+            true ->
+            fly_mod_offline_push:send_offline_message({_C2SState,TimeStampedPacket});
+            false ->
+              ok
+            end;
+        true ->
+          ok
+        end,
+
+        if MetaData =:= <<>> ->
             Metadata = <<"{}">>;
           MetaData =:= <<"">> ->
             Metadata = <<"{}">>;
         true ->
             Metadata = MetaData
         end,
-          store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, MetaData,BlockUser, EditMsgid, FlatTimeStamp),
-          fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid),
-        if BlockUser == <<"0">> ->
-          case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
-            true ->
-              mod_offline:store_packet({UpdatedPacket ,xmpp:decode(UpdatedPacket)});
-            false ->
-              ok
-          end,
-            case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
-            true ->
-            fly_mod_offline_push:send_offline_message({_C2SState,UpdatedPacket});
-            false ->
-              ok
-            end;
-        true ->
-          ok
-        end;
+
+        fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid);
         S when (S == false) ->
-          UpdatedPacket = Packet
+          BlockUser = <<"0">>,
+          ok
       end
   end,
   %%Save the Message to temp storage for 10 sec when server
@@ -342,8 +336,9 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
     _ ->
       ok
   end,
-  {UpdatedPacket,_C2SState};
-true ->
+  if BlockUser == <<"0">> ->
+  {Packet,_C2SState};
+  true ->
     {drop,_C2SState}
 end;
 on_user_send_packet(Acc) ->
@@ -363,7 +358,7 @@ store_in_table(FServer, BarePeer, SUser, MessageId, MsgContent, SType, MessageTy
                 _ ->
                   ok
               end,
-          if BlockUser == <<"0">> ->
+          if (BlockUser == <<"0">>  orelse BlockUser == <<>>) ->
             case catch fly_mod_utils:update_recent_chat(FServer,SUser,BarePeer,MessageId,SUser,MsgContent,SType,MessageType,Topicid, MetaData, <<"1">>,EditMsgid, FlatTimeStamp) of
               {updated,1} ->
                 ok;
@@ -372,16 +367,7 @@ store_in_table(FServer, BarePeer, SUser, MessageId, MsgContent, SType, MessageTy
               _ ->
                 ok
             end;
-            BlockUser == <<>> ->
-              case catch fly_mod_utils:update_recent_chat(FServer,SUser,BarePeer,MessageId,SUser,MsgContent,SType,MessageType,Topicid, MetaData, <<"1">>, EditMsgid, FlatTimeStamp) of
-                {updated,1} ->
-                  ok;
-                {updated,0}->
-                  fly_mod_utils:insert_recent_chat(FServer,SUser,BarePeer,MessageId,SUser,MsgContent,SType,MessageType,Topicid, MetaData, <<"">>,<<"1">>,FlatTimeStamp);
-                _ ->
-                  ok
-              end;
-            true ->
+          true ->
               ok
           end,
   if Topicid =/= <<"">> ->
@@ -405,7 +391,7 @@ if Metadata =:= <<>> ->
             _ ->
               ok
           end,
-      if BlockUser == <<"0">> ->
+      if (BlockUser == <<"0">>  orelse BlockUser == <<>>)->
         case catch fly_mod_utils:update_recent_chat_topic(FServer,SUser,BarePeer,MessageId,SUser,MsgContent,SType,MessageType,Topicid, MetaData, <<"1">>,FlatTimeStamp) of
           {updated,1} ->
             ok;
@@ -414,15 +400,6 @@ if Metadata =:= <<>> ->
           _ ->
             ok
         end;
-        BlockUser == <<>> ->
-          case catch fly_mod_utils:update_recent_chat_topic(FServer,SUser,BarePeer,MessageId,SUser,MsgContent,SType,MessageType,Topicid, MetaData, <<"1">>,FlatTimeStamp) of
-            {updated,1} ->
-              ok;
-            {updated,0}->
-              fly_mod_utils:insert_recent_chat_topic(FServer,SUser,BarePeer,MessageId,SUser,MsgContent,SType,MessageType,Topicid, MetaData, <<"">>,<<"1">>,FlatTimeStamp);
-            _ ->
-              ok
-          end;
         true ->
           ok
       end.
