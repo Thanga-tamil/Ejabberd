@@ -118,7 +118,7 @@
   update_media_call_status/6,
   insert_media_call_status/11,
   insert_call_log_status/13,
-  get_admin_user/2,
+  get_admin_user/3,
   get_call_user_list/2,
   get_call_initiator/2,
   get_call_calling_status/2,
@@ -538,9 +538,9 @@ get_participants_update(LServer, NodeHost, ParticipantData) ->
     LServer,
     [<<"update mix_pam  SET affiliation='o'  where channel = '">>,NodeHost,<<"' and username = '">>,ParticipantData,<<"';">>]).
 
-get_admin_user(LServer, User) ->
+get_admin_user(LServer, User, Token) ->
   ejabberd_sql:sql_query(LServer,
-    [<<"select username from users where username='">>,User,<<"' and is_admin = 1 limit 1;">>]).
+    [<<"select username from users where username='">>,User,<<"' and password = '">>,Token,<<"' and is_admin = 1 limit 1;">>]).
 
 get_admin_update(LServer, NodeHost, ParticipantData) ->
 
