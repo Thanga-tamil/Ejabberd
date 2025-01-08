@@ -60,7 +60,7 @@ start_link(Name, Prog) ->
 
 check_password(User, Server, Password) ->
    LoginUrl = extauth_login_url(Server),
-   case catch fly_mod_utils:get_admin_user(Server, User) of
+   case catch fly_mod_utils:get_admin_user(Server, User, Password) of
     {selected, _, []} ->
       Secure = Password;
     {selected, _, _Result} ->

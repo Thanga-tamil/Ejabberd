@@ -418,7 +418,7 @@ add_participants_service(From, To, SubEl, IQ) ->
   GroupName = fxml:get_subtag(VCard, <<"nickName">>),
   NickName = fxml:get_tag_cdata(GroupName),
   fly_mod_utils:update_vcard_date(FServer, Channel),
-  mod_vcard:set_vcard(Channel, FServer, VCard),
+  % mod_vcard:set_vcard(Channel, FServer, VCard),
   GroupJid = jid:make(Channel, TServer, <<>>),
   case catch fly_mod_utils:get_group_users(FServer, Channel) of
     {selected, _, []} ->
