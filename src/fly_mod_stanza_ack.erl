@@ -341,7 +341,6 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
   true ->
     {drop,_C2SState}
 end;
-
 on_user_send_packet(Acc) ->
   Acc.
 

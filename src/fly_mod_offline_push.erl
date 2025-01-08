@@ -157,11 +157,8 @@ handle_cast({queryexecution, <<"clear_all">>,
 handle_cast({queryexecution, <<"call_log">>,
   {From, Chat_Type, Delete_Type, XMLBody}},
     State) ->
-
   clear_call_log(From, Chat_Type, Delete_Type, XMLBody, State),
-
   {noreply, State};
-
 handle_cast({groupcreationexecutions, <<"group_creation">>,
   {From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes}},State) ->
   group_create_query(From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes, State),
@@ -427,8 +424,6 @@ get_string() ->
     fly_mod_utils:group_notify_message(From, FromJID, PUser, Channel, <<"1">>, <<"create_group">>, GroupCreateID,<<"">>),
     fly_mix_group_chat:update_group_status(From, GroupJID, SubEl, IQ, <<"2">>, Participant, MessageID)
   end, Participants#xmlel.children).
-
-
 
 %% send_push_notifications
 %%
