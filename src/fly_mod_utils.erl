@@ -97,7 +97,7 @@
   get_group_chat_messages/7,
   get_message_status/2,
   get_groupmessage_status/2,
-  group_notify_message/7,
+  group_notify_message/8,
   get_blockedlist/2,
   check_group_exists/2,
   set_web_password/2,
@@ -1701,14 +1701,18 @@ check_group_exists(FServer, GroupId) ->
   ejabberd_sql:sql_query(FServer,
     [<<"SELECT from_user FROM message_status WHERE from_user  = '">>,GroupId,<<"';">>]).
 
-group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser}, TUser, Groupid,NotifyId, RequestType, Msgid)->
+group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser}, TUser, Groupid,NotifyId, RequestType, Msgid, TimeStamp)->
   % MsgId = get_iq_message_id(8),
 
   Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
 
   FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
 
-  Currenttime = list_to_binary(FlatTimeStamp),
+  if TimeStamp == <<"">> ->
+    Currenttime = list_to_binary(FlatTimeStamp);
+  true ->
+    Currenttime = TimeStamp
+  end,
 
   FromNotification = list_to_binary(binary_to_list(AUser) ++ "@" ++ binary_to_list(AServer)),
 

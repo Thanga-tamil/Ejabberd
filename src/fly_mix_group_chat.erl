@@ -621,7 +621,7 @@ process_add_participants(From, To, SubEl, IQ) ->
           sub_els = [#mix_client_join{channel = To,xmlns = <<"urn:xmpp:mix:pam:0">>,affiliation = <<"n">>,
           join = #mix_join{owner = jid:to_string(From), message_id = MessageId ,nick = GroupName, group_create = <<"n">>, custom_attributes = #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, xmlns = <<"urn:xmpp:mix:core:0">>, subscribe = [<<"urn:xmpp:mix:nodes:messages">>,<<"urn:xmpp:mix:nodes:presence">>,
           <<"urn:xmpp:mix:nodes:participants">>,<<"urn:xmpp:mix:nodes:info">>,<<"urn:xmpp:mix:nodes:config">>]}}]}),
-          fly_mod_utils:group_notify_message(From, FromJID, PUser, TUser, <<"2">>, RequestType, MessageId),
+          fly_mod_utils:group_notify_message(From, FromJID, PUser, TUser, <<"2">>, RequestType, MessageId,<<"">>),
           update_group_status(From, To, SubEl, IQ, <<"2">>, Participant, MessageId);
         {selected, _, _GroupMembers} ->
           ok;
@@ -1676,7 +1676,7 @@ update_group_info_to_members(ActionUser, GroupFrom, Status, Data, Members, Notif
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
         #jid{user = TUser, lserver = TServer} = RouteToJid,
-        fly_mod_utils:group_notify_message(ActionUser, RouteToJid, Data, FUser, Notification, Status, MessageId),
+        fly_mod_utils:group_notify_message(ActionUser, RouteToJid, Data, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp)),
         Packet = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(GroupFrom)}, {<<"type">>, <<"normal">>}, {<<"id">>,MessageId}, {<<"to">>, jid:to_string(RouteToJid)}],
           children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, Status}, {<<"done_by">>, ActionDoneBy}, {<<"new_admin">>, ParticipantJid}]}]},
             #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}],
@@ -1697,7 +1697,7 @@ Status == <<"remove_admin">> ->
   lists:foreach(fun(To) ->
     RouteToJid = jid:make(To, _AServer, <<>>),
     #jid{user = TUser, lserver = TServer} = RouteToJid,
-    fly_mod_utils:group_notify_message(ActionUser, RouteToJid, Data, FUser, Notification, Status, MessageId),
+    fly_mod_utils:group_notify_message(ActionUser, RouteToJid, Data, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp)),
     Packet = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(GroupFrom)}, {<<"type">>, <<"normal">>}, {<<"id">>,MessageId}, {<<"to">>, jid:to_string(RouteToJid)}],
       children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, Status}, {<<"done_by">>, ActionDoneBy},{<<"remove_admin">>, ParticipantJid}]}]},
         #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}],children = []}]},
@@ -1745,7 +1745,7 @@ Status == <<"remove_admin">> ->
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
         #jid{user = TUser, lserver = TServer} = RouteToJid,
-        fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId),
+        fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp)),
         Packet = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupFrom)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
           children = [
@@ -1842,7 +1842,7 @@ update_group_status(From, To, SubEl, IQ, MsgStatus, Participant, MessageId) ->
   fly_mod_utils:update_group_count(FServer, TUser),
   case catch fly_mod_utils:get_group_users(FServer, TUser) of
     {selected, _, []} ->
-      fly_mod_utils:group_notify_message(From, From, PUser, TUser, MsgStatus, RequestType, MessageId),
+      fly_mod_utils:group_notify_message(From, From, PUser, TUser, MsgStatus, RequestType, MessageId, <<"">>),
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Group Does Not exists">>});
     {selected, _, GroupMembers} ->
       JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
@@ -1853,19 +1853,19 @@ update_group_status(From, To, SubEl, IQ, MsgStatus, Participant, MessageId) ->
       end,
       lists:foreach(fun(Touser) ->
         RouteToJid = jid:make(Touser, FServer, <<>>),
-        fly_mod_utils:group_notify_message(From, RouteToJid, PUser, TUser, MsgStatus, RequestType, MessageId)
+        fly_mod_utils:group_notify_message(From, RouteToJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>)
       end, NewJids),
       case RequestType of
         <<"admin_remove_admin">> ->
-          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId);
+          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>);
         <<"remove_participant">> ->
-          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId);
+          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>);
         <<"admin_remove_participant">> ->
-          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId);
+          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>);
         <<"admin_exit_group">> ->
-          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId);
+          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>);
         <<"user_exit_group">> ->
-          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId);
+          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>);
         _ ->
           ok
       end
