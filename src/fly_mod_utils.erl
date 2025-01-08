@@ -1708,7 +1708,7 @@ group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser},
 
   FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
 
-  if TimeStamp == <<"">> ->
+  if TimeStamp =:= <<"">> ->
     Currenttime = list_to_binary(FlatTimeStamp);
   true ->
     Currenttime = TimeStamp

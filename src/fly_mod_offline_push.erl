@@ -420,8 +420,8 @@ get_string() ->
         <<"urn:xmpp:mix:nodes:participants">>,<<"urn:xmpp:mix:nodes:info">>,<<"urn:xmpp:mix:nodes:config">>]}}]}),
 
     #jid{user = PUser} = FromJID,
-    timer:sleep(1000),
     fly_mod_utils:group_notify_message(From, FromJID, PUser, Channel, <<"1">>, <<"create_group">>, GroupCreateID,<<"">>),
+    timer:sleep(1000),
     fly_mix_group_chat:update_group_status(From, GroupJID, SubEl, IQ, <<"2">>, Participant, MessageID)
   end, Participants#xmlel.children).
 
