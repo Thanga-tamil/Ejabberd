@@ -73,7 +73,7 @@ start_link() ->
     Return.
 
 init([Host, _Opts]) ->
-    ejabberd_hooks:add(user_send_packet, Host, ?MODULE, on_user_send_packet, 100),
+    ejabberd_hooks:add(user_send_packet, Host, ?MODULE, on_user_send_packet, 80),
     {ok, #state{server_host = Host}}.
 
 handle_call(stop, _From, State) ->
@@ -93,7 +93,7 @@ terminate(_Reason, State) ->
     %% and might be registered within a module on another virtual host
     Host = State#state.server_host,
 
-    ejabberd_hooks:delete(user_send_packet, Host, ?MODULE, on_user_send_packet, 100).
+    ejabberd_hooks:delete(user_send_packet, Host, ?MODULE, on_user_send_packet, 80).
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -135,11 +135,11 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
         MResource = <<"">>
       end,
   #jid{user = TUser, lserver = TServer} = To,
-  IsValid = fly_mod_utils:validate_license(FServer, true, <<"chat">>),
-  if IsValid =:= true ->
+
     MessageId = Packet#message.id,
   ContentAcknowledge = xmpp:get_subtag(Packet, #chatcontent{}),
   if (ContentAcknowledge =:= false) or (Type =:= normal)  ->
+    BlockUser = <<"0">>,
       ok;
     true ->
       case should_acknowledge_on_send(Packet) of
@@ -156,10 +156,19 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           end,
           case catch fly_mod_utils:check_blockeduser(FServer, FUser, TUser) of
             {selected, _, []} ->
-              BlockUser = <<"0">>;
+              UserBlocked = <<"0">>;
             {selected, _, _ResultSet} ->
-              BlockUser = TUser
+              UserBlocked = TUser
           end,
+          if UserBlocked =:= <<"0">> ->
+          case catch fly_mod_utils:check_singlechatenabled(FServer, TUser) of
+            {selected, _, []} ->
+              UserDisabled = <<"0">>;
+            {selected, _, _Result} ->
+              UserDisabled = TUser
+          end
+        end,
+        BlockUser = UserDisabled,
           SUser = case Type of
                     chat -> FUser;
                     groupchat -> ok
@@ -180,15 +189,8 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
               {_, _, FlatTimeStamp} = GetTimestamp,
               TimeStampedPacket = NewPacket
           end,
-          if MetaData =:= <<>> ->
-            Metadata = <<"{}">>;
-          MetaData =:= <<"">> ->
-            Metadata = <<"{}">>;
-        true ->
-            Metadata = MetaData
-        end,
           store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, MetaData,BlockUser, EditMsgid, FlatTimeStamp),
-          fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid),
+
         if BlockUser == <<"0">> ->
           case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
             true ->
@@ -204,8 +206,19 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             end;
         true ->
           ok
-        end;
+        end,
+
+        if MetaData =:= <<>> ->
+            Metadata = <<"{}">>;
+          MetaData =:= <<"">> ->
+            Metadata = <<"{}">>;
+        true ->
+            Metadata = MetaData
+        end,
+
+        fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid);
         S when (S == false) ->
+          BlockUser = <<"0">>,
           ok
       end
   end,
@@ -323,8 +336,9 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
     _ ->
       ok
   end,
+  if BlockUser == <<"0">> ->
   {Packet,_C2SState};
-true ->
+  true ->
     {drop,_C2SState}
 end;
 on_user_send_packet(Acc) ->
@@ -344,7 +358,7 @@ store_in_table(FServer, BarePeer, SUser, MessageId, MsgContent, SType, MessageTy
                 _ ->
                   ok
               end,
-          if BlockUser == <<"0">> ->
+          if (BlockUser == <<"0">>  orelse BlockUser == <<>>) ->
             case catch fly_mod_utils:update_recent_chat(FServer,SUser,BarePeer,MessageId,SUser,MsgContent,SType,MessageType,Topicid, MetaData, <<"1">>,EditMsgid, FlatTimeStamp) of
               {updated,1} ->
                 ok;
@@ -353,16 +367,7 @@ store_in_table(FServer, BarePeer, SUser, MessageId, MsgContent, SType, MessageTy
               _ ->
                 ok
             end;
-            BlockUser == <<>> ->
-              case catch fly_mod_utils:update_recent_chat(FServer,SUser,BarePeer,MessageId,SUser,MsgContent,SType,MessageType,Topicid, MetaData, <<"1">>, EditMsgid, FlatTimeStamp) of
-                {updated,1} ->
-                  ok;
-                {updated,0}->
-                  fly_mod_utils:insert_recent_chat(FServer,SUser,BarePeer,MessageId,SUser,MsgContent,SType,MessageType,Topicid, MetaData, <<"">>,<<"1">>,FlatTimeStamp);
-                _ ->
-                  ok
-              end;
-            true ->
+          true ->
               ok
           end,
   if Topicid =/= <<"">> ->
@@ -386,7 +391,7 @@ if Metadata =:= <<>> ->
             _ ->
               ok
           end,
-      if BlockUser == <<"0">> ->
+      if (BlockUser == <<"0">>  orelse BlockUser == <<>>)->
         case catch fly_mod_utils:update_recent_chat_topic(FServer,SUser,BarePeer,MessageId,SUser,MsgContent,SType,MessageType,Topicid, MetaData, <<"1">>,FlatTimeStamp) of
           {updated,1} ->
             ok;
@@ -395,15 +400,6 @@ if Metadata =:= <<>> ->
           _ ->
             ok
         end;
-        BlockUser == <<>> ->
-          case catch fly_mod_utils:update_recent_chat_topic(FServer,SUser,BarePeer,MessageId,SUser,MsgContent,SType,MessageType,Topicid, MetaData, <<"1">>,FlatTimeStamp) of
-            {updated,1} ->
-              ok;
-            {updated,0}->
-              fly_mod_utils:insert_recent_chat_topic(FServer,SUser,BarePeer,MessageId,SUser,MsgContent,SType,MessageType,Topicid, MetaData, <<"">>,<<"1">>,FlatTimeStamp);
-            _ ->
-              ok
-          end;
         true ->
           ok
       end.

@@ -27,6 +27,8 @@ def read():
         u, s, p, l = pkt.split(':', 5)[1:]
         if u == "wrong":
             write(False)
+        elif p == 'allow':
+            write(True)
         else:
             rurl = str("https://"+l)
             #dt = datetime.now()
