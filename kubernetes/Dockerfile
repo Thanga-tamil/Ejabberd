@@ -11,7 +11,7 @@ COPY .erlang.cookie /root
 RUN chmod -R 600 /home/ejabberd/.erlang.cookie /root/.erlang.cookie
 RUN chown -R ejabberd:ejabberd /home/ejabberd/.erlang.cookie /root/.erlang.cookie
 RUN mkdir /opt/ejabberd
-RUN apt-get update && apt-get install -y dnsutils vim
+
 #COPY MirrorFly.py /opt/ejabberd/
 COPY MirrorFly.py /opt/ejabberd/MirrorFly.py
 
@@ -19,9 +19,8 @@ RUN chmod +x /opt/ejabberd/MirrorFly.py
 
 RUN mkdir -p /opt/ejabberd/certs
 COPY limits.conf /etc/security/limits.conf
-### for kafka ###
-### RUN apt-get update && apt-get install -y libsasl2-dev liblz4-dev libzstd-dev
 ### Move Source code files  and Install ###
+
 COPY . /tmp/ejabberd/
 RUN chmod -R 755 /opt/
 RUN cd /tmp/ejabberd; ./autogen.sh; ./configure --with-rebar=rebar --enable-user=ejabberd --enable-mysql --prefix=/opt/ejabberd
@@ -34,12 +33,8 @@ RUN cd /tmp/ejabberd; make install
 
 ### install tini
 
-# COPY entrypoint.sh /entrypoint.sh
-# RUN chmod +x /entrypoint.sh
-# RUN apt install -y curl 
-# RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
-#     chmod +x kubectl && \
-#     mv kubectl /usr/local/bin/kubectl
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 ### Move configs to etc ###
 
@@ -54,21 +49,12 @@ RUN rm -rf /tmp/es.rpm
 
 ### The application's jar file ###
 
-# ARG JAR_FILE=ejabberdadmin.jar
+ARG JAR_FILE=ejabberdadmin.jar
 
-# ###  Add the application's jar to the container ###
+###  Add the application's jar to the container ###
 
-# ADD ${JAR_FILE} ejabberdadmin.jar
+ADD ${JAR_FILE} ejabberdadmin.jar
 
 ###  Run the jar file ###
 
-# Copy the startup script into the container
-COPY cluster-join-leave.sh /usr/local/bin/cluster-join-leave.sh
-
-# Ensure the script is executable
-RUN chmod +x /usr/local/bin/cluster-join-leave.sh
-
-# Set the script as the entrypoint or part of the command
-ENTRYPOINT ["/usr/local/bin/cluster-join-leave.sh"]
-
-# ENTRYPOINT ["/tini", "--", "/entrypoint.sh"]
+ENTRYPOINT ["/tini", "--", "/entrypoint.sh"]
