@@ -664,24 +664,26 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 				end,
 				if (EditMsgId =:= MessageId) or (EditMsgId =:= <<"">>) ->
 				InsertStatement = <<"insert into message_status (from_user,to_user,status, recent,message_id, edit_message_id, message_type,txt,chat_type,from_notification, message_time,to_notification,message_notification,received_at,seen_at, meta_data) values ">>,
-			   RecentInsert = <<"insert into chat_recent (from_user, to_user,  message_id, message_from, txt, chat_type, message_type,  notification_to, unread, message_time,meta_data) values ">>,
-				ValueStatement = lists:map(fun(Part) ->
+			        RecentInsert = <<"insert into chat_recent (from_user, to_user,  message_id, message_from, txt, chat_type, message_type,  notification_to, unread, message_time,meta_data) values ">>,
+				FromUserStr = binary_to_list(FromUser),
+				MessageIdStr = binary_to_list(MessageId),
+				EditMsgIdStr = binary_to_list(EditMsgId),
+				MessageTypeStr = binary_to_list(MessageType),
+				MessageSendStr = binary_to_list(MesssageSend),
+				MetaDataStr = binary_to_list(MetaData),
+				{ValueStatement,RecentValueStatement} = lists:unzip(lists:map(fun(Part) ->
 					#jid{luser = ToUser} = Part,
-					string:concat("", ", ('" ++ binary_to_list(FromUser) ++ "', '" ++ binary_to_list(ToUser) ++ "', 0,1, '" ++ binary_to_list(MessageId) ++ "', '" ++ binary_to_list(EditMsgId) ++ "','" ++ binary_to_list(MessageType) ++ "', '" ++ binary_to_list(MsgData) ++"', 'normal', '" ++ binary_to_list(MesssageSend) ++ "', '" ++ FlatTimeStampNew ++ "','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00','" ++ binary_to_list(MetaData) ++"')")
-				end, Subscribers),
-
-				RecentValueStatement = lists:map(fun(Part) ->
-					#jid{luser = ToUser} = Part,
-
 					if ToUser =:= SUser ->
 						Unread = <<"0">>;
 					true ->
 						Unread = <<"1">>
 					end,
-					string:concat("", ", ('" ++ binary_to_list(FromUser) ++ "', '" ++ binary_to_list(ToUser) ++ "', '" ++ binary_to_list(MessageId) ++ "', '"  ++ binary_to_list(SUser) ++ "', '"  ++ binary_to_list(MsgData) ++ "', 'normal', '" ++ binary_to_list(MessageType) ++ "', '', '" ++ binary_to_list(Unread) ++ "', '" ++ FlatTimeStampNew ++ "','" ++ binary_to_list(MetaData) ++"')")
-				end, Subscribers),
-
-				DuplicateStatement = "ON DUPLICATE KEY UPDATE to_user = values(to_user), message_id = '" ++ binary_to_list(MessageId) ++"' ;",
+                                        ToUserStr = binary_to_list(ToUser),
+				ValueStatements = string:concat("", ", ('" ++ FromUserStr ++ "', '" ++ ToUserStr ++ "', 0,1, '" ++ MessageIdStr ++ "', '" ++ EditMsgIdStr ++ "','" ++ MessageTypeStr ++ "', '', 'normal', '" ++ MessageSendStr ++ "', '" ++ FlatTimeStampNew ++ "','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00','" ++ MetaDataStr ++"')"),
+				RecentValueStatements = string:concat("", ", ('" ++ FromUserStr ++ "', '" ++ ToUserStr ++ "', '" ++ MessageIdStr ++ "', '"  ++ binary_to_list(SUser) ++ "', '"  ++ binary_to_list(MsgData) ++ "', 'normal', '" ++ MessageTypeStr ++ "', '', '" ++ binary_to_list(Unread) ++ "', '" ++ FlatTimeStampNew ++ "','" ++ MetaDataStr ++"')"),
+				{ValueStatements, RecentValueStatements}
+				end, Subscribers)),
+                                DuplicateStatement = "ON DUPLICATE KEY UPDATE to_user = values(to_user), message_id = '" ++ MessageIdStr ++"' ;",
 				RecentDuplicateStatement = " ON DUPLICATE KEY UPDATE message_id = values(message_id), message_from = values(message_from), txt = values(txt), chat_type = values(chat_type), message_type = values(message_type),  notification_to = values(notification_to), unread = unread + values(unread), status = 0, recall_status = 0, favourite_status = 0, message_time= values(message_time), meta_data= values(meta_data), created_at = NOW();",
 				[_|NewVal] = re:replace(ValueStatement, ",", ""),
 				[_|RecentNewVal] = re:replace(RecentValueStatement, ",", ""),
@@ -691,7 +693,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 				ejabberd_sql:sql_query(LServer, [FinalQuery]),
 				ejabberd_sql:sql_query(LServer, [RecentFinalQuery]);
 				true ->
-				ejabberd_sql:sql_query(LServer, [<<"update  message_status set status = 0, edit_status = 1, received_at = '0000-00-00 00:00:00' ,seen_at = '0000-00-00 00:00:00',  edit_message_id = '">>, EditMsgId, <<"', txt  = '">>, MsgData , <<"' where message_id = '">>, MessageId, <<"' ;">>]),
+				ejabberd_sql:sql_query(LServer, [<<"update  message_status set status = 0, edit_status = 1, received_at = '0000-00-00 00:00:00' ,seen_at = '0000-00-00 00:00:00',  edit_message_id = '">>, EditMsgId, <<"' where message_id = '">>, MessageId, <<"' ;">>]),
 				ejabberd_sql:sql_query(LServer, [<<"update chat_recent set status = 0,  txt  = '">>, MsgData , <<"'where message_id = '">>, MessageId, <<"';">>])
 				end,
 				ejabberd_sql:sql_query( LServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg, meta_data) values ('">>, SUser, <<"', '">>, FromUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'normal', '">>, MsgData, <<"', '">>, MetaData, <<"');">>]);

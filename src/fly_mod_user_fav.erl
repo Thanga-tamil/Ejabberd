@@ -165,7 +165,7 @@ get_favourite_message(#jid{luser = _User, lserver = _Server, lresource = _Resour
       fly_mod_utils:generate_subel(IQ, #user_fav{type = RequestType, result_type = <<"No chats available">>});
     {selected, _, Result} ->
       SubEls1 = lists:map(fun(G) ->
-        [MessageUser, MessageTag, Time,MsgId, Status, NotifyUser, MessageFrom,  ChatTypes, FavouriteDate,FavMsgId,MessageTime,RowId, EditStatus] = G,
+        [MessageUser, MessageTag, Time,MsgId, Status, NotifyUser, MessageFrom,  ChatTypes, FavouriteDate,FavMsgId,MessageTime,RowId, EditStatus, MessageContentTag] = G,
         UserElements = #xmlel{name = <<"user">>, attrs = [],
           children = [{xmlcdata, MessageUser}]},
         StatusElements = #xmlel{name = <<"status">>, attrs = [],
@@ -182,8 +182,13 @@ get_favourite_message(#jid{luser = _User, lserver = _Server, lresource = _Resour
           children = [{xmlcdata, NotifyUser}]},
         MsgToElement = #xmlel{name = <<"messageto">>, attrs = [],
           children = [{xmlcdata, MessageFrom}]},
-        MessageElement = #xmlel{name = <<"message ">>, attrs = [],
-          children = [{xmlcdata, MessageTag}]},
+        if MessageTag =:=  <<"">> ->
+          MessageElement = #xmlel{name = <<"message ">>, attrs = [],
+          children = [{xmlcdata, MessageContentTag}]};
+        true ->
+          MessageElement = #xmlel{name = <<"message ">>, attrs = [],
+          children = [{xmlcdata, MessageTag}]}
+        end,
         FavMsgIdElement = #xmlel{name = <<"favmsgid ">>, attrs = [],
           children = [{xmlcdata, FavMsgId}]},
         MessageTimeElement = #xmlel{name = <<"message_time">>, attrs = [],

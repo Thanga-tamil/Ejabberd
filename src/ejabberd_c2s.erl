@@ -525,7 +525,8 @@ handle_authenticated_packet(Pkt, #{lserver := LServer, jid := JID,
 		false ->
 			case fxml:get_subtag(xmpp:encode(Pkt),<<"gone">>) of
 			false ->
-				spawn(fly_mod_stanza_ack, send_ack_response, [_From, _To, SubmissionID, <<"acknowledge">>]);
+				fly_mod_stanza_ack:send_ack_response(_From, _To, SubmissionID, <<"acknowledge">>);
+				% spawn(fly_mod_stanza_ack, send_ack_response, [_From, _To, SubmissionID, <<"acknowledge">>]);
 			_ ->
 				ok
 			end;
