@@ -160,7 +160,6 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             {selected, _, _ResultSet} ->
               BlockUser = TUser
           end,
-          
           SUser = case Type of
                     chat -> FUser;
                     groupchat -> ok
