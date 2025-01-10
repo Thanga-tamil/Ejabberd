@@ -380,7 +380,9 @@ create_msg(From, To, ReasonMsg, ReplyId,Packet)->
             {selected, _, []} ->
               Body = <<"">>;
             {selected, _, [[Txt]]} ->
-              Body = Txt
+              
+                Body = Txt
+
           end,
           MsgContent = Body;
         Message_type =:= <<"auto_text">> ->
@@ -388,7 +390,9 @@ create_msg(From, To, ReasonMsg, ReplyId,Packet)->
             {selected, _, []} ->
               Body = <<"">>;
             {selected, _, [[Txt]]} ->
-              Body = Txt
+              
+                Body = Txt
+
           end,
           MsgContent = Body;
           Message_type =:= <<"0">> ->

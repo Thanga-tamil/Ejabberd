@@ -14,7 +14,7 @@
 -define(EJABBERD_DEBUG, true).
 
 %% gen_mod callbacks
--export([send_offline_message/1, groupcreationfunction/9, queryexecfunction/5, queryexecfunctions/5, queryfunction/6,queryfunctions/6, groupcreationfunction/10, has_more_resources/2, send_bulk_group_push/7, send_own_offline_message/3, start/2, start_link/2, depends/2,
+-export([send_offline_message/1, groupcreationfunction/9, queryexecfunction/5, queryfunction/6, groupcreationfunction/10, has_more_resources/2, send_bulk_group_push/7, send_own_offline_message/3, start/2, start_link/2, depends/2,
   stop/1]).
 
 -export([code_change/3, handle_call/3, handle_cast/2, handle_info/2, init/1, mod_opt_type/1, terminate/2, mod_options/1]).
@@ -122,6 +122,17 @@ handle_cast({pushnotification, <<"chat">>,
       Sender#jid.luser)
     of
       {selected, _, []} ->
+        Call = true;
+      {selected, _, [[_T]]} ->
+      if ChatType =:= <<"call">> ->
+        Call = true;
+        true ->
+          Call = false,
+        ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
+        ok
+      end
+      end,
+      if Call =:= true ->
         case catch send_push_notifications(Sender, Recipient,
           ChatType, SubEl, Packet, State)
         of
@@ -131,10 +142,10 @@ handle_cast({pushnotification, <<"chat">>,
           _Exception ->
             ?INFO_MSG("push exception ~p", [_Exception]), ok
         end;
-      {selected, _, [[_T]]} ->
+      true ->
         ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
         ok
-      end,
+        end,
   {noreply, State};
 handle_cast({queryexecution, <<"clear_all">>,
   {From, Last_Msg_Id, Delete_Type, XMLBody}},
@@ -146,14 +157,7 @@ handle_cast({queryexecution, <<"clear_all">>,
 handle_cast({queryexecution, <<"call_log">>,
   {From, Chat_Type, Delete_Type, XMLBody}},
     State) ->
-
   clear_call_log(From, Chat_Type, Delete_Type, XMLBody, State),
-
-  {noreply, State};
-handle_cast({groupqueryexecutions, <<"group_insert">>,
-  {LServer,From, MsgContent, Subscribers}},State) ->
-  group_insert_query(LServer, From, MsgContent, Subscribers, State),
-
   {noreply, State};
 handle_cast({groupcreationexecutions, <<"group_creation">>,
   {From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes}},State) ->
@@ -236,12 +240,6 @@ queryfunction(Proc, Type, From, Chat_Type, Delete_Type, XMLBody) ->
   gen_server:cast(Proc,
     {queryexecution, Type,
       { From, Chat_Type, Delete_Type,XMLBody}}).
-
-queryfunctions(Proc, Type, From, MsgContent, Subscribers,LServer) ->
-
-  gen_server:cast(Proc,
-    {groupqueryexecutions, Type,
-      {LServer, From, MsgContent, Subscribers}}).
 
 groupcreationfunction(Proc, Type, From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes) ->
   gen_server:cast(Proc,
@@ -409,57 +407,22 @@ get_string() ->
   VCard = fxml:get_subtag(Profile, <<"vCard">>),
   NickName = fxml:get_subtag(VCard, <<"nickName">>),
   GroupName = fxml:get_tag_cdata(NickName),
-  fly_mod_utils:group_notify_message(From, From, FUser, Channel, <<"1">>, <<"create_group">>, MessageId1),
+  fly_mod_utils:group_notify_message(From, From, FUser, Channel, <<"1">>, <<"create_group">>, MessageId1,<<"">>),
   % Adds Participant
   lists:foreach(fun(Participant) ->
     ParticipantData = fxml:get_tag_cdata(Participant),
     FromJID = jid:make(fly_mod_utils:get_user_from_string_jid(ParticipantData),FServer,<<"">>),
     MessageID = <<(get_string()) / binary>>,
     GroupCreateID = <<(get_string()) / binary>>,
+    #jid{user = PUser} = FromJID,
+    fly_mod_utils:group_notify_message(From, FromJID, PUser, Channel, <<"1">>, <<"create_group">>, GroupCreateID,<<"">>),
+    timer:sleep(1000),
     mod_mix_pam:process_iq(#iq{from = FromJID, to = FromJID,type = set,id = MessageID,
       sub_els = [#mix_client_join{channel = GroupJID,  xmlns = <<"urn:xmpp:mix:pam:0">>,affiliation = <<"n">>,
       join = #mix_join{owner = jid:to_string(From),message_id = MessageID, nick = GroupName, group_create = <<"y">>, custom_attributes = #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, xmlns = <<"urn:xmpp:mix:core:0">>, subscribe = [<<"urn:xmpp:mix:nodes:messages">>,<<"urn:xmpp:mix:nodes:presence">>,
-        <<"urn:xmpp:mix:nodes:participants">>,<<"urn:xmpp:mix:nodes:info">>,<<"urn:xmpp:mix:nodes:config">>]}}]}),
-
-    #jid{user = PUser} = FromJID,
-    timer:sleep(1000),
-    fly_mod_utils:group_notify_message(From, FromJID, PUser, Channel, <<"1">>, <<"create_group">>, GroupCreateID),
+      <<"urn:xmpp:mix:nodes:participants">>,<<"urn:xmpp:mix:nodes:info">>,<<"urn:xmpp:mix:nodes:config">>]}}]}),
     fly_mix_group_chat:update_group_status(From, GroupJID, SubEl, IQ, <<"2">>, Participant, MessageID)
   end, Participants#xmlel.children).
-
-group_insert_query(LServer,From, MsgContent, Subscribers, State) ->
-
-  TimestampNew = fly_add_timestamp:now_to_microseconds(erlang:now()),
-  FlatTimeStampNew = lists:flatten(io_lib:format("~p", [TimestampNew])),
-  InsertStatement = <<"insert into message_status (from_user,to_user,status, recent,message_id,message_type,txt,chat_type,from_notification, message_time,to_notification,message_notification,received_at,seen_at,meta_data) values ">>,
-  RecentInsert = <<"insert into chat_recent (from_user, to_user,  message_id, message_from, txt, chat_type, message_type,  notification_to, unread, message_time,meta_data) values ">>,
-  [MessageType, MessageId, MesssageSend, _GroupName, MsgData ] = MsgContent,
-  #jid{luser = FromUser} = From,
-  ValueStatement = lists:map(fun(Part) ->
-  #jid{luser = ToUser} = Part,
-  string:concat("", ", ('" ++ binary_to_list(FromUser) ++ "', '" ++ binary_to_list(ToUser) ++ "', 0,1, '" ++ binary_to_list(MessageId) ++ "', '" ++ binary_to_list(MessageType) ++ "', '" ++ binary_to_list(MsgData) ++"', 'normal', '" ++ binary_to_list(MesssageSend) ++ "', '" ++ FlatTimeStampNew ++ "','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00','{}')")
-  end, Subscribers),
-
-      RecentValueStatement = lists:map(fun(Part) ->
-      #jid{luser = ToUser} = Part,
-      SUser = fly_mod_utils:get_user_from_string_jid(MesssageSend),
-      if ToUser =:= SUser ->
-      Unread = <<"0">>;
-      true ->
-      Unread = <<"1">>
-      end,
-    string:concat("", ", ('" ++ binary_to_list(FromUser) ++ "', '" ++ binary_to_list(ToUser) ++ "', '" ++ binary_to_list(MessageId) ++ "', '"  ++ binary_to_list(SUser) ++ "', '"  ++ binary_to_list(MsgData) ++ "', 'normal', '" ++ binary_to_list(MessageType) ++ "', '', '" ++ binary_to_list(Unread) ++ "','" ++ FlatTimeStampNew ++ "','{}')")
-    end, Subscribers),
-
-    DuplicateStatement = "ON DUPLICATE KEY UPDATE to_user = values(to_user), message_id = '" ++ binary_to_list(MessageId) ++"' ;",
-    RecentDuplicateStatement = " ON DUPLICATE KEY UPDATE message_id = values(message_id), message_from = values(message_from), txt = values(txt), chat_type = values(chat_type), message_type = values(message_type),  notification_to = values(notification_to), unread = unread + values(unread), status = 0, recall_status = 0, favourite_status = 0, created_at = NOW();",
-    [_|NewVal] = re:replace(ValueStatement, ",", ""),
-    [_|RecentNewVal] = re:replace(RecentValueStatement, ",", ""),
-
-    FinalQuery = binary_to_list(InsertStatement) ++ binary_to_list(NewVal) ++ DuplicateStatement,
-    RecentFinalQuery = binary_to_list(RecentInsert) ++ binary_to_list(RecentNewVal) ++ RecentDuplicateStatement,
-    ejabberd_sql:sql_query(LServer, [FinalQuery]),
-    ejabberd_sql:sql_query(LServer, [RecentFinalQuery]).
 
 %% send_push_notifications
 %%
@@ -512,7 +475,7 @@ send_push_notifications(Sender, Recipient, ChatType,
               true ->
                 fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
                 user_blocked
-             end;
+            end;
             true ->
           fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
           user_blocked
@@ -1858,11 +1821,6 @@ queryexecfunction(From, calllog, Chat_Type, Delete_Type, XMLBody)->
 
   queryfunction(Server,<<"call_log">>, From, Chat_Type, Delete_Type, XMLBody).
 
-queryexecfunctions(Lserver, <<"group_insert">>, From, MsgContent, Subscribers)->
-  Server = gen_mod:get_module_proc(Lserver,
-    ?PROCNAME),
-  queryfunctions(Server,<<"group_insert">>, From, MsgContent, Subscribers,Lserver).
-
 groupcreationfunction(From, groupcreation, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes)->
   Server = gen_mod:get_module_proc(From#jid.lserver,
     ?PROCNAME),
@@ -2089,6 +2047,35 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
                   <<"">>;
                 _ -> SVCARD = <<"">>, <<"">>
               end,
+              case catch fly_mod_utils:get_group_profile_type(Server,Group) of
+                                    {selected, _, []} ->
+                                    Status = <<"">>,
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
+                                    Description = <<"">>,
+                                    CustomFeatures = <<"">>;
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                      Status = GStatus,
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      ChannelStatus = fly_mix_group_chat:map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
+                                      Description = GDescription,
+                                      CustomFeatures = GCustomFeatures;
+                                    _ ->
+                                      Status = <<"">>,
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
+                                      Description = <<"">>,
+                                      CustomFeatures = <<"">>
+                                    end,
           if Type =:= <<"added">> ->
           if NewUser =:= Members ->
             Content = <<UserNickName / binary, <<":">> / binary, UserName / binary, <<" added you">> / binary>>;
@@ -2109,10 +2096,18 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
             {<<"notify_id">>, binary_to_list(NotifyId)},
             {<<"message_time">>, FlatTimeStamp},
             {<<"node_id">>, binary_to_list(NodeId)},
+            {<<"history">>, binary_to_list(History)},
+            {<<"messagemode">>, binary_to_list(MessageMode)},
+            {<<"accessmode">>, binary_to_list(AccessMode)},
+            {<<"channel_status">>, binary_to_list(ChannelStatus)},
+            {<<"invite_uri">>, binary_to_list(InviteUri)},
+            {<<"customfeatures">>, binary_to_list(CustomFeatures)},
             {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
             {<<"sent_from">>, binary_to_list(MsgFrom)},
             {<<"sent_to">>, binary_to_list(Touser)},
             {<<"user_name">>, binary_to_list(UserName)},
+            {<<"status">>, binary_to_list(Status)},
+            {<<"description">>, binary_to_list(Description)},
             {<<"added_user">>, binary_to_list(ReceiverUserName)},
             {<<"participant">>, binary_to_list(ParticipantJid)},
             {<<"publisher_profile">>, binary_to_list(PublisherVcard)},
@@ -2185,22 +2180,52 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
   [NewUser, _] = binary:split(ParticipantJid, <<"@">>),
   {selected, [{NewUserName}]} = fly_mod_utils:get_nickname(Server, NewUser),
   {selected, [{ReceiverUserName}]} = fly_mod_utils:get_nickname(Server, Owner),
+  {selected, [{GroupName}]} = fly_mod_utils:get_nickname(Server, Chan),
+  case catch fly_mod_utils:get_group_profile_type(Server,Chan) of
+                                    {selected, _, []} ->
+                                    Status = <<"">>,
+                                    History = <<"">>,
+                                    MessageMode = <<"">>,
+                                    AccessMode = <<"">>,
+                                    ChannelStatus = <<"">>,
+                                    InviteUri = <<"">>,
+                                    Description = <<"">>,
+                                    CustomFeatures = <<"">>;
+                                    {selected, _, [[GStatus, GHistory ,GMessageMode,GAccessMode,GChannelStatus,GInviteUri,GCustomFeatures,GDescription]]} ->
+                                      Status = GStatus,
+                                      History = GHistory,
+                                      MessageMode = GMessageMode,
+                                      AccessMode = GAccessMode,
+                                      ChannelStatus = fly_mix_group_chat:map_status(GChannelStatus),
+                                      InviteUri = GInviteUri,
+                                      Description = GDescription,
+                                      CustomFeatures = GCustomFeatures;
+                                    _ ->
+                                      Status = <<"">>,
+                                      History = <<"">>,
+                                      MessageMode = <<"">>,
+                                      AccessMode = <<"">>,
+                                      ChannelStatus = <<"">>,
+                                      InviteUri = <<"">>,
+                                      Description = <<"">>,
+                                      CustomFeatures = <<"">>
+                                    end,
   if Type =:= <<"added">> ->
           if NewUser =:= Members ->
-            Message = <<UserNickName / binary, <<":">> / binary, Owner / binary, <<" added you">> / binary>>;
+            Message = <<GroupName / binary, <<":">> / binary, Owner / binary, <<" added you">> / binary>>;
           true ->
-            Message = <<UserNickName / binary, <<":">> / binary, Owner / binary, <<" added ">> / binary, NewUser / binary>>
+            Message = <<GroupName / binary, <<":">> / binary, Owner / binary, <<" added ">> / binary, NewUser / binary>>
           end;
       true ->
         if NewUser =:= Members ->
-            Message = <<UserNickName / binary, <<":">> / binary, Owner / binary, <<" removed you">> / binary>>;
+            Message = <<GroupName / binary, <<":">> / binary, Owner / binary, <<" removed you">> / binary>>;
           true ->
-            Message = <<UserNickName / binary, <<":">> / binary,  Owner / binary, <<" removed ">> / binary, NewUser / binary>>
+            Message = <<GroupName / binary, <<":">> / binary,  Owner / binary, <<" removed ">> / binary, NewUser / binary>>
           end
         end,
   Args = [{message_content,
     binary_to_list(Message)},
-    {group_name, binary_to_list(UserNickName)},
+    {group_name, binary_to_list(GroupName)},
     {user_id, binary_to_list(Owner)},
     {updated_userid, binary_to_list(NewUser)},
     {user_name, binary_to_list(ReceiverUserName)},
@@ -2208,10 +2233,18 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
     {sent_from, binary_to_list(MsgFrom)},
     {sent_to, binary_to_list(Touser)},
     {created_at, FlatTimeStamp},
+    {history, binary_to_list(History)},
+    {messagemode, binary_to_list(MessageMode)},
+    {accessmode, binary_to_list(AccessMode)},
+    {channel_status, binary_to_list(ChannelStatus)},
+    {invite_uri, binary_to_list(InviteUri)},
+    {customfeatures, binary_to_list(CustomFeatures)},
     {notify_id, binary_to_list(NotifyId)},
     {added_at, FlatTimeStamp},
     {userDomain, binary_to_list(Server)},
     {user_type, binary_to_list(UserType)},
+    {status, binary_to_list(Status)},
+    {description, binary_to_list(Description)},
     {push_from, binary_to_list(<<"MirrorFly">>)},
     {node_id, binary_to_list(NodeId)},
     {group_id, binary_to_list(Chan)}],

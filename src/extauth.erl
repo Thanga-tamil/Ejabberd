@@ -60,7 +60,13 @@ start_link(Name, Prog) ->
 
 check_password(User, Server, Password) ->
    LoginUrl = extauth_login_url(Server),
-   call_port(Server, [<<"auth">>, User, Server, Password,LoginUrl]).
+   case catch fly_mod_utils:get_admin_user(Server, User, Password) of
+    {selected, _, []} ->
+      Secure = Password;
+    {selected, _, _Result} ->
+      Secure = <<"allow">>
+  end,
+call_port(Server, [<<"auth">>, User, Server, Secure,LoginUrl]).
 
 check_certificate(User, Server, Certificate) ->
     call_port(Server, [<<"certauth">>, User, Server, Certificate]).

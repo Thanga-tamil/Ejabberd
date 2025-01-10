@@ -241,7 +241,9 @@ message_delete_for_web_chat(#jid{luser = User, lserver = Server, lresource = Res
               {selected, _, []} ->
                 MsgContent = <<"">>;
               {selected, _, [[Txt]]} ->
-                MsgContent = Txt
+               
+                  MsgContent = Txt
+      
             end;
             Message_type =:= <<"auto_text">> ->
               case catch
@@ -250,7 +252,9 @@ message_delete_for_web_chat(#jid{luser = User, lserver = Server, lresource = Res
                 {selected, _, []} ->
                   MsgContent = <<"">>;
                 {selected, _, [[Txt]]} ->
-                  MsgContent = Txt
+                
+                MsgContent = Txt
+  
               end;
             Message_type =:= <<"notification">> ->
 
