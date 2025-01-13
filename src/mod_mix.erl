@@ -1051,8 +1051,9 @@ notify_participant_left(Mod, LServer, To, ID, FromJid, BFromJid, AdminUser, MsgI
 	     fun(_) -> Msg end).
 
 get_string() ->
-  R = crypto:rand_uniform(0, 16#10000000000000000),
-  Alphanumeric = list_to_binary(integer_to_list(R, 36)).
+  R = crypto:rand_uniform(0, 16#100000000000000000000000000000000),
+  AlphanumericList = string:to_lower(integer_to_list(R, 36)),
+  Alphanumeric = list_to_binary(AlphanumericList).
 
 -spec make_id(jid(), binary()) -> binary().
 make_id(JID, Key) ->
