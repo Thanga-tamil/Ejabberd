@@ -2429,8 +2429,9 @@ set_user_validate(From, SubEl, IQ) ->
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"License Key updated successfully">>}).
 
 get_string() ->
-  R = crypto:rand_uniform(0, 16#10000000000000000),
-  Alphanumeric = list_to_binary(integer_to_list(R, 36)).
+  R = crypto:rand_uniform(0, 16#100000000000000000000000000000000),
+  AlphanumericList = string:to_lower(integer_to_list(R, 36)),
+  Alphanumeric = list_to_binary(AlphanumericList).
 
 % -spec format_reason(state(), term()) -> binary().
 format_reason(#{stop_reason := Reason}, _) ->
