@@ -1052,7 +1052,7 @@ notify_participant_left(Mod, LServer, To, ID, FromJid, BFromJid, AdminUser, MsgI
 
 get_string() ->
   R = crypto:rand_uniform(0, 16#10000000000000000),
-  Alphanumeric = integer_to_list(R, 36).
+  Alphanumeric = list_to_binary(integer_to_list(R, 36)).
 
 -spec make_id(jid(), binary()) -> binary().
 make_id(JID, Key) ->
