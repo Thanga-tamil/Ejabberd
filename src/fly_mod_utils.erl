@@ -1683,19 +1683,19 @@ get_message_status(#jid{lserver = FServer}, Msgid) ->
 
 get_groupmessage_status(#jid{luser = FUser, lserver = FServer}, Msgid) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT status as status FROM message_status WHERE to_user !='">>,FUser,<<"' and  message_id ='">>,Msgid,<<"'  order by status asc limit 1;">>]).
+    [<<"SELECT status  FROM message_status WHERE to_user != '">>,FUser,<<"' and  message_id = '">>,Msgid,<<"'  order by status asc limit 1;">>]).
 
 get_message_time(FServer , Msgid) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT message_time FROM message_status WHERE  message_id ='">>,Msgid,<<"'  order by id asc limit 1;">>]).
+    [<<"SELECT message_time FROM message_status WHERE  message_id = '">>,Msgid,<<"'  order by id asc limit 1;">>]).
 
 message_status(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT status as status FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id ='">>,Msgid,<<"' order by status asc limit 1;">>]).
+    [<<"SELECT status  FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id = '">>,Msgid,<<"' order by status asc limit 1;">>]).
 
 message_status_new(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT status, id FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id ='">>,Msgid,<<"' order by status asc limit 1;">>]).
+    [<<"SELECT status, id FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id = '">>,Msgid,<<"' order by status asc limit 1;">>]).
 
 check_group_exists(FServer, GroupId) ->
   ejabberd_sql:sql_query(FServer,
