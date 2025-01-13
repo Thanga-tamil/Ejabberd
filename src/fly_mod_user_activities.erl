@@ -2430,7 +2430,7 @@ set_user_validate(From, SubEl, IQ) ->
 
 get_string() ->
   R = crypto:rand_uniform(0, 16#10000000000000000),
-  Alphanumeric = integer_to_list(R, 36).
+  Alphanumeric = list_to_binary(integer_to_list(R, 36)).
 
 % -spec format_reason(state(), term()) -> binary().
 format_reason(#{stop_reason := Reason}, _) ->

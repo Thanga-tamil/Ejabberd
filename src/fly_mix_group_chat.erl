@@ -1900,7 +1900,7 @@ length(Resources) =:= 3 ->
 
 get_string() ->
   R = crypto:rand_uniform(0, 16#10000000000000000),
-  Alphanumeric = integer_to_list(R, 36).
+  Alphanumeric = list_to_binary(integer_to_list(R, 36)).
 % mod_opt_type(iqdisc) -> fun gen_iq_handler:check_type/1;
 % mod_opt_type(db_type) -> fun(T) -> ejabberd_config:v_db(?MODULE, T) end;
 % mod_opt_type(_) -> [db_type, iqdisc].
