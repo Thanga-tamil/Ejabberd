@@ -434,7 +434,7 @@ push_vcard_updates(#iq{from = #jid{luser = LUser, lserver = LServer}} = IQ) ->
 
   Packet = #xmlel{
     name = <<"iq">>,
-    attrs = [{<<"type">>, <<"result">>},{<<"id">>, p1_rand:get_string()}],
+    attrs = [{<<"type">>, <<"result">>},{<<"id">>,<<(get_string()) / binary>>}],
     children = [VCARD]
   },
 
@@ -549,7 +549,7 @@ process_get_recent_profile(From, RequestType, SubEl, IQ) ->
 user_logout(From, RequestType, SubEl, IQ) ->
   #jid{luser = LUser, lserver = LServer, lresource = LResource} = From,
   SocketId = fxml:get_path_s(SubEl, [{attr, <<"socket_id">>}]),
-  MessageId = p1_rand:get_string(),
+  MessageId = <<(get_string()) / binary>>,
   To = jid:make({LUser, LServer, <<>>}),
   XmlBody = #xmlel{name = <<"message">>,
     attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, jid:to_string(To)}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
@@ -579,7 +579,7 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
   ToUserJid = fxml:get_path_s(SubEl, [{attr, <<"to_user">>}]),
   ToJid = jid:from_string(ToUserJid),
   #jid{luser = TUser, lserver = TServer} = ToJid,
-  MessageId = p1_rand:get_string(),
+  MessageId = <<(get_string()) / binary>>,
 
   lists:foreach(fun(R) ->
     XmlBody = #xmlel{name = <<"message">>,
@@ -679,7 +679,7 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   MessageTo = fxml:get_path_s(SubEl, [{attr, <<"send_from">>}]),
   MessageId = fxml:get_path_s(SubEl, [{attr, <<"message_id">>}]),
   GroupId = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
-  Messageid = p1_rand:get_string(),
+  Messageid = <<(get_string()) / binary>>,
   FromJid = jid:from_string(MessageFrom),
   ToJid = jid:from_string(MessageTo),
   #jid{user = FUser, lserver = FServer} = FromJid,
@@ -752,7 +752,7 @@ PollId = fxml:get_path_s(SubEl, [{attr, <<"poll_id">>}]),
 ChatType = fxml:get_path_s(SubEl, [{attr, <<"type">>}]),
 SendTo = fxml:get_path_s(SubEl, [{attr, <<"to_user">>}]),
 VoteId = fxml:get_path_s(SubEl, [{attr, <<"vote_id">>}]),
-MessageId = p1_rand:get_string(),
+MessageId = <<(get_string()) / binary>>,
 CustAtr = fxml:get_subtag_with_xmlns(xmpp:encode(SubEl), <<"custom_attributes">>, <<"ocp:json">>),
 ReceivedTimestamp = now_to_microseconds(erlang:now()),
 ReceivedFlatTimeStamp = lists:flatten(io_lib:format("~p", [ReceivedTimestamp])),
@@ -783,7 +783,7 @@ if ChatType == <<"chat">> ->
 ChatType == <<"groupchat">> ->
   ToUser = binary_to_list(fxml:get_path_s(SubEl, [{attr, <<"to_user">>}])),
   [GUser | _S] = string:tokens(ToUser, "@"),
-  MsgId = p1_rand:get_string(),
+  MsgId = <<(get_string()) / binary>>,
   case catch fly_mod_utils:get_group_users(FServer, GUser) of
   {selected, _, []} ->
   ok;
@@ -931,7 +931,7 @@ carboncall_message(From, RequestType, SubEl,IQ) ->
   Call_Status = fxml:get_path_s(SubEl, [{attr, <<"call_status">>}]),
   #jid{luser = LUser, lserver = LServer, lresource = LResource} = From,
   WebResource = string:str(binary_to_list(LResource), binary_to_list(<<"Web">>)),
-  MessageId = p1_rand:get_string(),
+  MessageId = <<(get_string()) / binary>>,
   length(lists:foldl(fun(SResource,_Acc) ->
     MobileResource = string:str(binary_to_list(SResource), binary_to_list(<<"Mobile">>)),
     if WebResource =:= 1 ->
@@ -1075,7 +1075,7 @@ register_update_to_rosters(From, RequestType, SubEl, IQ) ->
   ToJid = jid:from_string(ToUserJid),
 
   XmlBody = #xmlel{name = <<"message">>,
-    attrs = [{<<"from">>, jid:to_string(From)},{<<"type">>, <<"chat">>}, {<<"id">>, p1_rand:get_string()}],
+    attrs = [{<<"from">>, jid:to_string(From)},{<<"type">>, <<"chat">>}, {<<"id">>, <<(get_string()) / binary>>}],
     children = [#xmlel{name = <<"register_update">>,
       attrs = [{<<"xmlns">>, <<"urn:xmpp:register_update">>}, {<<"status">>, RequestType}],
       children = []}]},
@@ -1133,7 +1133,7 @@ call_message(_From, RequestType, SubEl, IQ) ->
   Call_Type = fxml:get_path_s(SubEl, [{attr, <<"call_type">>}]),
   Caller_Device = fxml:get_path_s(SubEl, [{attr, <<"caller_device">>}]),
   Call_Id = fxml:get_path_s(SubEl, [{attr, <<"call_id">>}]),
-  MessageId = p1_rand:get_string(),
+  MessageId = <<(get_string()) / binary>>,
   FromJid = jid:from_string(MessageFrom),
   ToJid = jid:from_string(MessageTo),
   #jid{user = TUser, server = TServer} = ToJid,
@@ -1395,7 +1395,7 @@ get_block_list(From, RequestType, _SubEl, IQ) ->
 
 send_block_list(From, To, RequestType) ->
   #jid{luser = User, lserver = LServer} = From,
-  MessageId = p1_rand:get_string(),
+  MessageId = <<(get_string()) / binary>>,
   if RequestType =:= <<"unblock">> ->
     fly_mod_utils:delete_spool(LServer, User);
     true ->
@@ -1432,7 +1432,7 @@ clear_message(#jid{luser = User, lserver = Server, lresource = _Resource} = From
     Timestamp = now_to_microseconds(erlang:now()),
     FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
     Remove_User = fxml:get_path_s(SubEl, [{attr, <<"remove_user">>}]),
-    MessageId = p1_rand:get_string(),
+    MessageId = <<(get_string()) / binary>>,
     To = jid:make({User, Server, <<>>}),
     if Last_Msg_Id =:= <<"">> andalso Log_Ids =:= <<"">> ->
     XmlBody = #xmlel{name = <<"message">>,
@@ -1495,7 +1495,7 @@ clear_all(#jid{luser = User, lserver = Server, lresource = _Resource} = From, Re
   Delete_Type = fxml:get_path_s(SubEl, [{attr, <<"delete_type">>}]),
   Last_Msg_Id = fxml:get_path_s(SubEl, [{attr, <<"last_msg_id">>}]),
   Log_Ids = fxml:get_path_s(SubEl, [{attr, <<"calllog_ids">>}]),
-  MessageId = p1_rand:get_string(),
+  MessageId = <<(get_string()) / binary>>,
   Timestamp = now_to_microseconds(erlang:now()),
   FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
   To = jid:make(User, Server),
@@ -1542,7 +1542,7 @@ delete_message(FromUser, RequestType, SubEl, IQ) ->
   #jid{luser = FUser, lserver = FServer, lresource = _Resource} = FromUser,
   Chat_Type = fxml:get_path_s(SubEl, [{attr, <<"type">>}]),
   UserType = fxml:get_path_s(SubEl, [{attr, <<"chat_type">>}]),
-  MessageId = p1_rand:get_string(),
+  MessageId = <<(get_string()) / binary>>,
   Timestamp = now_to_microseconds(erlang:now()),
   MessageIds = fxml:get_path_s(SubEl, [{attr, <<"message_ids">>}]),
   FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
@@ -1663,7 +1663,7 @@ delete_message(FromUser, RequestType, SubEl, IQ) ->
   end;
   true ->
     fly_mod_stanza_ack:send_ack_response(From, To, MsgId,  <<"recall">>),
-    MessageId = p1_rand:get_string(),
+    MessageId = <<(get_string()) / binary>>,
     Timestamp = now_to_microseconds(erlang:now()),
     FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
     XmlBody = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, jid:to_string(To)}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
@@ -2427,6 +2427,10 @@ set_user_validate(From, SubEl, IQ) ->
     fly_mod_utils:update_license_lookup(FServer)
   end,
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"License Key updated successfully">>}).
+
+get_string() ->
+  R = crypto:rand_uniform(0, 16#10000000000000000),
+  Alphanumeric = integer_to_list(R, 36).
 
 % -spec format_reason(state(), term()) -> binary().
 format_reason(#{stop_reason := Reason}, _) ->
