@@ -156,19 +156,10 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           end,
           case catch fly_mod_utils:check_blockeduser(FServer, FUser, TUser) of
             {selected, _, []} ->
-              UserBlocked = <<"0">>;
+              BlockUser = <<"0">>;
             {selected, _, _ResultSet} ->
-              UserBlocked = TUser
+              BlockUser = TUser
           end,
-          if UserBlocked =:= <<"0">> ->
-          case catch fly_mod_utils:check_singlechatenabled(FServer, TUser) of
-            {selected, _, []} ->
-              UserDisabled = <<"0">>;
-            {selected, _, _Result} ->
-              UserDisabled = TUser
-          end
-        end,
-        BlockUser = UserDisabled,
           SUser = case Type of
                     chat -> FUser;
                     groupchat -> ok
