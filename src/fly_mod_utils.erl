@@ -1638,7 +1638,7 @@ get_group_chat_messages(#jid{luser = FUser, lserver = FServer}, TUser,  Position
     true->
       if Position =:= <<"up">> ->
         ejabberd_sql:sql_query(FServer,
-          [<<"SELECT message_status.id, message_status.from_user, coalesce(msg,txt), message_status.created_at as time, message_id,edit_message_id,  status, from_notification, message_type, recall_status, favourite_status, favourite_by, to_notification, message_notification, message_time,edit_status,  IFNULL(json_unquote(message_status.meta_data),'') as meta FROM message_status  left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> '' WHERE  message_status.id < ">>, RowId, <<"  and message_status.from_user = '">>, TUser, <<"' and message_status.to_user='">>, FUser, <<"'  AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' ORDER BY id DESC  LIMIT 0, ">>,Limit,<<";">>]);
+          [<<"SELECT message_status.id, message_status.from_user, coalesce(msg,txt), message_status.created_at as time, message_status.message_id, message_status.edit_message_id,  status, from_notification, message_type, recall_status, favourite_status, favourite_by, to_notification, message_notification, message_time,edit_status,  IFNULL(json_unquote(message_status.meta_data),'') as meta FROM message_status  left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> '' WHERE  message_status.id < ">>, RowId, <<"  and message_status.from_user = '">>, TUser, <<"' and message_status.to_user='">>, FUser, <<"'  AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' ORDER BY id DESC  LIMIT 0, ">>,Limit,<<";">>]);
         Position =:= <<"down">> ->
           ejabberd_sql:sql_query(FServer,
             [<<"SELECT message_status.id, message_status.from_user, coalesce(msg,txt), message_status.created_at as time, message_status.message_id, message_status.edit_message_id, status, from_notification, message_type, recall_status, favourite_status, favourite_by, to_notification, message_notification, message_time, edit_status, IFNULL(json_unquote(message_status.meta_data),'') as meta FROM message_status  left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> '' WHERE message_status.id >= ">>, RowId, <<" and message_status.from_user = '">>, TUser, <<"' and message_status.to_user='">>, FUser, <<"'  AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' ORDER BY id ASC LIMIT 0,">>,Limit,<<";">>]);
@@ -1683,19 +1683,19 @@ get_message_status(#jid{lserver = FServer}, Msgid) ->
 
 get_groupmessage_status(#jid{luser = FUser, lserver = FServer}, Msgid) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT status as status FROM message_status WHERE to_user !='">>,FUser,<<"' and  message_id ='">>,Msgid,<<"'  order by status asc limit 1;">>]).
+    [<<"SELECT status  FROM message_status WHERE to_user != '">>,FUser,<<"' and  message_id = '">>,Msgid,<<"'  order by status asc limit 1;">>]).
 
 get_message_time(FServer , Msgid) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT message_time FROM message_status WHERE  message_id ='">>,Msgid,<<"'  order by id asc limit 1;">>]).
+    [<<"SELECT message_time FROM message_status WHERE  message_id = '">>,Msgid,<<"'  order by id asc limit 1;">>]).
 
 message_status(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT status as status FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id ='">>,Msgid,<<"' order by status asc limit 1;">>]).
+    [<<"SELECT status  FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id = '">>,Msgid,<<"' order by status asc limit 1;">>]).
 
 message_status_new(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT status, id FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id ='">>,Msgid,<<"' order by status asc limit 1;">>]).
+    [<<"SELECT status, id FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id = '">>,Msgid,<<"' order by status asc limit 1;">>]).
 
 check_group_exists(FServer, GroupId) ->
   ejabberd_sql:sql_query(FServer,
