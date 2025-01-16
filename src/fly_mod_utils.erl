@@ -937,12 +937,18 @@ delete_group_user(LServer,GroupId,User) ->
   ejabberd_sql:sql_query(
               LServer,
               [<<"delete  from mix_pam  where  channel ='">>,GroupId,<<"' and username='">>,User,<<"';">>]),
+
+ejabberd_sql:sql_query(LServer,
+    [<<"Delete from spool WHERE  to_user = '">>,GroupId, <<"' and username = '">>,User, <<"' ;">>]),
+
 ejabberd_sql:sql_query(LServer,
     [<<"Delete from chat_recent WHERE  from_user = '">>,GroupId, <<"' and to_user = '">>,User, <<"' ;">>]).
 
 delete_group(LServer,GroupId) ->
   ejabberd_sql:sql_query(
             LServer,[<<"delete  from mix_pam  where channel ='">>,GroupId,<<"' and is_delete= '0';">>]),
+  ejabberd_sql:sql_query(
+            LServer,[<<"delete  from spool  where to_user ='">>,GroupId,<<"';">>]),
   ejabberd_sql:sql_query(
             LServer,[<<"Delete from chat_recent WHERE  from_user = '">>,GroupId, <<"';">>]).
 
