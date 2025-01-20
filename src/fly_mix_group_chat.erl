@@ -1804,7 +1804,7 @@ Status == <<"remove_admin">> ->
       fly_mod_utils:update_recall(ActionUser, Data);
     Status == <<"composing">> ->
       Packet = #xmlel{name = <<"message">>, attrs = [{<<"type">>, <<"headline">>}],
-        children = [#xmlel{name = <<"composing">>, attrs = [{<<"type">>, <<"normal">>}, {<<"group_id">>, Data},{<<"xmlns">>, "https://jabber.org/protocol/chatstates"}]},
+        children = [#xmlel{name = <<"composing">>, attrs = [{<<"type">>, <<"normal">>}, {<<"group_id">>, Data},{<<"xmlns">>, "http://jabber.org/protocol/chatstates"}]},
           #xmlel{name = <<"no-store">>, attrs = [{<<"xmlns">>, "urn:xmpp:hints"}]},#xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}]},
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
@@ -1815,7 +1815,7 @@ Status == <<"remove_admin">> ->
         end end, Members);
     Status == <<"gone">> ->
       Packet = #xmlel{name = <<"message">>, attrs = [{<<"type">>, <<"headline">>}],
-        children = [#xmlel{name = <<"gone">>, attrs = [{<<"type">>, <<"normal">>}, {<<"group_id">>, Data},{<<"xmlns">>, "https://jabber.org/protocol/chatstates"}]},
+        children = [#xmlel{name = <<"gone">>, attrs = [{<<"type">>, <<"normal">>}, {<<"group_id">>, Data},{<<"xmlns">>, "http://jabber.org/protocol/chatstates"}]},
           #xmlel{name = <<"no-store">>, attrs = [{<<"xmlns">>, "urn:xmpp:hints"}]}, #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}]},
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
