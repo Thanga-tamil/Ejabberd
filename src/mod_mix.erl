@@ -362,7 +362,7 @@ process_mix_create(#iq{to = To, from = From,
     Mod = gen_mod:db_mod(ServerHost, ?MODULE),
     Creator = jid:remove_resource(From),
     Chan1 = case Chan of
-		<<>> -> p1_rand:get_string();
+		<<>> -> <<(get_string()) / binary>>;
 		_ -> Chan
 	    end,
     Ret = case Mod:get_channel(ServerHost, Chan1, Host) of
@@ -963,15 +963,14 @@ notify_participant_joined(Mod, LServer, To, From, ID, [Nick, GroupCreate, Publis
 			      _ ->
 			      #xmlel{name = <<"vCard">>}
 			      end,
-                      ItemId = p1_rand:get_string(),
+                      ItemId = <<(get_string()) / binary>>,
 		      Participant = #mix_participant{jid = jid:remove_resource(From),
 						      nick = Nick, sub_els=[Vcard]},
 		      Item = #ps_item{id = ItemId, publisher = Publisher,
-					      sub_els = [xmpp:encode(Participant), #xmlel{name = <<"publisher">>, attrs = [{<<"item_id">>, p1_rand:get_string()}, {<<"jid">>, jid:to_string(PublisherJID)}], children = [PublisherVcard]},#xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, ""}]}]},
+					      sub_els = [xmpp:encode(Participant), #xmlel{name = <<"publisher">>, attrs = [{<<"item_id">>, <<(get_string()) / binary>>}, {<<"jid">>, jid:to_string(PublisherJID)}], children = [PublisherVcard]},#xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, ""}]}]},
 		      Items = #ps_items{node = ?NS_MIX_NODES_PARTICIPANTS,
 					      items = [Item]},
 		      Event = #ps_event{items = Items},
-		      %%MsgId = p1_rand:get_string(),
 		      Msg = #message{from = jid:remove_resource(To),
 			      to = jid:remove_resource(RouteToJid),
 				      id = MsgId,
@@ -1002,15 +1001,15 @@ notify_participant_joined(Mod, LServer, To, From, ID, [Nick, GroupCreate, Publis
 		  {BFrom, BServer, _} = jid:tolower(BFromJid),
 		  ServerHost = ejabberd_router:host_of_route(Host),
                   Mod = gen_mod:db_mod(ServerHost, ?MODULE),
-		  ItemId = p1_rand:get_string(),
-		  RetractId = p1_rand:get_string(),
+		  ItemId = <<(get_string()) / binary>>,
+		  RetractId = <<(get_string()) / binary>>,
 		  RemovedUser = [{xmlcdata, <<BFrom/binary, <<"@">>/binary, BServer/binary>>}],
 		  Publisher = <<From/binary,$@, Server/binary>>,
 			Item = #ps_item{id = ItemId, publisher = Publisher, sub_els=[#xmlel{name = <<"jid">>, attrs = [], children = RemovedUser}]},
 			      Items = #ps_items{node = ?NS_MIX_NODES_PARTICIPANTS,
 				    retract = RetractId, items = [Item]},
 		  Event = #ps_event{items = Items},
-		  MsgId = p1_rand:get_string(),
+		  MsgId = <<(get_string()) / binary>>,
 		  Msg = #message{from = jid:remove_resource(To),
 		                 to = jid:remove_resource(RouteToJid),
 				 id = MsgId,
@@ -1050,6 +1049,11 @@ notify_participant_left(Mod, LServer, To, ID, FromJid, BFromJid, AdminUser, MsgI
 		   sub_els = [Event]},
     multicast(Mod, LServer, Chan, Host, ?NS_MIX_NODES_PARTICIPANTS,
 	     fun(_) -> Msg end).
+
+get_string() ->
+  R = crypto:rand_uniform(0, 16#100000000000000000000000000000000),
+  AlphanumericList = string:to_lower(integer_to_list(R, 36)),
+  Alphanumeric = list_to_binary(AlphanumericList).
 
 -spec make_id(jid(), binary()) -> binary().
 make_id(JID, Key) ->

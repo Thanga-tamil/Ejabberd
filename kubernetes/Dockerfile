@@ -1,5 +1,4 @@
 FROM nexus-demo.contus.us:8446/mirrorfly-uikit/prod/erlang24:v1
-
 ### Expose the ejabberd ports ###
 EXPOSE 5222
 EXPOSE 5269
@@ -14,9 +13,7 @@ RUN mkdir /opt/ejabberd
 RUN apt-get update && apt-get install -y dnsutils vim
 #COPY MirrorFly.py /opt/ejabberd/
 COPY MirrorFly.py /opt/ejabberd/MirrorFly.py
-
 RUN chmod +x /opt/ejabberd/MirrorFly.py
-
 RUN mkdir -p /opt/ejabberd/certs
 COPY limits.conf /etc/security/limits.conf
 ### for kafka ###
@@ -31,44 +28,29 @@ RUN cd /tmp/ejabberd/deps/xmpp; make spec; make
 RUN cd /tmp/ejabberd; make
 COPY rabbit_common.app  /tmp/ejabberd/deps/rabbit_common/ebin/rabbit_common.app
 RUN cd /tmp/ejabberd; make install
-
 ### install tini
-
 # COPY entrypoint.sh /entrypoint.sh
 # RUN chmod +x /entrypoint.sh
 # RUN apt install -y curl 
 # RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
 #     chmod +x kubectl && \
 #     mv kubectl /usr/local/bin/kubectl
-
+# COPY entrypoint.sh /entrypoint.sh
+# RUN chmod +x /entrypoint.sh
 ### Move configs to etc ###
-
 #COPY etc /opt/ejabberd/etc
 RUN chown -R ejabberd:ejabberd /opt/ejabberd
 RUN chmod -R 755 /opt/ejabberd
-
 ### remove source code from the container
-
 RUN rm -rf /tmp/es.rpm
 #RUN rm -rf /opt/ejabberd/source
-
 ### The application's jar file ###
-
 # ARG JAR_FILE=ejabberdadmin.jar
-
-# ###  Add the application's jar to the container ###
-
-# ADD ${JAR_FILE} ejabberdadmin.jar
-
-###  Run the jar file ###
+#ARG JAR_FILE=ejabberdadmin.jar
 
 # Copy the startup script into the container
 COPY cluster-join-leave.sh /usr/local/bin/cluster-join-leave.sh
-
 # Ensure the script is executable
 RUN chmod +x /usr/local/bin/cluster-join-leave.sh
-
 # Set the script as the entrypoint or part of the command
 ENTRYPOINT ["/usr/local/bin/cluster-join-leave.sh"]
-
-# ENTRYPOINT ["/tini", "--", "/entrypoint.sh"]
