@@ -30,13 +30,13 @@
 -spec start(host(), opts()) -> ok.
 
 start(Host, _Opts) ->
-  ejabberd_hooks:add(user_send_packet, Host, ?MODULE, on_user_send_packet, 90),
+  ejabberd_hooks:add(user_send_packet, Host, ?MODULE, on_user_send_packet, 70),
   ok.
 
 -spec stop(host()) -> ok.
 stop(Host) ->
   ejabberd_hooks:delete(user_send_packet, Host, ?MODULE,
-    on_user_send_packet, 90),
+    on_user_send_packet, 70),
   ok.
 
 %% ====================================================================
