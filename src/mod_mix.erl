@@ -679,7 +679,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 						Unread = <<"1">>
 					end,
                                         ToUserStr = binary_to_list(ToUser),
-				ValueStatements = string:concat("", ", ('" ++ FromUserStr ++ "', '" ++ ToUserStr ++ "', 0,1, '" ++ MessageIdStr ++ "','" ++ MentionList ++ "', '" ++ EditMsgIdStr ++ "','" ++ MessageTypeStr ++ "', '', 'normal', '" ++ MessageSendStr ++ "', '" ++ FlatTimeStampNew ++ "','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00','" ++ MetaDataStr ++"')"),
+				ValueStatements = string:concat("", ", ('" ++ FromUserStr ++ "', '" ++ ToUserStr ++ "', 0,1, '" ++ MessageIdStr ++ "','" ++ binary_to_list(MentionList) ++ "', '" ++ EditMsgIdStr ++ "','" ++ MessageTypeStr ++ "', '', 'normal', '" ++ MessageSendStr ++ "', '" ++ FlatTimeStampNew ++ "','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00','" ++ MetaDataStr ++"')"),
 				RecentValueStatements = string:concat("", ", ('" ++ FromUserStr ++ "', '" ++ ToUserStr ++ "', '" ++ MessageIdStr ++ "', '"  ++ binary_to_list(SUser) ++ "', '"  ++ binary_to_list(MsgData) ++ "', 'normal', '" ++ MessageTypeStr ++ "', '', '" ++ binary_to_list(Unread) ++ "', '" ++ FlatTimeStampNew ++ "','" ++ MetaDataStr ++"')"),
 				{ValueStatements, RecentValueStatements}
 				end, Subscribers)),
