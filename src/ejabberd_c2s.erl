@@ -297,9 +297,68 @@ process_closed(State, Reason) ->
     stop_async(self()),
     State#{stop_reason => Reason}.
 
+
+get_resource_segments(Resource) ->
+
+  string:tokens(binary_to_list(Resource),"-").
+
+is_same_platform(CurrentResource,OldResource) ->
+  try
+    if CurrentResource =:= OldResource ->
+      no;
+      true->
+        [CurrentPlatform,_CurrentPlatformIdentifier] = get_resource_segments(CurrentResource),
+
+        [OldPlatform,_OldPlatformIdentifier] = get_resource_segments(OldResource),
+
+        if CurrentPlatform =:= OldPlatform ->
+          yes;
+          true ->
+            no
+        end
+    end
+  catch _:_ ->
+    no
+  end.
+
+has_more_resources(User, LServer,NewResource) ->
+
+  length(lists:foldl(fun(SResource,Acc) ->
+
+
+    case is_same_platform(NewResource,SResource) of
+      yes ->
+        Acc ++ [SResource];
+      _ ->
+
+        Acc
+    end
+                     end,[],ejabberd_sm:get_user_resources(User, LServer))).
+
+
 process_terminated(#{sid := SID, jid := JID, user := U, server := S, resource := R} = State,
 		   Reason) ->
     Status = format_reason(State, Reason),
+    NewSubstring = string:str(binary_to_list(R), binary_to_list(<<"Web">>)),
+    ?INFO_MSG("web resource length NewSubstring ~p",[NewSubstring]),
+    ?INFO_MSG("web resource length Resource ~p",[R]),
+		if NewSubstring =:= 1 ->
+		Ls = has_more_resources(U, S, R),
+
+		?INFO_MSG("web resource length ~p",[Ls]),
+                 if Ls > 1  ->
+			ok;
+		true ->
+			?INFO_MSG("web resource length 2 ~p",[Ls]),
+			 fly_mod_utils:update_availability(S, U, <<"0">>)
+		end;
+	true ->
+		ok
+	end,
+
+    ?INFO_MSG("Terminated called for user: ~p, server: ~p, reason: ~p", [U, S, Reason]),
+
+
     ?INFO_MSG("(~ts) Closing c2s session for ~ts: ~ts",
 	      [case maps:find(socket, State) of
 		   {ok, Socket} -> xmpp_socket:pp(Socket);

@@ -905,11 +905,11 @@ get_resource_sessions(User, Server, Resource) ->
 		    if length(Ss) =< MaxSessions -> ok;
 		    true ->
 			    NewSubstring = string:str(binary_to_list(LResource), binary_to_list(<<"Web">>)),
-			    ?INFO_MSG("NewSubstring ~p",[NewSubstring]),
+			    ?INFO_MSG("NewSubstring 1~p",[NewSubstring]),
 		if NewSubstring =:= 1 ->
 		US = has_more_resources(LUser, LServer, LResource),
 			    Ls = length(US),
-			    ?INFO_MSG("web resource length ~p",[Ls]),
+			    ?INFO_MSG("web resource length 1~p",[Ls]),
 			    if Ls == 0 ->
 		   #session{sid = {_, Pid}} = lists:min(Ss),
 			       ejabberd_c2s:route(Pid, replaced);
