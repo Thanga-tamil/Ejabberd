@@ -637,7 +637,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 			Stanza = xmpp:encode(Pkt),
 			if Node =:= <<"urn:xmpp:mix:nodes:messages">>  ->
 				Content = get_message_content(Stanza , Pkt),
-				[_, CMessageId, _, _, _, CEditMsgId, _ ] = Content,
+				[_, CMessageId, _, _, _, CEditMsgId,_, _ ] = Content,
 				if (CEditMsgId =:= CMessageId) or (CEditMsgId =:= <<"">>) ->
 				spawn(?MODULE, send_group_push_message, [F,Node,Subscribers,LServer,Chan,Service,Stanza,Content]);
 				true ->
