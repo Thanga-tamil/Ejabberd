@@ -1415,19 +1415,26 @@ insert_status(#jid{luser = User,lserver = Server}, ToUser ) ->
   Server, [<<"insert into message_status (from_user,to_user,status,recent,message_id, edit_message_id, chat_type,to_notification,message_notification,received_at,seen_at,meta_data) values
   ('">>, ToUser, <<"','">>, User, <<"',0,">>,<<"1,">>,<<"0,'">>,<<"0,'">>,<<"chat">>, <<"','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00'),'{}';">>]),
   ejabberd_sql:sql_query(
-  Server, [<<"insert into chat_recent (from_user, to_user,  message_id, edit_message_id, message_from, txt, chat_type, message_type,  notification_to,message_time,meta_data) values
-  ('">>, ToUser, <<"','">>, User, <<"','0','">>,<<"','0','">>, User, <<"','0','broadcast','notification','">>,  User, <<"',0),'{}';">>]).
+    Server, [<<"insert into chat_recent (from_user, to_user, message_id, edit_message_id, message_from, txt, chat_type, message_type, notification_to, message_time, meta_data, mute_status) values
+    ('">>, ToUser, <<"','">>, User, <<"','0','0','">>, User, <<"','0','broadcast','notification','">>, User, <<"',0,'{}',
+    (SELECT CASE WHEN EXISTS (SELECT 1 FROM muted_chats WHERE username = '">>, ToUser, <<"' AND chat_id = '">>, User, <<"') THEN 1 ELSE 0 END)
+    ');">>]).
 
-insert_recent_chat_topic(LServer,SUser,BarePeer,MessageId,MessageFrom,Body,SType,MessageType, Topicid, MetaData, Notification_to,Unread,FlatTimeStamp) ->
-if Topicid =:= <<"">> ->
-ejabberd_sql:sql_query(
-LServer, [<<"insert into chat_recent_topic (from_user, to_user,  message_id, message_from, txt, chat_type, message_type,  unread, notification_to,message_time) values
-('">>, SUser, <<"','">>, BarePeer, <<"','">>,  MessageId, <<"','">>, MessageFrom, <<"','">>, Body, <<"','">>,  SType, <<"','">>,  MessageType, <<"','">>,  Unread, <<"','">>,  Notification_to, <<"','">>,  FlatTimeStamp, <<"');">>]);
-true ->
-ejabberd_sql:sql_query(
-LServer, [<<"insert into chat_recent_topic (from_user, to_user,  message_id, message_from, txt, chat_type, message_type, topic_id, meta_data, unread, notification_to,message_time) values
-('">>, SUser, <<"','">>, BarePeer, <<"','">>,  MessageId, <<"','">>, MessageFrom, <<"','">>, Body, <<"','">>,  SType, <<"','">>,  MessageType, <<"', '">>,  Topicid, <<"', '">>,  MetaData, <<"','">>,  Unread, <<"','">>,  Notification_to, <<"','">>,  FlatTimeStamp, <<"');">>])
-end.
+
+    insert_recent_chat_topic(LServer, SUser, BarePeer, MessageId, MessageFrom, Body, SType, MessageType, Topicid, MetaData, Notification_to, Unread, FlatTimeStamp) ->
+      if Topicid =:= <<"">> ->
+          ejabberd_sql:sql_query(
+              LServer, [<<"insert into chat_recent_topic (from_user, to_user, message_id, message_from, txt, chat_type, message_type, unread, notification_to, message_time, mute_status) values
+              ('">>, SUser, <<"','">>, BarePeer, <<"','">>, MessageId, <<"','">>, MessageFrom, <<"','">>, Body, <<"','">>, SType, <<"','">>, MessageType, <<"','">>, Unread, <<"','">>, Notification_to, <<"','">>, FlatTimeStamp, <<"',
+              (SELECT CASE WHEN EXISTS (SELECT 1 FROM muted_chats WHERE username = '">>, SUser, <<"' AND chat_id = '">>, BarePeer, <<"') THEN 1 ELSE 0 END)
+              ');">>]);
+      true ->
+          ejabberd_sql:sql_query(
+              LServer, [<<"insert into chat_recent_topic (from_user, to_user, message_id, message_from, txt, chat_type, message_type, topic_id, meta_data, unread, notification_to, message_time, mute_status) values
+              ('">>, SUser, <<"','">>, BarePeer, <<"','">>, MessageId, <<"','">>, MessageFrom, <<"','">>, Body, <<"','">>, SType, <<"','">>, MessageType, <<"','">>, Topicid, <<"','">>, MetaData, <<"','">>, Unread, <<"','">>, Notification_to, <<"','">>, FlatTimeStamp, <<"',
+              (SELECT CASE WHEN EXISTS (SELECT 1 FROM muted_chats WHERE username = '">>, SUser, <<"' AND chat_id = '">>, BarePeer, <<"') THEN 1 ELSE 0 END)
+              ');">>])
+      end.
 
 update_recent_chat_topic(LServer,SUser,BarePeer,MessageId,MessageFrom,Body,SType,MessageType, Topicid, MetaData, Unread,FlatTimeStamp) ->
 
@@ -1439,11 +1446,13 @@ update_recent_chat_topic(LServer,SUser,BarePeer,MessageId,MessageFrom,Body,SType
       [<<"UPDATE  chat_recent_topic SET  meta_data =  '">>,MetaData, <<"', message_id =  '">>,MessageId, <<"',message_from =  '">>,MessageFrom, <<"',txt =  '">>,Body, <<"',chat_type =  '">>,SType, <<"',message_type =  '">>,MessageType, <<"',meta_data =  '">>,MetaData,  <<"',unread =  '">>,Unread, <<"'  ,status =  '0', recall_status = '0', created_at = NOW(),  message_time =  '">>,FlatTimeStamp,  <<"' WHERE  from_user ='">>,SUser, <<"' and to_user ='">>,BarePeer, <<"' and topic_id ='">>,Topicid, <<"';">>])
 end.
 
-insert_recent_chat(LServer,SUser,BarePeer,MessageId,MessageFrom,Body,SType,MessageType, Topicid, MetaData, Notification_to,Unread,FlatTimeStamp) ->
+insert_recent_chat(LServer, SUser, BarePeer, MessageId, MessageFrom, Body, SType, MessageType, Topicid, MetaData, Notification_to, Unread, FlatTimeStamp) ->
+    ejabberd_sql:sql_query(
+        LServer, [<<"insert into chat_recent (from_user, to_user, message_id, message_from, txt, chat_type, message_type, topic_id, meta_data, unread, notification_to, message_time, mute_status) values
+        ('">>, SUser, <<"','">>, BarePeer, <<"','">>, MessageId, <<"','">>, MessageFrom, <<"','">>, Body, <<"','">>, SType, <<"','">>, MessageType, <<"','">>, Topicid, <<"','">>, MetaData, <<"','">>, Unread, <<"','">>, Notification_to, <<"','">>, FlatTimeStamp, <<"',
+        (SELECT CASE WHEN EXISTS (SELECT 1 FROM muted_chats WHERE username = '">>, SUser, <<"' AND chat_id = '">>, BarePeer, <<"') THEN 1 ELSE 0 END)
+        ');">>]).
 
-ejabberd_sql:sql_query(
-LServer, [<<"insert into chat_recent (from_user, to_user,  message_id, message_from, txt, chat_type, message_type, topic_id, meta_data, unread, notification_to,message_time) values
-('">>, SUser, <<"','">>, BarePeer, <<"','">>,  MessageId, <<"','">>, MessageFrom, <<"','">>, Body, <<"','">>,  SType, <<"','">>,  MessageType, <<"', '">>,  Topicid, <<"', '">>,  MetaData, <<"','">>,  Unread, <<"','">>,  Notification_to, <<"','">>,  FlatTimeStamp, <<"');">>]).
 
 update_recent_chat(LServer,SUser,BarePeer,MessageId,MessageFrom,Body,SType,MessageType, Topicid, MetaData, Unread, EditmsgId , FlatTimeStamp) ->
   if EditmsgId =:= <<"">> ->
