@@ -1416,24 +1416,58 @@ end,
   end,
   ejabberd_sql:sql_query( ToServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg, meta_data) values ('">>, User, <<"', '">>, ToUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'chat', '">>, Msg, <<"', '">>, MetaData, <<"');">>]).
 
-insert_status(#jid{luser = User,lserver = Server}, ToUser ) ->
-  ejabberd_sql:sql_query(
-  Server, [<<"insert into message_status (from_user,to_user,status,recent,message_id, edit_message_id, chat_type,to_notification,message_notification,received_at,seen_at,meta_data) values
-  ('">>, ToUser, <<"','">>, User, <<"',0,">>,<<"1,">>,<<"0,'">>,<<"0,'">>,<<"chat">>, <<"','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00'),'{}';">>]),
-  ejabberd_sql:sql_query(
-  Server, [<<"insert into chat_recent (from_user, to_user,  message_id, edit_message_id, message_from, txt, chat_type, message_type,  notification_to,message_time,meta_data) values
-  ('">>, ToUser, <<"','">>, User, <<"','0','">>,<<"','0','">>, User, <<"','0','broadcast','notification','">>,  User, <<"',0),'{}';">>]).
+mute_status(Lserver, Luser, Tuser)->
+  ejabberd_sql:sql_query(Lserver,
+  [<<"SELECT COUNT(username) FROM muted_chats WHERE username ='">>, Luser, <<"' AND chat_id = '">>, Tuser, <<" ;">>]).
 
-insert_recent_chat_topic(LServer,SUser,BarePeer,MessageId,MessageFrom,Body,SType,MessageType, Topicid, MetaData, Notification_to,Unread,FlatTimeStamp) ->
-if Topicid =:= <<"">> ->
-ejabberd_sql:sql_query(
-LServer, [<<"insert into chat_recent_topic (from_user, to_user,  message_id, message_from, txt, chat_type, message_type,  unread, notification_to,message_time) values
-('">>, SUser, <<"','">>, BarePeer, <<"','">>,  MessageId, <<"','">>, MessageFrom, <<"','">>, Body, <<"','">>,  SType, <<"','">>,  MessageType, <<"','">>,  Unread, <<"','">>,  Notification_to, <<"','">>,  FlatTimeStamp, <<"');">>]);
-true ->
-ejabberd_sql:sql_query(
-LServer, [<<"insert into chat_recent_topic (from_user, to_user,  message_id, message_from, txt, chat_type, message_type, topic_id, meta_data, unread, notification_to,message_time) values
-('">>, SUser, <<"','">>, BarePeer, <<"','">>,  MessageId, <<"','">>, MessageFrom, <<"','">>, Body, <<"','">>,  SType, <<"','">>,  MessageType, <<"', '">>,  Topicid, <<"', '">>,  MetaData, <<"','">>,  Unread, <<"','">>,  Notification_to, <<"','">>,  FlatTimeStamp, <<"');">>])
-end.
+insert_status(#jid{luser = User, lserver = Server}, ToUser) ->
+
+     MuteStatus= case catch mute_status(Server, User, ToUser) of
+        {selected, _, []} ->
+          <<"0">>;
+        {selected, _, [[MuteCount]]} ->
+          MuteCount;
+        _ ->
+        <<"0">>
+      end,
+
+    % Insert into message_status table
+    MessageStatusQuery = [<<"INSERT INTO message_status (from_user, to_user, status, recent, message_id, edit_message_id, chat_type, to_notification, message_notification, received_at, seen_at, meta_data) VALUES
+        ('">>, ToUser, <<"','">>, User, <<"',0,1,0,'0','chat','','0','0000-00-00 00:00:00','0000-00-00 00:00:00','{}');">>],
+    
+    ejabberd_sql:sql_query(Server, MessageStatusQuery),
+
+    % Insert into chat_recent table
+    ChatRecentQuery = [<<"INSERT INTO chat_recent (from_user, to_user, message_id, edit_message_id, message_from, txt, chat_type, message_type, notification_to, message_time, meta_data, mute_status) VALUES
+        ('">>, ToUser, <<"','">>, User, <<"','0','0','">>, User, <<"','0','broadcast','notification','">>, User, <<"',0,'{}','">>, MuteStatus, <<"');">>],
+    
+    ejabberd_sql:sql_query(Server, ChatRecentQuery).
+
+
+  insert_recent_chat_topic(LServer, SUser, BarePeer, MessageId, MessageFrom, Body, SType, MessageType, Topicid, MetaData, Notification_to, Unread, FlatTimeStamp) ->
+
+  MuteStatus= case catch mute_status(LServer, BarePeer, SUser) of
+        {selected, _, []} ->
+          <<"0">>;
+        {selected, _, [[MuteCount]]} ->
+          MuteCount;
+        _ ->
+        <<"0">>
+      end,
+
+    InsertQuery =
+        if
+            Topicid =:= <<"">> ->
+                [<<"INSERT INTO chat_recent_topic (from_user, to_user, message_id, message_from, txt, chat_type, message_type, unread, notification_to, message_time, mute_status) VALUES
+                    ('">>, SUser, <<"','">>, BarePeer, <<"','">>, MessageId, <<"','">>, MessageFrom, <<"','">>, Body, <<"','">>, SType, <<"','">>, MessageType, <<"','">>,
+                    Unread, <<"','">>, Notification_to, <<"','">>, FlatTimeStamp, <<"','">>, MuteStatus, <<"');">>];
+            true ->
+                [<<"INSERT INTO chat_recent_topic (from_user, to_user, message_id, message_from, txt, chat_type, message_type, topic_id, meta_data, unread, notification_to, message_time, mute_status) VALUES
+                    ('">>, SUser, <<"','">>, BarePeer, <<"','">>, MessageId, <<"','">>, MessageFrom, <<"','">>, Body, <<"','">>, SType, <<"','">>, MessageType, <<"','">>, 
+                    Topicid, <<"','">>, MetaData, <<"','">>, Unread, <<"','">>, Notification_to, <<"','">>, FlatTimeStamp, <<"','">>, MuteStatus, <<"');">>]
+        end,
+
+    ejabberd_sql:sql_query(LServer, InsertQuery).
 
 update_recent_chat_topic(LServer,SUser,BarePeer,MessageId,MessageFrom,Body,SType,MessageType, Topicid, MetaData, Unread,FlatTimeStamp) ->
 
@@ -1445,11 +1479,25 @@ update_recent_chat_topic(LServer,SUser,BarePeer,MessageId,MessageFrom,Body,SType
       [<<"UPDATE  chat_recent_topic SET  meta_data =  '">>,MetaData, <<"', message_id =  '">>,MessageId, <<"',message_from =  '">>,MessageFrom, <<"',txt =  '">>,Body, <<"',chat_type =  '">>,SType, <<"',message_type =  '">>,MessageType, <<"',meta_data =  '">>,MetaData,  <<"',unread =  '">>,Unread, <<"'  ,status =  '0', recall_status = '0', created_at = NOW(),  message_time =  '">>,FlatTimeStamp,  <<"' WHERE  from_user ='">>,SUser, <<"' and to_user ='">>,BarePeer, <<"' and topic_id ='">>,Topicid, <<"';">>])
 end.
 
-insert_recent_chat(LServer,SUser,BarePeer,MessageId,MessageFrom,Body,SType,MessageType, Topicid, MetaData, Notification_to,Unread,FlatTimeStamp) ->
+% Inserts recent_chat table entry
+insert_recent_chat(LServer, SUser, BarePeer, MessageId, MessageFrom, Body, SType, MessageType, Topicid, MetaData, Notification_to, Unread, FlatTimeStamp) ->
+    % Determine MuteStatus based on SType
+        MuteStatus= case catch mute_status(LServer, BarePeer, SUser) of
+        {selected, _, []} ->
+          <<"0">>;
+        {selected, _, [[MuteCount]]} ->
+          MuteCount;
+        _ ->
+        <<"0">>
+      end,
 
-ejabberd_sql:sql_query(
-LServer, [<<"insert into chat_recent (from_user, to_user,  message_id, message_from, txt, chat_type, message_type, topic_id, meta_data, unread, notification_to,message_time) values
-('">>, SUser, <<"','">>, BarePeer, <<"','">>,  MessageId, <<"','">>, MessageFrom, <<"','">>, Body, <<"','">>,  SType, <<"','">>,  MessageType, <<"', '">>,  Topicid, <<"', '">>,  MetaData, <<"','">>,  Unread, <<"','">>,  Notification_to, <<"','">>,  FlatTimeStamp, <<"');">>]).
+    InsertQuery = [
+        <<"INSERT INTO chat_recent (from_user, to_user, message_id, message_from, txt, chat_type, message_type, topic_id, meta_data, unread, notification_to, message_time, mute_status) VALUES
+        ('">>, SUser, <<"','">>, BarePeer, <<"','">>, MessageId, <<"','">>, MessageFrom, <<"','">>, Body, <<"','">>, SType, <<"','">>, MessageType, <<"','">>, Topicid, <<"','">>, MetaData, <<"','">>, Unread, <<"','">>, Notification_to, <<"','">>, FlatTimeStamp, <<"','">>, MuteStatus, <<"');">>
+    ],
+
+    ejabberd_sql:sql_query(LServer, InsertQuery).
+
 
 update_recent_chat(LServer,SUser,BarePeer,MessageId,MessageFrom,Body,SType,MessageType, Topicid, MetaData, Unread, EditmsgId , FlatTimeStamp) ->
   if EditmsgId =:= <<"">> ->
