@@ -638,6 +638,8 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 			if Node =:= <<"urn:xmpp:mix:nodes:messages">>  ->
 				Content = get_message_content(Stanza , Pkt),
 				[_, CMessageId, _, _, _, CEditMsgId, _ ] = Content,
+				?INFO_MSG("Message Content ~p",[Content]),
+				?INFO_MSG("Message Pkt ~p",[Pkt]),
 				if (CEditMsgId =:= CMessageId) or (CEditMsgId =:= <<"">>) ->
 				spawn(?MODULE, send_group_push_message, [F,Node,Subscribers,LServer,Chan,Service,Stanza,Content]);
 				true ->
@@ -714,6 +716,7 @@ end.
 %% Contus Added send_group_push_message
 send_group_push_message(_F,Node,Members,LServer,Chan,Service,Stanza,MessageContent) ->
 	From = jid:make(Chan,Service,<<"">>),
+	?INFO_MSG("Group Members ~p",[Members]),
 	if Members =/= []  ->
 
 		fly_mod_offline_push:send_bulk_group_push(From,LServer,MessageContent,Members,Node,Stanza, <<"message">>);
