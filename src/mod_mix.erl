@@ -639,7 +639,9 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 				Content = get_message_content(Stanza , Pkt),
 				[_, CMessageId, _, _, _, CEditMsgId,_, _ ] = Content,
 				?INFO_MSG("Message Content ~p",[Content]),
-				if (CEditMsgId =:= CMessageId) or (CEditMsgId =:= <<"">>) ->
+				?INFO_MSG("Message CEditMsgId ~p",[CEditMsgId]),
+				?INFO_MSG("Message CMessageId ~p",[CMessageId]),
+				if CEditMsgId =:= CMessageId orelse CEditMsgId =:= <<"">> ->
 				spawn(?MODULE, send_group_push_message, [F,Node,Subscribers,LServer,Chan,Service,Stanza,Content]);
 				true ->
 				 ok
