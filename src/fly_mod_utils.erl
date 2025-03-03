@@ -1418,7 +1418,7 @@ end,
 
 mute_status(Lserver, Luser, Tuser)->
   ejabberd_sql:sql_query(Lserver,
-  [<<"SELECT COUNT(username) FROM muted_chats WHERE username ='">>, Luser, <<"' AND chat_id = '">>, Tuser, <<" ;">>]).
+  [<<"SELECT COUNT(username) FROM muted_chats WHERE username ='">>, Luser, <<"' AND chat_id = '">>, Tuser, <<"';">>]).
 
 insert_status(#jid{luser = User, lserver = Server}, ToUser) ->
 
