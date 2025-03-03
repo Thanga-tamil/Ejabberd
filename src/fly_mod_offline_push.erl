@@ -535,9 +535,10 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     ContentAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #chatcontent{}),
   if ContentAcknowledge =:= false ->
     MessageType = <<"">>,
+    MentionList = <<"">>,
     EditMsgId = MessageId;
     true ->
-    {_,_,_,_,MessageType,_,_,EditMsgId,_} = ContentAcknowledge
+    {_,_,_,_,MessageType,_,_,EditMsgId,MentionList,_} = ContentAcknowledge
     end,
     % DecryptedMessage = fly_mod_security:aes_decrpyt(binary_to_list(MessageId), Message),
     % ParsedMessageJson = jiffy:decode(http_uri:decode(binary_to_list(DecryptedMessage))),
@@ -1251,9 +1252,10 @@ add_quotes(String) ->
 
       if ContentAcknowledge =:= false ->
         MessageType = <<"">>,
-        EditMsgId = MessageId;
+        EditMsgId = MessageId,
+        MentionList = <<"">>;
         true ->
-        {_,_,_,_,MessageType,_,_,EditMsgId,_} = ContentAcknowledge
+        {_,_,_,_,MessageType,_,_,EditMsgId,MentionList,_} = ContentAcknowledge
         end,
 
     Server = Recipient#jid.server,
