@@ -1490,7 +1490,9 @@ insert_recent_chat(LServer, SUser, BarePeer, MessageId, MessageFrom, Body, SType
         _ ->
         <<"0">>
       end,
-
+    ?INFO_MSG("MuteStatus ~p",[MuteStatus]),
+    ?INFO_MSG("BarePeer ~p",[BarePeer]),
+    ?INFO_MSG("SUser ~p",[SUser]),
     InsertQuery = [
         <<"INSERT INTO chat_recent (from_user, to_user, message_id, message_from, txt, chat_type, message_type, topic_id, meta_data, unread, notification_to, message_time, mute_status) VALUES
         ('">>, SUser, <<"','">>, BarePeer, <<"','">>, MessageId, <<"','">>, MessageFrom, <<"','">>, Body, <<"','">>, SType, <<"','">>, MessageType, <<"','">>, Topicid, <<"','">>, MetaData, <<"','">>, Unread, <<"','">>, Notification_to, <<"','">>, FlatTimeStamp, <<"','">>, MuteStatus, <<"');">>
