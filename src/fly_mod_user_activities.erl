@@ -558,12 +558,12 @@ user_logout(From, RequestType, SubEl, IQ) ->
       children = []}]},
   ejabberd_router:route(From, To, XmlBody),
 
-    NewPacket = #xmlel{name = <<"message">>,
-      attrs = [{<<"from">>, jid:to_string(To)}, {<<"to">>, jid:to_string(From)}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
-      children = [#xmlel{name = <<"logout">>,
-        attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, <<"logout">>}, {<<"socket_id">>, SocketId}],
-        children = []}]},
-    mod_offline:store_packet({From, xmpp:decode(NewPacket)}),
+    % NewPacket = #xmlel{name = <<"message">>,
+    %   attrs = [{<<"from">>, jid:to_string(To)}, {<<"to">>, jid:to_string(From)}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
+    %   children = [#xmlel{name = <<"logout">>,
+    %     attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, <<"logout">>}, {<<"socket_id">>, SocketId}],
+    %     children = []}]},
+    mod_offline:store_packet({To, xmpp:decode(XmlBody)}),
   Resources = ejabberd_sm:get_user_resources(LUser, LServer),
   if length(Resources) =:= 1 ->
     push_to_rosters(To, #xmlel{name = <<"presence">>,
