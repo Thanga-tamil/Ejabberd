@@ -1449,7 +1449,7 @@ clear_message(#jid{luser = User, lserver = Server, lresource = _Resource} = From
       attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, jid:to_string(To)}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
       children = [
             #xmlel{name = <<"messageclear">>,
-        attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"favourite">>, Favourite},{<<"last_msg_id">>, Last_Msg_Id}, {<<"remove_message_user">>, Remove_User},{<<"message_id">>, Message_ID}, {<<"calllog_ids">>, Log_Ids}, {<<"type">>, Type}, {<<"status">>, RequestType}, {<<"chat_type">>, Chat_Type}, {<<"delete_type">>, DeleteAction}],
+        attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"favourite">>, Favourite},{<<"last_msg_id">>, Last_Msg_Id}, {<<"remove_message_user">>, Remove_User},{<<"message_id">>, Message_ID}, {<<"calllog_ids">>, Log_Ids}, {<<"type">>, RequestType}, {<<"status">>, RequestType}, {<<"chat_type">>, Chat_Type}, {<<"delete_type">>, DeleteAction}],
         children = []},
             #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}],
                 children = []}
