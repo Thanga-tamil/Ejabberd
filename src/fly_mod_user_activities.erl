@@ -549,14 +549,20 @@ process_get_recent_profile(From, RequestType, SubEl, IQ) ->
 user_logout(From, RequestType, SubEl, IQ) ->
   #jid{luser = LUser, lserver = LServer, lresource = LResource} = From,
   SocketId = fxml:get_path_s(SubEl, [{attr, <<"socket_id">>}]),
+  UserName = fxml:get_path_s(SubEl, [{attr, <<"username">>}]),
+  if UserName =:= <<>> ->
+    To = jid:make({LUser, LServer, <<>>});
+  true ->
+    To = jid:make({UserName, LServer, <<>>})
+  end,
   MessageId = <<(get_string()) / binary>>,
-  To = jid:make({LUser, LServer, <<>>}),
+  
   XmlBody = #xmlel{name = <<"message">>,
-    attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, jid:to_string(To)}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
+    attrs = [{<<"from">>, jid:to_string(To)}, {<<"to">>, jid:to_string(To)}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
     children = [#xmlel{name = <<"logout">>,
       attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, <<"logout">>}, {<<"socket_id">>, SocketId}],
       children = []}]},
-  ejabberd_router:route(From, To, XmlBody),
+  ejabberd_router:route(To, To, XmlBody),
 
     % NewPacket = #xmlel{name = <<"message">>,
     %   attrs = [{<<"from">>, jid:to_string(To)}, {<<"to">>, jid:to_string(From)}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
