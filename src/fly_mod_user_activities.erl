@@ -549,7 +549,7 @@ process_get_recent_profile(From, RequestType, SubEl, IQ) ->
 user_logout(From, RequestType, SubEl, IQ) ->
   #jid{luser = LUser, lserver = LServer, lresource = LResource} = From,
   SocketId = fxml:get_path_s(SubEl, [{attr, <<"socket_id">>}]),
-  UserName = fxml:get_path_s(SubEl, [{attr, <<"username">>}]),
+  UserName = fxml:get_path_s(SubEl, [{attr, <<"message_from">>}]),
   if UserName =:= <<>> ->
     To = jid:make({LUser, LServer, <<>>});
   true ->
