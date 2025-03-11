@@ -124,7 +124,7 @@ handle_cast({pushnotification, <<"chat">>,
       {selected, _, []} ->
         Call = true;
       {selected, _, [[_T]]} ->
-      if ChatType =:= <<"call">> ->
+      if ChatType =:= <<"mediacall">> ->
         Call = true;
         true ->
           Call = false,
@@ -996,11 +996,9 @@ gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
             {<<"title">>, binary_to_list(GroupName)},
             {<<"type">>, "normal"}],
           Payload = create_android_json(DeviceToken, BF),
-          if (LServer =/= <<"vezbi-xmpp.mirrorfly.com">>) ->
+          
           send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, LServer);
-          true ->
-            ok
-        end;
+          
           true -> {ok, <<"ParticipantJid =/= SendFrom gcm">>}
         end;
       true -> {ok, <<"item empty and namspace changed gcm">>}
@@ -1796,11 +1794,9 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
             {node_id, binary_to_list(NodeId)},
             {group_id, binary_to_list(GroupId)}],
           JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,Expiry,PushType),
-          if (Recipient#jid.server =/= <<"vezbi-xmpp.mirrorfly.com">>) ->
+         
           send_payload(JSON, ChatType, Channel, RMExchange, LServer, PushType);
-          true ->
-            ok
-          end;
+         
           true -> {ok, <<"ParticipantJid =/= SendFrom ios">>}
         end;
       true ->
@@ -2158,11 +2154,9 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
             {<<"type">>, "normal"}]
           end,
           AndPayload = create_android_json(AndroidDeviceToken, Load),
-          if (Server =/= <<"vezbi-xmpp.mirrorfly.com">>) ->
-          send_android_payload_to_rabbitmq(State#state.rabbitmq_connection, <<"normal">>, AndPayload, State#state.rabbitmq_exchange, Server);
-          true ->
-            ok
-        end
+          
+          send_android_payload_to_rabbitmq(State#state.rabbitmq_connection, <<"normal">>, AndPayload, State#state.rabbitmq_exchange, Server)
+          
         end,
         ATokens)
       end,
@@ -2260,7 +2254,7 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
     {push_from, binary_to_list(<<"MirrorFly">>)},
     {node_id, binary_to_list(NodeId)},
     {group_id, binary_to_list(Chan)}],
-    if (Server =/= <<"vezbi-xmpp.mirrorfly.com">>) ->
+    
   if  IOSPushType =:= <<"13above">> ->
     Msg = [{<<"mutable-content">>, integer_to_list(1)}, {alert, binary_to_list(Message)}, {mode, binary_to_list(Mode)}, {sound, binary_to_list(<<"default">>)}],
     IOSPayLoad = create_json(Msg, Args, binary_to_list(IOSDeviceToken),Mode,0,0,PushType),
@@ -2269,9 +2263,7 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
       Msg = [{<<"content-available">>, integer_to_list(1)},{is_voip, integer_to_list(1)},{alert, binary_to_list(Message)}, {mode, binary_to_list(Mode)}, {sound, binary_to_list(<<"default">>)}],
       IOSPayLoad = create_json(Msg, Args, binary_to_list(IOSDeviceToken),Mode,1,0,PushType),
       send_payload(IOSPayLoad, ChatType, State#state.rabbitmq_connection, State#state.rabbitmq_exchange,Server, PushType)
-  end;
-  true ->
-    ok
+
 end.
 ios_send_bulk_push(Server, ToUser, MessageContent, _FromUser, FlatTimeStamp, ChatType, GroupID, Mode, IOSDeviceToken, _Expiry, State,IOSPushType, UserType, PushType) ->
 [MessageType, MessageId, MesssageSend,GroupName, MSGBody, _EditMsg, _MetaData] = MessageContent,
