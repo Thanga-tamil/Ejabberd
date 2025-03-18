@@ -35,6 +35,7 @@ def read():
             currentTimestamp = int(time.time())
             obj = {'password': p, 'username': u,'currentTimestamp':currentTimestamp}
             headers = {'Content-Type': 'application/json'}
+            log('reuted url' + rurl)
             r = requests.post(rurl, data=json.dumps(obj), headers=headers)
             if ((r.status_code == 200 or r.status_code == 202 or r.status_code == 201) and (json.loads(r.text)['status'] == 200 or json.loads(r.text)['status'] == 201)):
                 write(True)
