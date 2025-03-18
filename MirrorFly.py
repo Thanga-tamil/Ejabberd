@@ -37,7 +37,6 @@ def read():
             log('requested object' + obj)
             headers = {'Content-Type': 'application/json'}
             r = requests.post(rurl, data=json.dumps(obj), headers=headers)
-            log('response object' + json.loads(r.text))
             if ((r.status_code == 200 or r.status_code == 202 or r.status_code == 201) and (json.loads(r.text)['status'] == 200 or json.loads(r.text)['status'] == 201)):
                 write(True)
             else:
@@ -74,5 +73,6 @@ def write(result):
 if __name__ == "__main__":
     try:
         read()
-    except struct.error:
-        pass
+    except struct.error as e:
+        # Handle specific cases or retry logic
+         log('requested object' + e)
