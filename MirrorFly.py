@@ -74,5 +74,6 @@ def write(result):
 if __name__ == "__main__":
     try:
         read()
-    except struct.error:
-        pass
+    except struct.error as e:
+        # Handle specific cases or retry logic
+         log('requested object' + e)
