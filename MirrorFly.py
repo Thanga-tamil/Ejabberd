@@ -20,7 +20,7 @@ def log(string):
 
 def read():
     (pkt_size,) = struct.unpack('>H', read_from_stdin(2))
-    pkt = sys.stdin.read(pkt_size)
+    objpkt = sys.stdin.read(pkt_size)
     cmd = pkt.split(':')[0]
     if cmd == 'auth':
         log('requested input' + pkt)
@@ -34,9 +34,10 @@ def read():
             #dt = datetime.now()
             currentTimestamp = int(time.time())
             obj = {'password': p, 'username': u,'currentTimestamp':currentTimestamp}
+            log('requested object' + obj)
             headers = {'Content-Type': 'application/json'}
-            log('reuted url' + rurl)
             r = requests.post(rurl, data=json.dumps(obj), headers=headers)
+            log('response object' + json.loads(r.text))
             if ((r.status_code == 200 or r.status_code == 202 or r.status_code == 201) and (json.loads(r.text)['status'] == 200 or json.loads(r.text)['status'] == 201)):
                 write(True)
             else:
