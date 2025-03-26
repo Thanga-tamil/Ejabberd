@@ -323,7 +323,7 @@
      #elem{name = <<"chatcontent">>,
            xmlns = <<"urn:xmpp:content">>,
 	   module = 'chatcontent',
-           result = {chatcontent, '$block_user', '$broadcast_id','$broadcast_msgid', '$message_type','$topic_id','$meta_data', '$edit_msg_id', '$scheduled_datetime'},
+           result = {chatcontent, '$block_user', '$broadcast_id','$broadcast_msgid', '$message_type','$topic_id','$meta_data', '$edit_msg_id', '$mention_list', '$scheduled_datetime'},
            attrs = [#attr{name = <<"block_user">>,default = <<"0">>},
                     #attr{name = <<"broadcast_id">>,default = <<"">>},
                     #attr{name = <<"broadcast_msgid">>,default = <<"">>},
@@ -331,6 +331,7 @@
                     #attr{name = <<"topic_id">>,default = <<"">>},
                     #attr{name = <<"meta_data">>,default = <<"">>},
                     #attr{name = <<"edit_msg_id">>,default = <<"">>},
+                    #attr{name = <<"mention_list">>,default = <<"">>},
                     #attr{name = <<"scheduled_datetime">>,default = <<"">>}]}).
 
 -xml(delivered,
@@ -369,8 +370,8 @@
      #elem{name = <<"logout">>,
            xmlns = <<"urn:xmpp:receipts">>,
 	   module = 'logout',
-           result = {logout, '$type','$socket_id'},
-           attrs = [#attr{name = <<"type">>,default = <<"">>},#attr{name = <<"socket_id">>,default = <<"">>}]}).
+           result = {logout, '$type','$socket_id','$username'},
+           attrs = [#attr{name = <<"type">>,default = <<"">>},#attr{name = <<"socket_id">>,default = <<"">>},#attr{name = <<"username">>,default = <<"">>}]}).
 
 -xml(recall,
      #elem{name = <<"recall">>,
