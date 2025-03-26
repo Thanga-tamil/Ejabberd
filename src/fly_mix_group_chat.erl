@@ -196,7 +196,9 @@ create_group(From, To, SubEl, IQ) ->
         join = #mix_join{nick = GroupName, message_id = MessageId1, group_create = <<"y">>, custom_attributes = #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, xmlns = <<"urn:xmpp:mix:core:0">>, subscribe = [<<"urn:xmpp:mix:nodes:messages">>,<<"urn:xmpp:mix:nodes:presence">>,
           <<"urn:xmpp:mix:nodes:participants">>,<<"urn:xmpp:mix:nodes:subject">>,<<"urn:xmpp:mix:nodes:config">>]}}]}),
   process_set_group_info(From, GroupJID, SubEl, IQ, <<"new">>),
+
   fly_mod_offline_push:groupcreationfunction(From, groupcreation, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes),
+ 
   fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, group_id = Channel, result_type = <<"Group Created successfully">>}).
 
 create_group_service(From, To, SubEl, IQ) ->
