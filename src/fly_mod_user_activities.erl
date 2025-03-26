@@ -978,14 +978,19 @@ update_mute_notification(From, RequestType, SubEl, IQ) ->
     children = [#xmlel{name = <<"mute">>,
       attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, RequestType}, {<<"to_user">>,ToUserJid}, {<<"mute_status">>, MuteStatus}],
       children = []}]},
-  ejabberd_router:route(From, To, XmlBody),
-
+  ReceivedTimestamp = now_to_microseconds(erlang:now()),
+  ReceivedFlatTimeStamp = lists:flatten(io_lib:format("~p", [ReceivedTimestamp])),
+  ReceivedXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(ReceivedFlatTimeStamp)}],
+    children = []},
+  XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
+  ejabberd_router:route(From, To, XmlBody1),
     NewPacket = #xmlel{name = <<"message">>,
       attrs = [{<<"from">>, jid:to_string(To)}, {<<"to">>, jid:to_string(From)}, {<<"type">>, <<"chat">>}, {<<"id">>, NewMessageId}],
       children = [#xmlel{name = <<"mute">>,
         attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, RequestType}, {<<"to_user">>,ToUserJid}, {<<"mute_status">>, MuteStatus}],
         children = []}]},
-    mod_offline:store_packet({From, xmpp:decode(NewPacket)}),
+    NewPacket1 = fxml:append_subtags(NewPacket, [ReceivedXMLTag]),
+    mod_offline:store_packet({From, xmpp:decode(NewPacket1)}),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Updated successfully">>}).
 
   mute_notification(From, RequestType, SubEl, IQ) ->
@@ -1001,7 +1006,7 @@ update_mute_notification(From, RequestType, SubEl, IQ) ->
       children = [#xmlel{name = <<"mute">>,
         attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, RequestType}, {<<"action">>,MuteAction}, {<<"mute_setting">>,MuteSettings}, {<<"user_list">>,UserIds}],
         children = []}]},
-    ReceivedTimestamp = now_to_microseconds(erlang:now()),
+  ReceivedTimestamp = now_to_microseconds(erlang:now()),
   ReceivedFlatTimeStamp = lists:flatten(io_lib:format("~p", [ReceivedTimestamp])),
   ReceivedXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(ReceivedFlatTimeStamp)}],
     children = []},
@@ -1039,10 +1044,15 @@ update_archive_chat(FromJid, RequestType, SubEl, IQ) ->
     children = [#xmlel{name = <<"archive">>,
       attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, RequestType}, {<<"to_user">>,ToUserJid}, {<<"archive_status">>, ArchiveStatus}],
       children = []}]},
-  ejabberd_router:route(From, To, XmlBody),
+  ReceivedTimestamp = now_to_microseconds(erlang:now()),
+  ReceivedFlatTimeStamp = lists:flatten(io_lib:format("~p", [ReceivedTimestamp])),
+  ReceivedXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(ReceivedFlatTimeStamp)}],
+    children = []},
+  XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
+  ejabberd_router:route(From, To, XmlBody1),
   case fly_mod_utils:get_mobile_user_message(User, Server) of
     true ->
-      mod_offline:store_packet({From,xmpp:decode(XmlBody)});
+      mod_offline:store_packet({From,xmpp:decode(XmlBody1)});
     false ->
       ok
   end,
@@ -1060,10 +1070,15 @@ update_archive_chat(FromJid, RequestType, SubEl, IQ) ->
       children = [#xmlel{name = <<"busy">>,
         attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, RequestType}, {<<"busy_message">>,BusyMsg}, {<<"busy_status">>, BusyStatus}],
         children = []}]},
-    ejabberd_router:route(From, To, XmlBody),
+  ReceivedTimestamp = now_to_microseconds(erlang:now()),
+  ReceivedFlatTimeStamp = lists:flatten(io_lib:format("~p", [ReceivedTimestamp])),
+  ReceivedXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(ReceivedFlatTimeStamp)}],
+    children = []},
+  XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
+    ejabberd_router:route(From, To, XmlBody1),
     case fly_mod_utils:get_mobile_user_message(User, Server) of
       true ->
-        mod_offline:store_packet({From,xmpp:decode(XmlBody)});
+        mod_offline:store_packet({From,xmpp:decode(XmlBody1)});
       false ->
         ok
     end,
@@ -1079,8 +1094,13 @@ register_update_to_rosters(From, RequestType, SubEl, IQ) ->
     children = [#xmlel{name = <<"register_update">>,
       attrs = [{<<"xmlns">>, <<"urn:xmpp:register_update">>}, {<<"status">>, RequestType}],
       children = []}]},
+  ReceivedTimestamp = now_to_microseconds(erlang:now()),
+  ReceivedFlatTimeStamp = lists:flatten(io_lib:format("~p", [ReceivedTimestamp])),
+  ReceivedXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(ReceivedFlatTimeStamp)}],
+    children = []},
+  XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
   {selected, _, Rosters} = fly_mod_utils:get_roster_from_recent_jid(ToJid),
-  push_register_packets(Rosters,XmlBody,ToJid),
+  push_register_packets(Rosters,XmlBody1,ToJid),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Updated to rosters successfully">>}).
 
 push_register_packets(Rosters,Packet,From) ->
