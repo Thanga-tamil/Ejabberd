@@ -150,9 +150,10 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             MessageType = <<"">>,
             Topicid = <<"">>,
             MetaData = <<"">>,
+            MentionList = <<"">>,
             EditMsgid = MessageId;
             true ->
-              {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,_} = ContentAcknowledge
+              {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,MentionList, _} = ContentAcknowledge
           end,
           case catch fly_mod_utils:check_blockeduser(FServer, FUser, TUser) of
             {selected, _, []} ->

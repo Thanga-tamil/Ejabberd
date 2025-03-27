@@ -535,9 +535,10 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     ContentAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #chatcontent{}),
   if ContentAcknowledge =:= false ->
     MessageType = <<"">>,
+    MentionList = <<"">>,
     EditMsgId = MessageId;
     true ->
-    {_,_,_,_,MessageType,_,_,EditMsgId,_} = ContentAcknowledge
+    {_,_,_,_,MessageType,_,_,EditMsgId,MentionList,_} = ContentAcknowledge
     end,
     % DecryptedMessage = fly_mod_security:aes_decrpyt(binary_to_list(MessageId), Message),
     % ParsedMessageJson = jiffy:decode(http_uri:decode(binary_to_list(DecryptedMessage))),
@@ -1253,9 +1254,10 @@ add_quotes(String) ->
 
       if ContentAcknowledge =:= false ->
         MessageType = <<"">>,
-        EditMsgId = MessageId;
+        EditMsgId = MessageId,
+        MentionList = <<"">>;
         true ->
-        {_,_,_,_,MessageType,_,_,EditMsgId,_} = ContentAcknowledge
+        {_,_,_,_,MessageType,_,_,EditMsgId,MentionList,_} = ContentAcknowledge
         end,
 
     Server = Recipient#jid.server,
@@ -1941,7 +1943,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
     ResourcesList = get_resources(Members),
     OfflineUsers = lists:filter(fun(Elem) -> not lists:member(Elem, [0]) end, Output),
     OnlineResources = lists:filter(fun(Elem) -> not lists:member(Elem, [0]) end, ResourcesList),
-    [MessageType, MessageId, MesssageSend,_GroupName, _MSGBody,_EditMsg, _MetaData] = MessageContent,
+    [MessageType, MessageId, MesssageSend,_GroupName, _MSGBody,_EditMsg,_MentionList, _MetaData] = MessageContent,
     case catch fly_mod_utils:get_bulk_user_device(Server, list_to_binary(OfflineUsers), list_to_binary(OnlineResources), <<"android">>,MesssageSend)
     of {selected, _, []} ->
     ok;
@@ -2266,7 +2268,7 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
 
 end.
 ios_send_bulk_push(Server, ToUser, MessageContent, _FromUser, FlatTimeStamp, ChatType, GroupID, Mode, IOSDeviceToken, _Expiry, State,IOSPushType, UserType, PushType) ->
-[MessageType, MessageId, MesssageSend,GroupName, MSGBody, _EditMsg, _MetaData] = MessageContent,
+[MessageType, MessageId, MesssageSend,GroupName, MSGBody, _EditMsg,_MentionList, _MetaData] = MessageContent,
   ChangedMessage = case MessageType of
                     <<"image">> ->
                       Message_Content = <<"">>,

@@ -30,13 +30,13 @@
 -spec start(host(), opts()) -> ok.
 
 start(Host, _Opts) ->
-  ejabberd_hooks:add(user_send_packet, Host, ?MODULE, on_user_send_packet, 90),
+  ejabberd_hooks:add(user_send_packet, Host, ?MODULE, on_user_send_packet, 70),
   ok.
 
 -spec stop(host()) -> ok.
 stop(Host) ->
   ejabberd_hooks:delete(user_send_packet, Host, ?MODULE,
-    on_user_send_packet, 90),
+    on_user_send_packet, 70),
   ok.
 
 %% ====================================================================
@@ -106,9 +106,10 @@ store_offline_user_send(Packet, _C2SState, #jid{luser = FUser, lserver = FServer
             MessageType = <<"">>,
             Topicid = <<"">>,
             MetaData = <<"">>,
+            MentionList = <<"">>,
             EditMsgid = MessageId;
             true ->
-              {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,_} = ContentAcknowledge
+              {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,MentionList,_} = ContentAcknowledge
           end,
 
           if EditMsgid =/= MessageId ->
