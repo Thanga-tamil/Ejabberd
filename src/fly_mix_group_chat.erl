@@ -1320,7 +1320,7 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
 			      {ok,VCARD} ->
 			      VCARD;
 			      _ ->
-			      #vcard_temp{}
+			      #xmlel{name = <<"vCard">>, attrs = [], children = []}
 			      end,
       ?INFO_MSG("group vcard ~P",[VCard]),
       ?INFO_MSG("group Id ~P",[TUser]),
