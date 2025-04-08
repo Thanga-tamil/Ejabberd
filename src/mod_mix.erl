@@ -948,8 +948,8 @@ notify_participant_joined(Mod, LServer, To, From, ID, [Nick, GroupCreate, Publis
 		      PublisherJID = jid:make(fly_mod_utils:get_user_from_string_jid(Publisher),FServer),
 		      #jid{user = PUser, lserver = PServer} = PublisherJID,
 		      Vcard = case catch fly_mod_utils:get_vcard(FServer, FUser) of
-			      {selected, [{GVCARD, _GrpCreatedAt}]} ->
-			      xmpp:encode(fxml_stream:parse_element(GVCARD));
+			      {selected, [{UVCARD, _GrpCreatedAt}]} ->
+			      xmpp:encode(fxml_stream:parse_element(UVCARD));
 			      {selected, []} ->
 			      #xmlel{name = <<"vCard">>};
 			      _ ->
@@ -965,8 +965,23 @@ notify_participant_joined(Mod, LServer, To, From, ID, [Nick, GroupCreate, Publis
 			      #xmlel{name = <<"vCard">>}
 			      end,
                       ItemId = <<(get_string()) / binary>>,
+		GVcard = case catch fly_mod_utils:get_vcard(FServer, Chan) of
+			      {selected, [{GVCARD, _GCreatedAt}]} ->
+			      xmpp:encode(fxml_stream:parse_element(GVCARD));
+			      {selected, []} ->
+			      #xmlel{name = <<"vCard">>};
+			      _ ->
+			      #xmlel{name = <<"vCard">>}
+			      end,
+		       UserNickName = case fxml:get_path_s(GVcard,[{elem, <<"nickName">>}, cdata]) of
+                          <<"">> ->
+                          fxml:get_path_s(GVcard,
+                            [{elem, <<"FN">>},
+                              cdata]);
+                          Nickname -> Nickname
+                        end,
 		      Participant = #mix_participant{jid = jid:remove_resource(From),
-						      nick = Nick, sub_els=[Vcard]},
+						      nick = UserNickName, sub_els=[Vcard]},
 		      Item = #ps_item{id = ItemId, publisher = Publisher,
 					      sub_els = [xmpp:encode(Participant), #xmlel{name = <<"publisher">>, attrs = [{<<"item_id">>, <<(get_string()) / binary>>}, {<<"jid">>, jid:to_string(PublisherJID)}], children = [PublisherVcard]},#xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, ""}]}]},
 		      Items = #ps_items{node = ?NS_MIX_NODES_PARTICIPANTS,
