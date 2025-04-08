@@ -1320,8 +1320,11 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
 			      {ok,VCARD} ->
 			      VCARD;
 			      _ ->
-			      #xmlel{name = <<"vCard">>}
+			      #vcard_temp{}
 			      end,
+      ?INFO_MSG("group vcard ~P",[VCard]),
+      ?INFO_MSG("group Id ~P",[TUser]),
+      ?INFO_MSG("group server ~P",[Server]),
       SubEls1 = lists:map(fun(G) ->
 
         [ItemId, JID, Affiliation,CreatedAt, IsAdminBlocked,SVCARD] = G,
