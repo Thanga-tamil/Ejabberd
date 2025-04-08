@@ -948,8 +948,8 @@ notify_participant_joined(Mod, LServer, To, From, ID, [Nick, GroupCreate, Publis
 		      PublisherJID = jid:make(fly_mod_utils:get_user_from_string_jid(Publisher),FServer),
 		      #jid{user = PUser, lserver = PServer} = PublisherJID,
 		      Vcard = case catch fly_mod_utils:get_vcard(FServer, FUser) of
-			      {selected, [{GVCARD, _GrpCreatedAt}]} ->
-			      xmpp:encode(fxml_stream:parse_element(GVCARD));
+			      {selected, [{UVCARD, _GrpCreatedAt}]} ->
+			      xmpp:encode(fxml_stream:parse_element(UVCARD));
 			      {selected, []} ->
 			      #xmlel{name = <<"vCard">>};
 			      _ ->
@@ -965,9 +965,17 @@ notify_participant_joined(Mod, LServer, To, From, ID, [Nick, GroupCreate, Publis
 			      #xmlel{name = <<"vCard">>}
 			      end,
                       ItemId = <<(get_string()) / binary>>,
-		       UserNickName = case fxml:get_path_s(Vcard,[{elem, <<"nickName">>}, cdata]) of
+		GVcard = case catch fly_mod_utils:get_vcard(FServer, Chan) of
+			      {selected, [{GVCARD, _GCreatedAt}]} ->
+			      xmpp:encode(fxml_stream:parse_element(GVCARD));
+			      {selected, []} ->
+			      #xmlel{name = <<"vCard">>};
+			      _ ->
+			      #xmlel{name = <<"vCard">>}
+			      end,
+		       UserNickName = case fxml:get_path_s(GVcard,[{elem, <<"nickName">>}, cdata]) of
                           <<"">> ->
-                          fxml:get_path_s(Vcard,
+                          fxml:get_path_s(GVcard,
                             [{elem, <<"FN">>},
                               cdata]);
                           Nickname -> Nickname
