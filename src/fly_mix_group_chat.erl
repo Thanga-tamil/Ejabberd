@@ -1318,8 +1318,13 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
     {selected, _, Members} ->
       VCard= case catch mod_vcard_sql:get_vcard(TUser, Server) of
 			      {ok,VCARD} ->
-			      VCARD;
-			      _ ->
+              case fxml_stream:parse_element(VCARD) of
+                    {error, _VReason} ->
+                      #xmlel{name = <<"vCard">>};
+                    VCARD -> 
+                      VCARD
+                  end;
+			       _ ->
 			      #xmlel{name = <<"vCard">>}
 			      end,
       SubEls1 = lists:map(fun(G) ->
