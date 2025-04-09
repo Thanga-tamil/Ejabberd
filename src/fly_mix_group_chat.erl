@@ -1322,9 +1322,8 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
                     {error, _VReason} ->
                       #xmlel{name = <<"vCard">>};
                     VCARD -> [VCARD]
-                  end,
-			      VCARD;
-			      _ ->
+                  end;
+			       _ ->
 			      #xmlel{name = <<"vCard">>}
 			      end,
       SubEls1 = lists:map(fun(G) ->
