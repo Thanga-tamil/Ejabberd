@@ -1316,17 +1316,10 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"No Participants Exists">>});
 
     {selected, _, Members} ->
-      VCard= case catch mod_vcard_sql:get_vcard(TUser, Server) of
-			      {ok,VCARD} ->
-              case fxml_stream:parse_element(VCARD) of
-                    {error, _VReason} ->
-                      [];
-                    VCARD -> 
-                      VCARD
-                  end;
-			       _ ->
-			      []
-			      end,
+     VCard = case mod_vcard_sql:get_vcard(TUser, Server) of
+		  {ok, GSVCard} -> GSVCard;
+		  _ -> []
+	      end,
       SubEls1 = lists:map(fun(G) ->
 
         [ItemId, JID, Affiliation,CreatedAt, IsAdminBlocked,SVCARD] = G,
