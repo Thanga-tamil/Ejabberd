@@ -1321,7 +1321,8 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
               case fxml_stream:parse_element(VCARD) of
                     {error, _VReason} ->
                       #xmlel{name = <<"vCard">>};
-                    VCARD -> [VCARD]
+                    VCARD -> 
+                      VCARD
                   end;
 			       _ ->
 			      #xmlel{name = <<"vCard">>}
