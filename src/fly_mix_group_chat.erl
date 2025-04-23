@@ -466,7 +466,7 @@ fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = 
         ParticipantData = fxml:get_tag_cdata(Participant),
         ConvertUserstring = fly_mod_utils:get_user_from_string_jid(ParticipantData),
         FromJID = jid:make(ConvertUserstring,FServer,<<"">>),
-        mod_mix_sql:del_participant_message(ServerHost,Channel,FromJID),
+        % mod_mix_sql:del_participant_message(ServerHost,Channel,FromJID),
         mod_mix:notify_participant_left_api(ServerHost, GroupJid, AdminUser, FromJID, FromJID, [ConvertUserstring]),
             lists:foreach(fun(ToJid) ->
               RouteToJid = jid:make(ToJid, FServer, <<>>),
@@ -1316,12 +1316,10 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"No Participants Exists">>});
 
     {selected, _, Members} ->
-      VCard= case catch mod_vcard_sql:get_vcard(TUser, Server) of
-			      {ok,VCARD} ->
-			      VCARD;
-			      _ ->
-			      #xmlel{name = <<"vCard">>}
-			      end,
+     VCard = case mod_vcard_sql:get_vcard(TUser, Server) of
+		  {ok, GSVCard} -> GSVCard;
+		  _ -> []
+	      end,
       SubEls1 = lists:map(fun(G) ->
 
         [ItemId, JID, Affiliation,CreatedAt, IsAdminBlocked,SVCARD] = G,

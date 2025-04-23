@@ -36,10 +36,15 @@ def read():
             obj = {'password': p, 'username': u,'currentTimestamp':currentTimestamp}
             headers = {'Content-Type': 'application/json'}
             log('reuted url' + rurl)
-            r = requests.post(rurl, data=json.dumps(obj), headers=headers)
-            if ((r.status_code == 200 or r.status_code == 202 or r.status_code == 201) and (json.loads(r.text)['status'] == 200 or json.loads(r.text)['status'] == 201)):
-                write(True)
-            else:
+            try:
+                r = requests.post(rurl, data=json.dumps(obj), headers=headers)
+                log(f"Raw response object: {r}")
+                if ((r.status_code == 200 or r.status_code == 202 or r.status_code == 201) and (json.loads(r.text)['status'] == 200 or json.loads(r.text)['status'] == 201)):
+                    write(True)
+                else:
+                    write(False)
+            except json.JSONDecodeError as e:
+                log(f"Response Struct error: {e}")
                 write(False)
     elif cmd == 'isuser':
         u, s = pkt.split(':', 2)[1:]
@@ -73,5 +78,7 @@ def write(result):
 if __name__ == "__main__":
     try:
         read()
-    except struct.error:
-        pass
+    except struct.error as e:
+        log(f"Struct error: {e}")
+    except Exception as e:
+        log(f"Unexpected error: {e}")
