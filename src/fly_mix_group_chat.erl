@@ -466,7 +466,7 @@ fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = 
         ParticipantData = fxml:get_tag_cdata(Participant),
         ConvertUserstring = fly_mod_utils:get_user_from_string_jid(ParticipantData),
         FromJID = jid:make(ConvertUserstring,FServer,<<"">>),
-        mod_mix_sql:del_participant_message(ServerHost,Channel,FromJID),
+        % mod_mix_sql:del_participant_message(ServerHost,Channel,FromJID),
         mod_mix:notify_participant_left_api(ServerHost, GroupJid, AdminUser, FromJID, FromJID, [ConvertUserstring]),
             lists:foreach(fun(ToJid) ->
               RouteToJid = jid:make(ToJid, FServer, <<>>),
