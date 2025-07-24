@@ -416,7 +416,7 @@ get_string() ->
     GroupCreateID = <<(get_string()) / binary>>,
     #jid{user = PUser} = FromJID,
     fly_mod_utils:group_notify_message(From, FromJID, PUser, Channel, <<"1">>, <<"create_group">>, GroupCreateID,<<"">>),
-    timer:sleep(1000),
+    timer:sleep(50),
     mod_mix_pam:process_iq(#iq{from = FromJID, to = FromJID,type = set,id = MessageID,
       sub_els = [#mix_client_join{channel = GroupJID,  xmlns = <<"urn:xmpp:mix:pam:0">>,affiliation = <<"n">>,
       join = #mix_join{owner = jid:to_string(From),message_id = MessageID, nick = GroupName, group_create = <<"y">>, custom_attributes = #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, xmlns = <<"urn:xmpp:mix:core:0">>, subscribe = [<<"urn:xmpp:mix:nodes:messages">>,<<"urn:xmpp:mix:nodes:presence">>,
