@@ -852,9 +852,11 @@ save_message(From,TServer,MessageContent,To,Node,Stanza, _MsgTime) ->
 
 													NodeId =  fxml:get_tag_attr_s(<<"id">>, Item),
 													IdValue = xmpp:get_id(Pkt),
-													Content1 = [Chan,Publisher,RemovedUser,NodeId,<<"">>,IdValue]
+													Content1 = [Chan,Publisher,RemovedUser,NodeId,<<"">>,IdValue],
 
-							end
+													Resources = ejabberd_sm:get_user_resources(TUser, LServer),
+													
+												end
 
 
 												end,
