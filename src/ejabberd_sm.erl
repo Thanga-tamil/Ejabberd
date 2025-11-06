@@ -894,38 +894,72 @@ get_resource_sessions(User, Server, Resource) ->
 
 %% Contus added the below code
 -spec check_max_sessions(binary(), binary(), binary()) -> ok | replaced.
-    check_max_sessions(LUser, LServer,LResource ) ->
-	Mod = get_sm_backend(LServer),
-	Ss = get_sessions(Mod, LUser, LServer),
-	MaxSessions = get_max_user_sessions(LUser, LServer, LResource),
-	    Rc = length(get_resource_sessions(LUser, LServer, LResource)),
-	    if Rc == 2 ->
-		    ok;
-	    true ->
-		    if length(Ss) =< MaxSessions -> ok;
-		    true ->
-			    NewSubstring = string:str(binary_to_list(LResource), binary_to_list(<<"Web">>)),
-			    ?INFO_MSG("NewSubstring ~p",[NewSubstring]),
-		if NewSubstring =:= 1 ->
-		US = has_more_resources(LUser, LServer, LResource),
-			    Ls = length(US),
-			    ?INFO_MSG("web resource length ~p",[Ls]),
-			    if Ls == 0 ->
-		   #session{sid = {_, Pid}} = lists:min(Ss),
-			       ejabberd_c2s:route(Pid, replaced);
-			       Ls == 1 ->
-				    #session{sid = {_, Pid}} = lists:min(Ss),
-			       ejabberd_c2s:route(Pid, replaced);
-			       Ls > 1 ->
-				    #session{sid = {_, Pid}} = lists:min(US),
-			       ejabberd_c2s:route(Pid, replaced)
-			    end;
-		       true ->
-			    #session{sid = {_, Pid}} = lists:min(Ss),
-			    ejabberd_c2s:route(Pid, replaced)
-		     end
-		    end
-	end.
+    check_max_sessions(LUser, LServer, LResource) ->
+    %% If the new connection is NOT a Web resource, do not run Web-only replacement.
+    case is_web_resource(LResource) of
+        true ->
+            Mod = get_sm_backend(LServer),
+            SsAll = get_sessions(Mod, LUser, LServer),
+
+            ?INFO_MSG("All sessions for user count: ~p", [length(SsAll)]),
+
+            % Filter only existing Web sessions excluding the current resource
+            SsWeb = [S || S <- SsAll,
+                         begin
+                             Res = extract_resource(S),
+                             is_web_resource(Res) andalso Res =/= LResource
+                         end],
+
+            ?INFO_MSG("Final Web session count after filtering: ~p", [length(SsWeb)]),
+
+            case SsWeb of
+                [] ->
+                    ok;
+                _ ->
+                    % pick oldest session (lists:min uses #session.sid ordering)
+                    OldSession = lists:min(SsWeb),
+                    #session{sid = {_, Pid}} = OldSession,
+
+                    % avoid recursive replacements
+                    case get(replace_in_progress) of
+                        true ->
+                            ?INFO_MSG("Replacement already in progress for ~p, skipping", [LUser]),
+                            ok;
+                        undefined ->
+                            put(replace_in_progress, true),
+                            ?INFO_MSG("Replacing old Web session with PID ~p for user ~p", [Pid, LUser]),
+                            spawn(fun() ->
+                                timer:sleep(1500),
+                                catch ejabberd_c2s:route(Pid, replaced),
+                                erase(replace_in_progress)
+                            end),
+                            replaced
+                    end
+            end;
+        false ->
+            ok
+    end.
+
+-spec is_web_resource(binary()) -> boolean().
+is_web_resource(Res) when is_binary(Res) ->
+    case binary:match(Res, <<"Web">>) of
+        {_, _} -> true;
+        nomatch -> false
+    end;
+is_web_resource(_) -> false.
+
+-spec extract_resource(#session{}) -> binary().
+extract_resource(S) ->
+    case S#session.usr of
+        {_, _, Res} -> 
+            Res;  % 3-element tuple contains resource
+        _ ->
+            % fallback: try to detect Web from info
+            case lists:keyfind(conn, 1, S#session.info) of
+                {conn, websocket} -> <<"Web">>;
+                _ -> <<"unknown">>
+            end
+    end.
 
     has_more_resources(User, LServer,NewResource) ->
      Mod = get_sm_backend(LServer),
