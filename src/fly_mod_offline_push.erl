@@ -133,14 +133,12 @@ handle_cast({pushnotification, <<"chat">>,
       end
       end,
       if Call =:= true ->
-        case catch send_push_notifications(Sender, Recipient,
-          ChatType, SubEl, Packet, State)
-        of
+        case catch send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) of
           {ok, _Result} -> ok;
           {error, Error} ->
             ?INFO_MSG("push error ~p", [Error]), ok;
           _Exception ->
-            ?INFO_MSG("push exception ~p", [_Exception]), ok
+            ?INFO_MSG("push status ~p", [_Exception]), ok
         end;
       true ->
         ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
@@ -438,10 +436,9 @@ send_push_notifications(Sender, Recipient, ChatType,
     Packet#xmlel.attrs),
   Rs = has_more_resources(Recipient#jid.luser,Recipient#jid.server),
   case catch
-    fly_mod_utils:get_user_device(Recipient#jid.server,
-      Recipient#jid.luser,Rs,ChatType)
+    fly_mod_utils:get_user_device(Recipient#jid.server, Recipient#jid.luser, Rs, ChatType)
   of
-    {selected, _, []} -> ?INFO_MSG("push_message get_user_device_details failed error is ~p", [Recipient#jid.luser]),
+    {selected, _, []} -> ?INFO_MSG("~p user online", [Recipient#jid.luser]),
       device_token_is_empty;
       {selected, _, Tokens} ->
       if ChatType == <<"call">> ->

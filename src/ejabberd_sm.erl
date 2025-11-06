@@ -901,7 +901,7 @@ get_resource_sessions(User, Server, Resource) ->
             Mod = get_sm_backend(LServer),
             SsAll = get_sessions(Mod, LUser, LServer),
 
-            ?INFO_MSG("All sessions for user count: ~p", [length(SsAll)]),
+            ?INFO_MSG(" for user count: ~p", [length(SsAll)]),
 
             % Filter only existing Web sessions excluding the current resource
             SsWeb = [S || S <- SsAll,
@@ -910,7 +910,7 @@ get_resource_sessions(User, Server, Resource) ->
                              is_web_resource(Res) andalso Res =/= LResource
                          end],
 
-            ?INFO_MSG("Final Web session count after filtering: ~p", [length(SsWeb)]),
+            ?INFO_MSG("all sessions ~p | filtered web session: ~p", [length(SsAll), length(SsWeb)]),
 
             case SsWeb of
                 [] ->
