@@ -144,7 +144,7 @@ format_error({unexpected_packet, Name}) ->
 format_error({tls, Reason}) ->
     format("TLS failed: ~ts", [format_tls_error(Reason)]);
 format_error({socket, A}) ->
-    format("~ts", [format_inet_error(A)]);
+    format("Connection failed: ~ts", [format_inet_error(A)]);
 format_error({code, Code}) ->
     format("Protocol error: ~ts", [mqtt_codec:format_reason_code(Code)]);
 format_error({auth, Code}) ->
