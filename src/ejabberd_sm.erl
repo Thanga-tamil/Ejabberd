@@ -901,8 +901,6 @@ get_resource_sessions(User, Server, Resource) ->
             Mod = get_sm_backend(LServer),
             SsAll = get_sessions(Mod, LUser, LServer),
 
-            ?INFO_MSG(" for user count: ~p", [length(SsAll)]),
-
             % Filter only existing Web sessions excluding the current resource
             SsWeb = [S || S <- SsAll,
                          begin
