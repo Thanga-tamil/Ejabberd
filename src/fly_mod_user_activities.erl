@@ -550,6 +550,7 @@ user_logout(From, RequestType, SubEl, IQ) ->
   #jid{luser = LUser, lserver = LServer, lresource = LResource} = From,
   SocketId = fxml:get_path_s(SubEl, [{attr, <<"socket_id">>}]),
   UserName = fxml:get_path_s(SubEl, [{attr, <<"message_from">>}]),
+  DeviceId = fxml:get_path_s(SubEl, [{attr, <<"device_id">>}]),
   if UserName =:= <<>> ->
     To = jid:make({LUser, LServer, <<>>});
   true ->
@@ -560,7 +561,7 @@ user_logout(From, RequestType, SubEl, IQ) ->
   XmlBody = #xmlel{name = <<"message">>,
     attrs = [{<<"from">>, jid:to_string(To)}, {<<"to">>, jid:to_string(To)}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
     children = [#xmlel{name = <<"logout">>,
-      attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, <<"logout">>}, {<<"socket_id">>, SocketId}],
+      attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, <<"logout">>}, {<<"socket_id">>, SocketId}, {<<"device_id">>, DeviceId}],
       children = []}]},
   ejabberd_router:route(To, To, XmlBody),
 
