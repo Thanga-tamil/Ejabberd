@@ -463,6 +463,7 @@ set_presence(User, Server, Resource, _Status) ->
       %State = #{jid => #jid{luser = User, lserver = Server, lresource = Resource} = UserJid},
       % mod_offline:route_offline_messages(State) ,
       fly_mod_utils:set_last_o(User, Server, <<"1">>),
+      fly_mod_utils:remove_offline_by_user(Server, User),
       JID = jid:make({User, Server, <<>>}),
       push_to_rosters(JID, #xmlel{name = <<"presence">>,
         attrs = [{<<"type">>, <<"available">>}],
