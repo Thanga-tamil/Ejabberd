@@ -71,6 +71,7 @@
   delete_message/2,
   remove_offline/2,
   remove_offline/3,
+  remove_offline_by_user/2,
   update_offline/3,
   update_seen/4,
   update_delivery/4,
@@ -1253,6 +1254,12 @@ remove_offline(Server, MessageId, LResource) ->
   ejabberd_sql:sql_query(
     Server,
     [<<"DELETE from spool where message_id='">>,MessageId,<<"' and (device_id = '">>,LResource,<<"' or device_id = '') ;">>]).
+
+remove_offline_by_user(Server, FUser) ->
+  ejabberd_sql:sql_query(
+    Server,
+    [<<"delete from spool where username= '">>,FUser,<<"' and device_id not in (select device_id from chat_users_details where username='">>,FUser,<<"');">>])
+.
 
 update_offline(Server, MessageId, LResource) ->
 
