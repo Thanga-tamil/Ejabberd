@@ -1483,6 +1483,13 @@ clear_message(#jid{luser = User, lserver = Server, lresource = _Resource} = From
                 children = []}
           ]}
         end,
+
+      if Last_Msg_Id =:= <<"">>->
+        fly_mod_utils:clear_message(From, Remove_User, Favourite, DeleteAction);
+      true->
+        fly_mod_utils:clear_message(From, Remove_User, Favourite, DeleteAction,Last_Msg_Id)
+      end,
+      
     ejabberd_router:route(From, To, XmlBody),
     if Last_Msg_Id =:= <<"">>->
       fly_mod_utils:clear_message(From, Remove_User, Favourite, DeleteAction);
