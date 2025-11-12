@@ -725,8 +725,7 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
 
     lists:foreach(
 	fun(OffMsg) ->
-	    route_offline_message(State, OffMsg),
-		timer:sleep(30)
+	    route_offline_message(State, OffMsg)
 	end, Msgs),
 	if Msgs =/= [] ->
 	route_offline_messages(State);
