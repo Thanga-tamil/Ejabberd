@@ -854,14 +854,8 @@ save_message(From,TServer,MessageContent,To,Node,Stanza, _MsgTime) ->
 													IdValue = xmpp:get_id(Pkt),
 													Content1 = [Chan,Publisher,RemovedUser,NodeId,<<"">>,IdValue],
 
-													Resources = ejabberd_sm:get_user_resources(TUser, LServer),
-													if (LServer =/= <<"kooratech-xmpp.mirrorfly.com">>) ->
-														fly_mod_offline_push:send_bulk_group_push(From,LServer,Content1,TUser,Node,Stanza,<<"remove">>);
-													true ->
-														ok
-							end
-
-
+													Resources = ejabberd_sm:get_user_resources(TUser, LServer)
+													
 												end,
 												fly_mix_group_chat:carboncall_message(TUser ,LServer, Msg2, From),
 												ok;
