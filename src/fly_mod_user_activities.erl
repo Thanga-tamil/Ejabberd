@@ -1483,12 +1483,15 @@ clear_message(#jid{luser = User, lserver = Server, lresource = _Resource} = From
                 children = []}
           ]}
         end,
-    ejabberd_router:route(From, To, XmlBody),
-    if Last_Msg_Id =:= <<"">>->
-      fly_mod_utils:clear_message(From, Remove_User, Favourite, DeleteAction);
-    true->
-      fly_mod_utils:clear_message(From, Remove_User, Favourite, DeleteAction,Last_Msg_Id)
+
+      if Last_Msg_Id =:= <<"">>->
+        fly_mod_utils:clear_message(From, Remove_User, Favourite, DeleteAction);
+      true->
+        fly_mod_utils:clear_message(From, Remove_User, Favourite, DeleteAction,Last_Msg_Id)
       end,
+      
+    ejabberd_router:route(From, To, XmlBody),
+
         case fly_mod_utils:get_mobile_user_message(User, Server) of
         true ->
           mod_offline:store_packet({From,xmpp:decode(XmlBody)});
