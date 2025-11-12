@@ -1275,23 +1275,30 @@ read_all(Server, Fuser, Tuser)->
 update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
 
     case catch ejabberd_sql:sql_query(
-    Server,
-    [<<"update message_status set status =  2, seen_at = NOW() where  to_user='">>,User,<<"' and message_id='">>,MessageId,<<"' and  status != 2 ;">>]) of
-    {updated,1} ->
-      if GroupId =/= <<"">> ->
-      ejabberd_sql:sql_query(
-    Server,
-    [<<"UPDATE chat_recent SET unread = CASE  WHEN unread > 0 THEN unread - 1  ELSE 0  END WHERE from_user ='">>,GroupId, <<"' and to_user ='">>,User, <<"';">>]);
-  true ->
-ejabberd_sql:sql_query(
-    Server,
-    [<<"UPDATE chat_recent SET unread = CASE  WHEN unread > 0 THEN unread - 1  ELSE 0 END WHERE from_user ='">>,TUser, <<"' and to_user ='">>,User, <<"';">>])
-end;
-    {updated,0}->
-      ok;
-    _ ->
-      ok
-  end,
+      Server,
+      [<<"update message_status set status =  2, seen_at = NOW() where  to_user='">>,User,<<"' and message_id='">>,MessageId,<<"' and  status != 2 ;">>]
+    ) of
+      {updated,1} ->
+        ejabberd_sql:sql_query(
+          Server,
+            [<<"update message_status set received_at = NOW() where to_user='">>,User,<<"' and message_id='">>,MessageId,<<"' and received_at = '0000-00-00 00:00:00';">>]
+        ),
+        if GroupId =/= <<"">> ->
+          ejabberd_sql:sql_query(
+            Server,
+              [<<"UPDATE chat_recent SET unread = CASE  WHEN unread > 0 THEN unread - 1  ELSE 0  END WHERE from_user ='">>,GroupId, <<"' and to_user ='">>,User, <<"';">>]
+          );
+        true ->
+          ejabberd_sql:sql_query(
+            Server,
+            [<<"UPDATE chat_recent SET unread = CASE  WHEN unread > 0 THEN unread - 1  ELSE 0 END WHERE from_user ='">>,TUser, <<"' and to_user ='">>,User, <<"';">>]
+          )
+        end;
+      {updated,0}->
+        ok;
+      _ ->
+        ok
+    end,
 
   % ejabberd_sql:sql_query(
   %   Server,
@@ -1313,7 +1320,8 @@ end;
 
   ejabberd_sql:sql_query(
     Server,
-    [<<"update chat_recent set status = 2 where  to_user ='">>,TUser,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>]).
+    [<<"update chat_recent set status = 2 where  to_user ='">>,TUser,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>])
+.
 
 %% Update message delivery status
 %%
