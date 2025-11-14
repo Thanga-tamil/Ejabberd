@@ -915,24 +915,45 @@ get_resource_sessions(User, Server, Resource) ->
                     ok;
                 _ ->
                     % pick oldest session (lists:min uses #session.sid ordering)
-                    OldSession = lists:min(SsWeb),
-                    #session{sid = {_, Pid}} = OldSession,
+                %     OldSession = lists:min(SsWeb),
+                %     #session{sid = {_, Pid}} = OldSession,
 
-                    % avoid recursive replacements
-                    case get(replace_in_progress) of
-                        true ->
-                            ?INFO_MSG("Replacement already in progress for ~p, skipping", [LUser]),
-                            ok;
-                        undefined ->
-                            put(replace_in_progress, true),
-                            ?INFO_MSG("Replacing old Web session with PID ~p for user ~p", [Pid, LUser]),
-                            spawn(fun() ->
-                                timer:sleep(1500),
-                                catch ejabberd_c2s:route(Pid, replaced),
-                                erase(replace_in_progress)
-                            end),
-                            replaced
-                    end
+                %     % avoid recursive replacements
+                %     case get(replace_in_progress) of
+                %         true ->
+                %             ?INFO_MSG("Replacement already in progress for ~p, skipping", [LUser]),
+                %             ok;
+                %         undefined ->
+                %             put(replace_in_progress, true),
+                %             ?INFO_MSG("Replacing old Web session with PID ~p for user ~p", [Pid, LUser]),
+                %             spawn(fun() ->
+                %                 timer:sleep(1500),
+                %                 catch ejabberd_c2s:route(Pid, replaced),
+                %                 erase(replace_in_progress)
+                %             end),
+                %             replaced
+                %     end
+		#session{sid = {_, C2SPid},
+			usr = {LUser, LServer},
+			resource = Resource} = OldSession,
+
+		From = jid:make(<<"server">>, <<"domain">>, <<"">>),
+		To   = jid:make(LUser, LServer, Resource),
+
+		LogoutMsg =
+		#message{
+		from = From,
+		to   = To,
+		type = normal,
+		sub_els = [#xmlel{
+				name = <<"logout">>,
+				attrs = [],
+				children = [{xmlcdata, <<"Replaced by new session">>}]
+				}]
+		},
+
+		ejabberd_router:route(LogoutMsg)
+
             end;
         false ->
             ok
