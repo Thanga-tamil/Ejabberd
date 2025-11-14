@@ -908,7 +908,8 @@ get_resource_sessions(User, Server, Resource) ->
                              is_web_resource(Res) andalso Res =/= LResource
                          end],
 
-            ?INFO_MSG("all sessions ~p | filtered web session: ~p", [length(SsAll), length(SsWeb)]),
+            ?INFO_MSG("all sessions length ~p | filtered web session length: ~p", [length(SsAll), length(SsWeb)]),
+	    ?INFO_MSG("all sessions ~p | filtered web session: ~p", [SsAll, SsWeb]),
 
             case SsWeb of
                 [] ->
@@ -928,7 +929,7 @@ get_resource_sessions(User, Server, Resource) ->
                             ?INFO_MSG("Replacing old Web session with PID ~p for user ~p", [Pid, LUser]),
                             spawn(fun() ->
                                 timer:sleep(1500),
-                                catch ejabberd_c2s:route(Pid, replaced),
+                                catch ejabberd_c2s:stop(Pid, replaced),
                                 erase(replace_in_progress)
                             end),
                             replaced
