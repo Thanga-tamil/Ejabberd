@@ -929,7 +929,7 @@ get_resource_sessions(User, Server, Resource) ->
                             ?INFO_MSG("Replacing old Web session with PID ~p for user ~p", [Pid, LUser]),
                             spawn(fun() ->
                                 timer:sleep(1500),
-                                catch ejabberd_c2s:stop(Pid, replaced),
+                                catch ejabberd_c2s:stop(Pid, {conflict, <<"Replaced by new connection">>}),
                                 erase(replace_in_progress)
                             end),
                             replaced
