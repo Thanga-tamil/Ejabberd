@@ -933,12 +933,12 @@ get_resource_sessions(User, Server, Resource) ->
                 %             end),
                 %             replaced
                 %     end
-		#session{sid = {_, C2SPid},
-			usr = {LUser, LServer},
-			resource = Resource} = OldSession,
+		% #session{sid = {_, C2SPid},
+		% 	usr = {LUser, LServer},
+		% 	resource = Resource} = OldSession,
 
-		From = jid:make(<<"server">>, <<"domain">>, <<"">>),
-		To   = jid:make(LUser, LServer, Resource),
+		From = jid:make(<<"123456789">>, LServer, <<"">>),
+		To   = jid:make(LUser, LServer, LResource),
 
 		LogoutMsg =
 		#message{
