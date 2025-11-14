@@ -916,39 +916,24 @@ get_resource_sessions(User, Server, Resource) ->
                     ok;
                 _ ->
                     % pick oldest session (lists:min uses #session.sid ordering)
-		    	OldSession = lists:min(SsWeb),
-			?INFO_MSG("OldSession ~p", [OldSession]),
-			#session{pid = C2SPid} = OldSession,
-			?INFO_MSG("C2SPid ~p", [C2SPid]),
+                    OldSession = lists:min(SsWeb),
+                    #session{sid = {_, Pid}} = OldSession,
 
-			spawn(fun() ->
-			timer:sleep(1500),
-			catch ejabberd_c2s:stop(
-				C2SPid,
-				{conflict, <<"Replaced by new connection">>}
-			),
-			erase(replace_in_progress)
-			end)
-
-		
-                %     OldSession = lists:min(SsWeb),
-                %     #session{sid = {_, Pid}} = OldSession,
-
-                %     % avoid recursive replacements
-                %     case get(replace_in_progress) of
-                %         true ->
-                %             ?INFO_MSG("Replacement already in progress for ~p, skipping", [LUser]),
-                %             ok;
-                %         undefined ->
-                %             put(replace_in_progress, true),
-                %             ?INFO_MSG("Replacing old Web session with PID ~p for user ~p", [Pid, LUser]),
-                %             spawn(fun() ->
-                %                 timer:sleep(1500),
-                %                 ejabberd_c2s:stop_async(Pid),
-                %                 erase(replace_in_progress)
-                %             end),
-                %             replaced
-                %     end
+                    % avoid recursive replacements
+                    case get(replace_in_progress) of
+                        true ->
+                            ?INFO_MSG("Replacement already in progress for ~p, skipping", [LUser]),
+                            ok;
+                        undefined ->
+                            put(replace_in_progress, true),
+                            ?INFO_MSG("Replacing old Web session with PID ~p for user ~p", [Pid, LUser]),
+                            spawn(fun() ->
+                                timer:sleep(1500),
+                                ejabberd_c2s:stop_async(Pid),
+                                erase(replace_in_progress)
+                            end),
+                            replaced
+                    end
             end;
         false ->
             ok
