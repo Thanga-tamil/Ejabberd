@@ -938,7 +938,7 @@ get_resource_sessions(User, Server, Resource) ->
                 %             end),
                 %             replaced
                 %     end
-		#session{sid = {_, C2SPid}, usr = { OldUser, OldServer }, resource = OldResource} = OldSession,
+		#session{sid = {_, C2SPid}, usr = { OldUser, OldServer, OldResource }} = OldSession,
 		?INFO_MSG("C2SPid ~p", [C2SPid]),
 		?INFO_MSG("OldUser ~p", [OldUser]),
 		?INFO_MSG("OldServer ~p", [OldServer]),
