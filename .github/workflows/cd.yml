@@ -1,0 +1,97 @@
+on:
+  push:
+    branches: ["production"]
+
+env:
+  IMAGE_TAG: ${{ github.sha }}
+  GCP_PROJECT: "ting-messenger"
+  GCP_REGION: "asia-south1"
+  ARTIFACT_REGISTRY_NAME: "tm-artifact-registry"
+  GCP_CLUSTER_NAME: "tm-cluster"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-deploy:
+    runs-on:
+      group: tm-runner-group
+      labels: arc-runner-set
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: gcp-auth
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY_JSON }}
+          export_environment_variables: true
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          version: 'latest'
+          install_components: 'gke-gcloud-auth-plugin'
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+
+      - name: Build and Push Docker image
+        id: docker_build
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          provenance: false
+          tags: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_NAME }}/${{ github.event.repository.name }}:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials $GCP_CLUSTER_NAME --region $GCP_REGION --project $GCP_PROJECT
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Get chart name
+        id: chart_name
+        run: |
+          CHART_NAME=$(grep '^name:' charts/Chart.yaml | awk '{print $2}')
+          echo "chart_name=${CHART_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch static IP for ejabberd
+        id: static_ip
+        run: |
+          IP=$(gcloud compute addresses describe tm-ejabberd-loadbalancer-ip \
+                --region $GCP_REGION \
+                --project $GCP_PROJECT \
+                --format="value(address)")
+
+          if [[ -z "$IP" ]]; then
+            echo "Static IP not found!"; exit 1
+          fi
+
+          echo "STATIC_IP=$IP" >> $GITHUB_OUTPUT
+
+      - name: Helm upgrade/install
+        run: |
+          RELEASE_NAME=${{ steps.chart_name.outputs.chart_name }}
+          helm upgrade --install "$RELEASE_NAME" ./charts \
+            --namespace production \
+            --create-namespace \
+            --set ejabberd.staticIp=${{ steps.static_ip.outputs.STATIC_IP }} \
+            --set rabbitmq.password="${{ secrets.TM_RABBITMQ_KEY }}" \
+            --set mysql.password="${{ secrets.TM_MYSQL_PRODUCTION_USER_KEY }}" \
+            --set client.key="${{ secrets.TM_CLIENT_KEY }}" \
+            --set image.repository=${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT}/${ARTIFACT_REGISTRY_NAME}/${{ github.event.repository.name }} \
+            --set image.tag=${IMAGE_TAG}
