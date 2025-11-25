@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "chatservice-headless.fullname" . }}
+  labels:
+    {{- include "chatservice-headless.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "chatservice-headless.fullname" . }}-hl
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "chatservice-headless.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
+      labels:
+        {{- include "chatservice-headless.selectorLabels" . | nindent 8 }}
+    spec:
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+      serviceAccountName: {{ include "chatservice-headless.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+
+      initContainers:
+        - name: build-ejabberd-pem
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              echo "Building ejabberd.pem..."
+              cat /tls/tls.key /tls/tls.crt > /certs/ejabberd.pem
+          volumeMounts:
+            - name: domain-tls
+              mountPath: /tls
+            - name: ejabberd-certs
+              mountPath: /certs
+
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          ports:
+            - name: c2s
+              containerPort: {{ .Values.service.c2s.port }}
+              protocol: TCP
+            - name: s2s
+              containerPort: {{ .Values.service.s2s.port }}
+              protocol: TCP
+            - name: http
+              containerPort: {{ .Values.service.http.port }}
+              protocol: TCP
+
+          livenessProbe:
+            tcpSocket:
+              port: 5222
+            initialDelaySeconds: 120
+            timeoutSeconds: 30
+            periodSeconds: 10
+
+          readinessProbe:
+            tcpSocket:
+              port: 5222
+            initialDelaySeconds: 120
+            timeoutSeconds: 45
+            periodSeconds: 10
+
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 10"]
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+          volumeMounts:
+            - name: ejabberd-certs
+              mountPath: /opt/ejabberd/certs
+              readOnly: true
+            - name: configetc
+              mountPath: /opt/ejabberd/etc/ejabberd
+            - name: varlog
+              mountPath: /opt/ejabberd/var/log/ejabberd/
+
+      volumes:
+        - name: domain-tls
+          projected:
+            sources:
+              - secret:
+                  name: {{ .Values.tls.secretName }}
+                  items:
+                    - key: tls.crt
+                      path: tls.crt
+                    - key: tls.key
+                      path: tls.key
+
+        - name: ejabberd-certs
+          emptyDir: {}
+
+        - name: configetc
+          secret:
+            secretName: {{ include "chatservice-headless.fullname" . }}-config
+
+        - name: varlog
+          emptyDir: {}
+
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
