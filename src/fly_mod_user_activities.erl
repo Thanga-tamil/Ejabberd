@@ -551,6 +551,7 @@ user_logout(From, RequestType, SubEl, IQ) ->
   #jid{luser = LUser, lserver = LServer, lresource = LResource} = From,
   SocketId = fxml:get_path_s(SubEl, [{attr, <<"socket_id">>}]),
   UserName = fxml:get_path_s(SubEl, [{attr, <<"message_from">>}]),
+  DeviceId = fxml:get_path_s(SubEl, [{attr, <<"device_id">>}]),
   if UserName =:= <<>> ->
     To = jid:make({LUser, LServer, <<>>});
   true ->
@@ -561,7 +562,7 @@ user_logout(From, RequestType, SubEl, IQ) ->
   XmlBody = #xmlel{name = <<"message">>,
     attrs = [{<<"from">>, jid:to_string(To)}, {<<"to">>, jid:to_string(To)}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
     children = [#xmlel{name = <<"logout">>,
-      attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, <<"logout">>}, {<<"socket_id">>, SocketId}],
+      attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, <<"logout">>}, {<<"socket_id">>, SocketId}, {<<"device_id">>, DeviceId}],
       children = []}]},
   ejabberd_router:route(To, To, XmlBody),
 
@@ -1482,12 +1483,15 @@ clear_message(#jid{luser = User, lserver = Server, lresource = _Resource} = From
                 children = []}
           ]}
         end,
-    ejabberd_router:route(From, To, XmlBody),
-    if Last_Msg_Id =:= <<"">>->
-      fly_mod_utils:clear_message(From, Remove_User, Favourite, DeleteAction);
-    true->
-      fly_mod_utils:clear_message(From, Remove_User, Favourite, DeleteAction,Last_Msg_Id)
+
+      if Last_Msg_Id =:= <<"">>->
+        fly_mod_utils:clear_message(From, Remove_User, Favourite, DeleteAction);
+      true->
+        fly_mod_utils:clear_message(From, Remove_User, Favourite, DeleteAction,Last_Msg_Id)
       end,
+      
+    ejabberd_router:route(From, To, XmlBody),
+
         case fly_mod_utils:get_mobile_user_message(User, Server) of
         true ->
           mod_offline:store_packet({From,xmpp:decode(XmlBody)});
