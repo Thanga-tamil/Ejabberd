@@ -1850,7 +1850,8 @@ Status == <<"remove_admin">> ->
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
         #jid{user = TUser, lserver = TServer} = RouteToJid,
-        fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp), GroupDescription),
+        EncryptedDescriptionNotifier = fly_mod_security:aes_encrpyt_license(MessageId, <<"ddc0f15cc2c90fca">>, GroupDescription),
+        fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp), EncryptedDescriptionNotifier),
         Packet = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupFrom)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
           children = [
