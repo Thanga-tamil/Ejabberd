@@ -1689,7 +1689,7 @@ delete_message(FromUser, RequestType, SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Group Does Not exists">>});
     {selected, _, GroupMembers} ->
       JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
-      fly_mix_group_chat:update_group_info_to_members(FromJid, To, Status,MsgId, JIDs, <<"8">>, SubEl),
+      fly_mix_group_chat:update_group_info_to_members(FromJid, To, Status,MsgId, JIDs, <<"8">>, SubEl, <<"">>),
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Recall status send successfully">>})
   end;
   true ->
