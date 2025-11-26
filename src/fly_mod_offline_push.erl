@@ -405,7 +405,7 @@ get_string() ->
   VCard = fxml:get_subtag(Profile, <<"vCard">>),
   NickName = fxml:get_subtag(VCard, <<"nickName">>),
   GroupName = fxml:get_tag_cdata(NickName),
-  fly_mod_utils:group_notify_message(From, From, FUser, Channel, <<"1">>, <<"create_group">>, MessageId1,<<"">>),
+  fly_mod_utils:group_notify_message(From, From, FUser, Channel, <<"1">>, <<"create_group">>, MessageId1,<<"">>,<<"">>),
   % Adds Participant
   lists:foreach(fun(Participant) ->
     ParticipantData = fxml:get_tag_cdata(Participant),
@@ -413,7 +413,7 @@ get_string() ->
     MessageID = <<(get_string()) / binary>>,
     GroupCreateID = <<(get_string()) / binary>>,
     #jid{user = PUser} = FromJID,
-    fly_mod_utils:group_notify_message(From, FromJID, PUser, Channel, <<"1">>, <<"create_group">>, GroupCreateID,<<"">>),
+    fly_mod_utils:group_notify_message(From, FromJID, PUser, Channel, <<"1">>, <<"create_group">>, GroupCreateID,<<"">>,<<"">>),
     timer:sleep(50),
     mod_mix_pam:process_iq(#iq{from = FromJID, to = FromJID,type = set,id = MessageID,
       sub_els = [#mix_client_join{channel = GroupJID,  xmlns = <<"urn:xmpp:mix:pam:0">>,affiliation = <<"n">>,
