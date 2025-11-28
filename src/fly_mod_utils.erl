@@ -1335,7 +1335,7 @@ update_delivery(#jid{luser = User,lserver = Server}, TUser,  MessageId, GroupId)
     {updated,_} ->
       if GroupId =/= <<"">> ->
     ToJid = jid:make(TUser, Server, <<>>),
-    timer:sleep(2000),
+    %% timer:sleep(2000),
     case catch get_groupmessage_status(ToJid, MessageId) of
         {selected, _, []} ->
           Status = <<"1">>;
