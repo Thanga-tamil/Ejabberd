@@ -98,7 +98,7 @@
   get_group_chat_messages/7,
   get_message_status/2,
   get_groupmessage_status/2,
-  group_notify_message/8,
+  group_notify_message/9,
   get_blockedlist/2,
   check_group_exists/2,
   set_web_password/2,
@@ -186,7 +186,7 @@
   set_user_settings/2, get_archived_chats/1,update_recent_unread_chat/2,update_recent_group_unread_chat/3,
   update_block_status_user/3,update_block_status_group/3,get_contact_permission/1,update_vcard_date/2,get_user_resources/2,
   get_user_resources/3,get_mobile_user_message/2,get_mobile_user_resource/2,get_push_type/1,get_meta_chat_web/4,poll_vote_update/8,
-  remove_poll_offline/3]).
+  remove_poll_offline/3,get_existing_group_info/2]).
 
 -include("logger.hrl").
 
@@ -1335,6 +1335,7 @@ update_delivery(#jid{luser = User,lserver = Server}, TUser,  MessageId, GroupId)
     {updated,_} ->
       if GroupId =/= <<"">> ->
     ToJid = jid:make(TUser, Server, <<>>),
+    %% timer:sleep(2000),
     case catch get_groupmessage_status(ToJid, MessageId) of
         {selected, _, []} ->
           Status = <<"1">>;
@@ -1768,7 +1769,10 @@ check_group_exists(FServer, GroupId) ->
   ejabberd_sql:sql_query(FServer,
     [<<"SELECT from_user FROM message_status WHERE from_user  = '">>,GroupId,<<"';">>]).
 
-group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser}, TUser, Groupid,NotifyId, RequestType, Msgid, TimeStamp)->
+get_existing_group_info(FServer, GroupId) ->
+  ejabberd_sql:sql_query(FServer, [<<"SELECT nickname, description, image FROM vcard_search WHERE username = '">>,GroupId,<<"' ;">>]).
+
+group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser}, TUser, Groupid,NotifyId, RequestType, Msgid, TimeStamp, Txt)->
   % MsgId = get_iq_message_id(8),
 
   Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
@@ -1786,7 +1790,7 @@ group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser},
   ejabberd_sql:sql_query(
     AServer,
     [<<"insert into message_status (from_notification,to_notification,from_user,to_user,message_id, edit_message_id, message_notification,chat_type, message_time,txt,received_at,seen_at,meta_data) values
-     ('">>,FromNotification, <<"','">>,TUser, <<"','">>,Groupid, <<"','">>,FUser,  <<"','">>,Msgid, <<"','">>,Msgid, <<"','">>,NotifyId, <<"','normal','">>,Currenttime, <<"','','0000-00-00 00:00:00','0000-00-00 00:00:00','{}') ON DUPLICATE KEY UPDATE to_user = '">>, FUser, <<"',message_id = '">>, Msgid, <<"' ;">>]),
+     ('">>,FromNotification, <<"','">>,TUser, <<"','">>,Groupid, <<"','">>,FUser,  <<"','">>,Msgid, <<"','">>,Msgid, <<"','">>,NotifyId, <<"','normal','">>,Currenttime, <<"','">>,Txt,<<"','0000-00-00 00:00:00','0000-00-00 00:00:00','{}') ON DUPLICATE KEY UPDATE to_user = '">>, FUser, <<"',message_id = '">>, Msgid, <<"' ;">>]),
 
   case catch update_recent_groupchat(AServer,Groupid,FUser,Msgid,AUser,NotifyId,<<"normal">>,<<"notification">>,TUser,<<"2">>,Currenttime) of
     {updated,1} ->

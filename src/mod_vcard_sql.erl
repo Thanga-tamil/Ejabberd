@@ -88,7 +88,8 @@ sql_schemas() ->
                      #sql_column{name = <<"orgname">>, type = text},
                      #sql_column{name = <<"lorgname">>, type = text},
                      #sql_column{name = <<"orgunit">>, type = text},
-                     #sql_column{name = <<"lorgunit">>, type = text}],
+                     #sql_column{name = <<"lorgunit">>, type = text},
+                     #sql_column{name = <<"description">>, type = text}],
                 indices = [#sql_index{
                               columns = [<<"server_host">>, <<"lusername">>],
                               unique = true},
@@ -167,7 +168,8 @@ set_vcard(LUser, LServer, VCARD,
             lthumbimage = LThumbImage,
             history = History,
             mobilenumber = MobileNumber,
-            lmobilenumber = LMobileNumber}) ->
+            lmobilenumber = LMobileNumber,
+            description = Description}) ->
     SVCARD = fxml:element_to_binary(VCARD),
     ejabberd_sql:sql_transaction(
       LServer,
@@ -210,7 +212,8 @@ set_vcard(LUser, LServer, VCARD,
                            "lthumbimage=%(LThumbImage)s",
                            "history=%(History)s",
                            "mobilenumber=%(MobileNumber)s",
-                           "lmobilenumber=%(LMobileNumber)s"])
+                           "lmobilenumber=%(LMobileNumber)s",
+                           "description=%(Description)s"])
       end).
 
 search(LServer, Data, AllowReturnAll, MaxMatch) ->
