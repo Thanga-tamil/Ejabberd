@@ -806,6 +806,44 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
     true -> ok
     end.
 
+%% helpers
+build_message_values(FromUser, ToUser, MessageId, EditMsgId,
+                     MessageType, MessageSend, MentionList,
+                     FlatTimeStamp, MetaData, SUser) ->
+    Unread = if ToUser =:= SUser -> <<"0">>; true -> <<"1">> end,
+    iolist_to_binary([
+        "('", FromUser, "','", ToUser, "',0,1,'", MessageId, "','", MentionList,
+        "','", EditMsgId, "','", MessageType, "','','normal','", MessageSend,
+        "','", FlatTimeStamp, "','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00','", MetaData, "')"
+    ]).
+
+build_recent_values(FromUser, ToUser, MessageId, SUser,
+                    MessageType, FlatTimeStamp, MetaData) ->
+    Unread = if ToUser =:= SUser -> <<"0">>; true -> <<"1">> end,
+    iolist_to_binary([
+        "('", FromUser, "','", ToUser, "','", MessageId, "','", SUser,
+        "','','normal','", MessageType, "','','", Unread,
+        "','", FlatTimeStamp, "','", MetaData, "')"
+    ]).
+
+join_binaries([], _Sep) ->
+    <<>>;
+join_binaries([One], _Sep) ->
+    One;
+join_binaries([H|T], Sep) ->
+    lists:foldl(fun(E, Acc) -> <<Acc/binary, Sep/binary, E/binary>> end, H, T).
+
+send_in_batches([], _BatchSize, _Fun) ->
+    ok;
+send_in_batches(SubList, BatchSize, Fun) when is_list(SubList), BatchSize > 0 ->
+    {Batch, Rest} =
+        case length(SubList) >= BatchSize of
+            true  -> lists:split(BatchSize, SubList);
+            false -> {SubList, []}
+        end,
+    spawn(fun() -> Fun(Batch) end),
+    send_in_batches(Rest, BatchSize, Fun).
+
 %% Contus Added send_group_push_message
 send_group_push_message(_F,Node,Members,LServer,Chan,Service,Stanza,MessageContent) ->
 	From = jid:make(Chan,Service,<<"">>),
