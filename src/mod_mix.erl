@@ -844,6 +844,7 @@ send_in_batches(SubList, BatchSize, Fun) when is_list(SubList), BatchSize > 0 ->
     spawn(fun() -> Fun(Batch) end),
     send_in_batches(Rest, BatchSize, Fun).
 
+
 %% Contus Added send_group_push_message
 send_group_push_message(_F,Node,Members,LServer,Chan,Service,Stanza,MessageContent) ->
 	From = jid:make(Chan,Service,<<"">>),
