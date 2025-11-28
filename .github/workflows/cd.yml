@@ -1,6 +1,6 @@
 on:
   push:
-    branches: ["hotfix/chat_msg_ack"]
+    branches: ["production"]
 
 env:
   IMAGE_TAG: ${{ github.sha }}
