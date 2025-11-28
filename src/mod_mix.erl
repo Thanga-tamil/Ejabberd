@@ -627,89 +627,184 @@ filter_nodes(Nodes) ->
 % 	    ok
 %     end.
 
+% multicast(Mod, LServer, Chan, Service, Node, F) ->
+% 	From = jid:make(Chan,Service,<<"">>),
+%   IsValid = fly_mod_utils:validate_license(LServer, true, <<"chat">>),
+%   if IsValid =:= true ->
+% 	case Mod:get_subscribed(LServer, Chan, Service, Node) of
+% 		{ok, Subscribers} ->
+% 			Pkt = xmpp:set_type(F(normal), normal),
+% 			Stanza = xmpp:encode(Pkt),
+% 			if Node =:= <<"urn:xmpp:mix:nodes:messages">>  ->
+% 				Content = get_message_content(Stanza , Pkt),
+% 				[_, CMessageId, _, _, _, CEditMsgId,_, _ ] = Content,
+% 				if CEditMsgId =:= CMessageId orelse CEditMsgId =:= <<"">> ->
+% 				spawn(?MODULE, send_group_push_message, [F,Node,Subscribers,LServer,Chan,Service,Stanza,Content]);
+% 				true ->
+% 				 ok
+% 				end;
+% 			true ->
+% 				Content  = ok
+% 			end,
+% 			MsgContent=Content,
+% 			% Bulk Insert Starts
+% 			if Node =:= <<"urn:xmpp:mix:nodes:messages">> ->
+
+% 				[MessageType, MessageId, MesssageSend, _GroupName, MsgData, EditmsgId, MentionList, MetaData] = MsgContent,
+
+% 				% fly_mod_offline_push:queryexecfunctions(LServer, <<"group_insert">>, From, MsgContent, Subscribers);
+% 				TimestampNew = fly_add_timestamp:now_to_microseconds(erlang:now()),
+% 				FlatTimeStampNew = lists:flatten(io_lib:format("~p", [TimestampNew])),
+% 				#jid{luser = FromUser} = From,
+% 				SUser = fly_mod_utils:get_user_from_string_jid(MesssageSend),
+% 				if EditmsgId =:= <<"">> ->
+% 					EditMsgId = MessageId;
+% 				true ->
+% 					EditMsgId = EditmsgId
+% 				end,
+% 				if (EditMsgId =:= MessageId) or (EditMsgId =:= <<"">>) ->
+% 				InsertStatement = <<"insert into message_status (from_user,to_user,status,  recent,message_id,mentioned_user_ids, edit_message_id, message_type,txt,chat_type,from_notification, message_time,to_notification,message_notification,received_at,seen_at, meta_data) values ">>,
+% 			        RecentInsert = <<"insert into chat_recent (from_user, to_user,  message_id, message_from, txt, chat_type, message_type,  notification_to, unread, message_time,meta_data) values ">>,
+% 				FromUserStr = binary_to_list(FromUser),
+% 				MessageIdStr = binary_to_list(MessageId),
+% 				EditMsgIdStr = binary_to_list(EditMsgId),
+% 				MessageTypeStr = binary_to_list(MessageType),
+% 				MessageSendStr = binary_to_list(MesssageSend),
+% 				MetaDataStr = binary_to_list(MetaData),
+% 				{ValueStatement,RecentValueStatement} = lists:unzip(lists:map(fun(Part) ->
+% 					#jid{luser = ToUser} = Part,
+% 					if ToUser =:= SUser ->
+% 						Unread = <<"0">>;
+% 					true ->
+% 						Unread = <<"1">>
+% 					end,
+%                                         ToUserStr = binary_to_list(ToUser),
+% 				ValueStatements = string:concat("", ", ('" ++ FromUserStr ++ "', '" ++ ToUserStr ++ "', 0,1, '" ++ MessageIdStr ++ "','" ++ binary_to_list(MentionList) ++ "', '" ++ EditMsgIdStr ++ "','" ++ MessageTypeStr ++ "', '', 'normal', '" ++ MessageSendStr ++ "', '" ++ FlatTimeStampNew ++ "','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00','" ++ MetaDataStr ++"')"),
+% 				RecentValueStatements = string:concat("", ", ('" ++ FromUserStr ++ "', '" ++ ToUserStr ++ "', '" ++ MessageIdStr ++ "', '"  ++ binary_to_list(SUser) ++ "', '"  ++ binary_to_list(MsgData) ++ "', 'normal', '" ++ MessageTypeStr ++ "', '', '" ++ binary_to_list(Unread) ++ "', '" ++ FlatTimeStampNew ++ "','" ++ MetaDataStr ++"')"),
+% 				{ValueStatements, RecentValueStatements}
+% 				end, Subscribers)),
+%                                 DuplicateStatement = "ON DUPLICATE KEY UPDATE to_user = values(to_user), message_id = '" ++ MessageIdStr ++"' ;",
+% 				RecentDuplicateStatement = " ON DUPLICATE KEY UPDATE message_id = values(message_id), message_from = values(message_from), txt = values(txt), chat_type = values(chat_type), message_type = values(message_type),  notification_to = values(notification_to), unread = unread + values(unread), status = 0, recall_status = 0, favourite_status = 0, message_time= values(message_time), meta_data= values(meta_data), created_at = NOW();",
+% 				[_|NewVal] = re:replace(ValueStatement, ",", ""),
+% 				[_|RecentNewVal] = re:replace(RecentValueStatement, ",", ""),
+
+% 				FinalQuery = binary_to_list(InsertStatement) ++ binary_to_list(NewVal) ++ DuplicateStatement,
+% 				RecentFinalQuery = binary_to_list(RecentInsert) ++ binary_to_list(RecentNewVal) ++ RecentDuplicateStatement,
+% 				ejabberd_sql:sql_query(LServer, [FinalQuery]),
+% 				ejabberd_sql:sql_query(LServer, [RecentFinalQuery]);
+% 				true ->
+% 				ejabberd_sql:sql_query(LServer, [<<"update  message_status set status = 0, mentioned_user_ids  = '">>, MentionList, <<"' , edit_status = 1, received_at = '0000-00-00 00:00:00' ,seen_at = '0000-00-00 00:00:00',  edit_message_id = '">>, EditMsgId, <<"' where message_id = '">>, MessageId, <<"' ;">>]),
+% 				ejabberd_sql:sql_query(LServer, [<<"update chat_recent set status = 0,  txt  = '">>, MsgData , <<"' where message_id = '">>, MessageId, <<"';">>])
+% 				end,
+% 				ejabberd_sql:sql_query( LServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg, meta_data) values ('">>, SUser, <<"', '">>, FromUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'normal', '">>, MsgData, <<"', '">>, MetaData, <<"');">>]);
+% 			true ->
+% 				ok
+% 			end,
+% 			% Bulk Insert Ends
+
+% 		spawn(?MODULE, process_group_msg, [Subscribers, MsgContent, From, F, Node, Stanza, Pkt, Chan]);
+
+% 	{error, db_failure} ->
+% 	  ok
+%     end;
+% true ->
+%     ok
+% end.
+
 multicast(Mod, LServer, Chan, Service, Node, F) ->
-	From = jid:make(Chan,Service,<<"">>),
-  IsValid = fly_mod_utils:validate_license(LServer, true, <<"chat">>),
-  if IsValid =:= true ->
-	case Mod:get_subscribed(LServer, Chan, Service, Node) of
-		{ok, Subscribers} ->
-			Pkt = xmpp:set_type(F(normal), normal),
-			Stanza = xmpp:encode(Pkt),
-			if Node =:= <<"urn:xmpp:mix:nodes:messages">>  ->
-				Content = get_message_content(Stanza , Pkt),
-				[_, CMessageId, _, _, _, CEditMsgId,_, _ ] = Content,
-				if CEditMsgId =:= CMessageId orelse CEditMsgId =:= <<"">> ->
-				spawn(?MODULE, send_group_push_message, [F,Node,Subscribers,LServer,Chan,Service,Stanza,Content]);
-				true ->
-				 ok
-				end;
-			true ->
-				Content  = ok
-			end,
-			MsgContent=Content,
-			% Bulk Insert Starts
-			if Node =:= <<"urn:xmpp:mix:nodes:messages">> ->
+    From = jid:make(Chan, Service, <<"">>),
+    BatchSize = 100,
+    IsValid = fly_mod_utils:validate_license(LServer, true, <<"chat">>),
+    if IsValid =:= true ->
+        case Mod:get_subscribed(LServer, Chan, Service, Node) of
+            {ok, Subscribers} ->
+                Pkt = xmpp:set_type(F(normal), normal),
+                Stanza = xmpp:encode(Pkt),
+                Content = case Node of
+                    <<"urn:xmpp:mix:nodes:messages">> ->
+                        get_message_content(Stanza, Pkt);
+                    _ -> ok
+                end,
+                case Content of
+                    [MessageType, MessageId, MessageSend, _GroupName,
+                     MsgData, EditMsgId0, MentionList, MetaData] ->
+                        % timestamp
+                        FlatTimeStampNew =
+                            case xmpp:get_subtag(Pkt, #timestampmsg{}) of
+                                false ->
+                                    T = fly_add_timestamp:now_to_microseconds(erlang:now()),
+                                    list_to_binary(io_lib:format("~p", [T]));
+                                {_, _, TS} -> TS
+                            end,
+                        if EditMsgId0 =:= MessageId orelse EditMsgId0 =:= <<"">> ->
+                    send_in_batches(Subscribers, BatchSize,
+                fun(Batch) ->
+                    spawn(?MODULE, send_group_push_message, [F,Node,Batch,LServer,Chan,Service,Stanza,Content])
+                end
+                );
+                
+                true ->
+                 ok
+                end,
+                        #jid{luser = FromUser} = From,
+                        SUser = fly_mod_utils:get_user_from_string_jid(MessageSend),
+                        EditMsgId = case EditMsgId0 of
+                            <<>> -> MessageId;
+                            _ -> EditMsgId0
+                        end,
 
-				[MessageType, MessageId, MesssageSend, _GroupName, MsgData, EditmsgId, MentionList, MetaData] = MsgContent,
+                        InsertHead =
+                          <<"INSERT INTO message_status ",
+                            "(from_user,to_user,status,recent,message_id,mentioned_user_ids,",
+                            "edit_message_id,message_type,txt,chat_type,from_notification,",
+                            "message_time,to_notification,message_notification,received_at,seen_at,meta_data) VALUES ">>,
 
-				% fly_mod_offline_push:queryexecfunctions(LServer, <<"group_insert">>, From, MsgContent, Subscribers);
-				TimestampNew = fly_add_timestamp:now_to_microseconds(erlang:now()),
-				FlatTimeStampNew = lists:flatten(io_lib:format("~p", [TimestampNew])),
-				#jid{luser = FromUser} = From,
-				SUser = fly_mod_utils:get_user_from_string_jid(MesssageSend),
-				if EditmsgId =:= <<"">> ->
-					EditMsgId = MessageId;
-				true ->
-					EditMsgId = EditmsgId
-				end,
-				if (EditMsgId =:= MessageId) or (EditMsgId =:= <<"">>) ->
-				InsertStatement = <<"insert into message_status (from_user,to_user,status,  recent,message_id,mentioned_user_ids, edit_message_id, message_type,txt,chat_type,from_notification, message_time,to_notification,message_notification,received_at,seen_at, meta_data) values ">>,
-			        RecentInsert = <<"insert into chat_recent (from_user, to_user,  message_id, message_from, txt, chat_type, message_type,  notification_to, unread, message_time,meta_data) values ">>,
-				FromUserStr = binary_to_list(FromUser),
-				MessageIdStr = binary_to_list(MessageId),
-				EditMsgIdStr = binary_to_list(EditMsgId),
-				MessageTypeStr = binary_to_list(MessageType),
-				MessageSendStr = binary_to_list(MesssageSend),
-				MetaDataStr = binary_to_list(MetaData),
-				{ValueStatement,RecentValueStatement} = lists:unzip(lists:map(fun(Part) ->
-					#jid{luser = ToUser} = Part,
-					if ToUser =:= SUser ->
-						Unread = <<"0">>;
-					true ->
-						Unread = <<"1">>
-					end,
-                                        ToUserStr = binary_to_list(ToUser),
-				ValueStatements = string:concat("", ", ('" ++ FromUserStr ++ "', '" ++ ToUserStr ++ "', 0,1, '" ++ MessageIdStr ++ "','" ++ binary_to_list(MentionList) ++ "', '" ++ EditMsgIdStr ++ "','" ++ MessageTypeStr ++ "', '', 'normal', '" ++ MessageSendStr ++ "', '" ++ FlatTimeStampNew ++ "','',0,'0000-00-00 00:00:00','0000-00-00 00:00:00','" ++ MetaDataStr ++"')"),
-				RecentValueStatements = string:concat("", ", ('" ++ FromUserStr ++ "', '" ++ ToUserStr ++ "', '" ++ MessageIdStr ++ "', '"  ++ binary_to_list(SUser) ++ "', '"  ++ binary_to_list(MsgData) ++ "', 'normal', '" ++ MessageTypeStr ++ "', '', '" ++ binary_to_list(Unread) ++ "', '" ++ FlatTimeStampNew ++ "','" ++ MetaDataStr ++"')"),
-				{ValueStatements, RecentValueStatements}
-				end, Subscribers)),
-                                DuplicateStatement = "ON DUPLICATE KEY UPDATE to_user = values(to_user), message_id = '" ++ MessageIdStr ++"' ;",
-				RecentDuplicateStatement = " ON DUPLICATE KEY UPDATE message_id = values(message_id), message_from = values(message_from), txt = values(txt), chat_type = values(chat_type), message_type = values(message_type),  notification_to = values(notification_to), unread = unread + values(unread), status = 0, recall_status = 0, favourite_status = 0, message_time= values(message_time), meta_data= values(meta_data), created_at = NOW();",
-				[_|NewVal] = re:replace(ValueStatement, ",", ""),
-				[_|RecentNewVal] = re:replace(RecentValueStatement, ",", ""),
+                        RecentHead =
+                          <<"INSERT INTO chat_recent ",
+                            "(from_user,to_user,message_id,message_from,txt,chat_type,message_type,",
+                            "notification_to,unread,message_time,meta_data) VALUES ">>,
 
-				FinalQuery = binary_to_list(InsertStatement) ++ binary_to_list(NewVal) ++ DuplicateStatement,
-				RecentFinalQuery = binary_to_list(RecentInsert) ++ binary_to_list(RecentNewVal) ++ RecentDuplicateStatement,
-				ejabberd_sql:sql_query(LServer, [FinalQuery]),
-				ejabberd_sql:sql_query(LServer, [RecentFinalQuery]);
-				true ->
-				ejabberd_sql:sql_query(LServer, [<<"update  message_status set status = 0, mentioned_user_ids  = '">>, MentionList, <<"' , edit_status = 1, received_at = '0000-00-00 00:00:00' ,seen_at = '0000-00-00 00:00:00',  edit_message_id = '">>, EditMsgId, <<"' where message_id = '">>, MessageId, <<"' ;">>]),
-				ejabberd_sql:sql_query(LServer, [<<"update chat_recent set status = 0,  txt  = '">>, MsgData , <<"' where message_id = '">>, MessageId, <<"';">>])
-				end,
-				ejabberd_sql:sql_query( LServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg, meta_data) values ('">>, SUser, <<"', '">>, FromUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'normal', '">>, MsgData, <<"', '">>, MetaData, <<"');">>]);
-			true ->
-				ok
-			end,
-			% Bulk Insert Ends
+                        DuplicateStmt =
+                          <<" ON DUPLICATE KEY UPDATE to_user=VALUES(to_user),message_id=VALUES(message_id);">>,
 
-		spawn(?MODULE, process_group_msg, [Subscribers, MsgContent, From, F, Node, Stanza, Pkt, Chan]);
+                        RecentDuplicateStmt =
+                          <<" ON DUPLICATE KEY UPDATE message_id=VALUES(message_id),message_from=VALUES(message_from),",
+                            "chat_type=VALUES(chat_type),message_type=VALUES(message_type),notification_to=VALUES(notification_to),",
+                            "unread=unread+VALUES(unread),status=0,recall_status=0,favourite_status=0,",
+                            "message_time=VALUES(message_time),meta_data=VALUES(meta_data),created_at=NOW();">>,
 
-	{error, db_failure} ->
-	  ok
-    end;
-true ->
-    ok
-end.
+                        % batch insert
+                        send_in_batches(Subscribers, BatchSize, fun(Batch) ->
+                            Values = [build_message_values(FromUser, ToUser, MessageId, EditMsgId,
+                                                           MessageType, MessageSend, MentionList,
+                                                           FlatTimeStampNew, MetaData, SUser)
+                                      || #jid{luser = ToUser} <- Batch],
+                            RecentValues = [build_recent_values(FromUser, ToUser, MessageId,
+                                                               SUser, MessageType,
+                                                               FlatTimeStampNew, MetaData)
+                                            || #jid{luser = ToUser} <- Batch],
+                            FinalQ = [InsertHead, join_binaries(Values, <<",">>), DuplicateStmt],
+                            RecentQ = [RecentHead, join_binaries(RecentValues, <<",">>), RecentDuplicateStmt],
+                            ejabberd_sql:sql_query(LServer, [FinalQ]),
+                            ejabberd_sql:sql_query(LServer, [RecentQ])
+                        end),
+
+                        ejabberd_sql:sql_query(LServer,
+                          [<<"INSERT INTO chat_message_edit_history ",
+                             "(from_user,to_user,message_id,edit_message_id,chat_type,msg,meta_data) VALUES ('">>,
+                            SUser, <<"','">>, FromUser, <<"','">>, MessageId, <<"','">>, EditMsgId,
+                            <<"','normal','">>, MsgData, <<"','">>, MetaData, <<"');">>]);
+                    _ -> ok
+                end,
+            send_in_batches(Subscribers, BatchSize,
+                fun(Batch) ->
+                    spawn(?MODULE, process_group_msg, [Batch, Content, From, F, Node, Stanza, Pkt, Chan])
+                end
+                );
+            _ -> ok
+        end;
+    true -> ok
+    end.
 
 %% Contus Added send_group_push_message
 send_group_push_message(_F,Node,Members,LServer,Chan,Service,Stanza,MessageContent) ->
