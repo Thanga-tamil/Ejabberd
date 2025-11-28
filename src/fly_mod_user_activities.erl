@@ -662,6 +662,8 @@ end,
                                       GStatus = <<"0">>;
                                     {selected, _, [[GroupStatus]]} ->
                                       GStatus = GroupStatus;
+                                    {error,timeout}  ->
+                                      GStatus = <<"0">>;
                                     _ ->
                                       GStatus = <<"0">>
                                   end,
