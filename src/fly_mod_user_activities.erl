@@ -657,16 +657,17 @@ end,
 true ->
     ok
 end,
-  case catch fly_mod_utils:message_status(FServer, OldMessageId, TUser) of
-                                    {selected, _, []} ->
-                                      GStatus = <<"0">>;
-                                    {selected, _, [[GroupStatus]]} ->
-                                      GStatus = GroupStatus;
-                                    {error,timeout}  ->
-                                      GStatus = <<"0">>;
-                                    _ ->
-                                      GStatus = <<"0">>
-                                  end,
+  % case catch fly_mod_utils:message_status(FServer, OldMessageId, TUser) of
+  %                                   {selected, _, []} ->
+  %                                     GStatus = <<"0">>;
+  %                                   {selected, _, [[GroupStatus]]} ->
+  %                                     GStatus = GroupStatus;
+  %                                   {error,timeout}  ->
+  %                                     GStatus = <<"0">>;
+  %                                   _ ->
+  %                                     GStatus = <<"0">>
+  %                                 end,
+  GStatus = <<"0">>,
   XmlBody = #xmlel{name = <<"message">>, attrs = [{<<"from">>, MessageFrom}, {<<"to">>, MessageTo}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
   children = [#xmlel{name = <<"delivered">>, attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"id">>, OldMessageId},{<<"message_status">>, GStatus}, {<<"group_id">>, GroupId}], children = []}]},
   ReceivedTimestamp = now_to_microseconds(erlang:now()),
