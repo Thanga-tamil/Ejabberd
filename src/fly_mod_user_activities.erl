@@ -629,10 +629,14 @@ end,
   true ->
     MResource = LResource
   end,
-  fly_mod_utils:update_offline(FServer, OldMessageId,MResource),
+  %% fly_mod_utils:update_offline(FServer, OldMessageId,MResource),
+  ?INFO_MSG("delivey 1 ~P",[TUser]),
   fly_mod_utils:update_delivery(FromJid, TUser, OldMessageId, GroupId),
+  ?INFO_MSG("delivey 2 ~P",[TUser]),
   BusyMsg = fly_mod_utils:get_userbusy_message(FServer, TUser, FUser),
+  ?INFO_MSG("delivey 3 ~P",[TUser]),
   if BusyMsg =/= <<"">> andalso GroupId =:= <<"">> ->
+  ?INFO_MSG("delivey 4 ~P",[TUser]),
     BodyString = fly_mod_security:aes_encrpyt_license(MsgId, <<"ddc0f15cc2c90fca">>, BusyMsg),
     MsgBody3 = XML = #xmlel{name = <<"message">>, attrs = [{<<"xmlns">>, <<"jabber:client">>},{<<"from">>, MessageFrom}, {<<"to">>, MessageTo},
       {<<"type">>, <<"chat">>},{<<"id">>, MsgId}],
@@ -657,14 +661,17 @@ end,
 true ->
     ok
 end,
-  case catch fly_mod_utils:message_status(FServer, OldMessageId, TUser) of
-                                    {selected, _, []} ->
-                                      GStatus = <<"0">>;
-                                    {selected, _, [[GroupStatus]]} ->
-                                      GStatus = GroupStatus;
-                                    _ ->
-                                      GStatus = <<"0">>
-                                  end,
+   case catch fly_mod_utils:message_status(FServer, OldMessageId, TUser) of
+                                     {selected, _, []} ->
+                                       GStatus = <<"0">>;
+                                     {selected, _, [[GroupStatus]]} ->
+                                       GStatus = GroupStatus;
+                                     {error,timeout}  ->
+                                       GStatus = <<"0">>;
+                                     _ ->
+                                       GStatus = <<"0">>
+                                   end,
+  ?INFO_MSG("delivey 5 ~P",[TUser]),
   XmlBody = #xmlel{name = <<"message">>, attrs = [{<<"from">>, MessageFrom}, {<<"to">>, MessageTo}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
   children = [#xmlel{name = <<"delivered">>, attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"id">>, OldMessageId},{<<"message_status">>, GStatus}, {<<"group_id">>, GroupId}], children = []}]},
   ReceivedTimestamp = now_to_microseconds(erlang:now()),
@@ -672,6 +679,7 @@ end,
   ReceivedXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(ReceivedFlatTimeStamp)}], children = []},
   XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
   ejabberd_router:route(FromJid, ToJid, XmlBody1),
+  ?INFO_MSG("delivey 6 ~P",[TUser]),
   fly_mod_stanza_ack:send_ack_response(FromJid, ToJid, OldMessageId, <<"delivered">>),
   TResource = ejabberd_sm:get_user_resources(TUser, TServer),
       if length(TResource) =:= 0 ->
@@ -680,6 +688,7 @@ end,
       true ->
         ok
       end,
+      ?INFO_MSG("delivey 7 ~P",[TUser]),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>}).
 
 send_seen_message(_From, RequestType, SubEl,IQ) ->
