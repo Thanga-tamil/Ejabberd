@@ -24,7 +24,7 @@
 
 %% API
 -export([init/2]).
--export([set_channel/6, get_channels/2, get_channel/3, del_channel/3]).
+-export([set_channel/7, get_channels/2, get_channel/3, del_channel/3]).
 -export([set_participant/6, get_participant/4, get_participants/3, del_participant/4]).
 -export([subscribe/5, unsubscribe/4, unsubscribe/5, get_subscribed/4]).
 -export([sql_schemas/0]).
@@ -54,6 +54,7 @@ sql_schemas() ->
                      #sql_column{name = <<"jid">>, type = text},
                      #sql_column{name = <<"hidden">>, type = boolean},
                      #sql_column{name = <<"hmac_key">>, type = text},
+		     #sql_column{name = <<"access_uri">>, type = text},
                      #sql_column{name = <<"created_at">>, type = timestamp,
                                  default = true}],
                 indices = [#sql_index{
@@ -95,7 +96,7 @@ sql_schemas() ->
                               columns = [<<"channel">>, <<"service">>,
                                          <<"node">>]}]}]}].
 
-set_channel(LServer, Channel, Service, CreatorJID, Hidden, Key) ->
+set_channel(LServer, Channel, Service, CreatorJID, Hidden, Key, AccessUri) ->
     {User, Domain, _} = jid:tolower(CreatorJID),
     ClientKey = gen_mod:get_module_opt(LServer, fly_mod_user_activities, client_key),
     RawJID = jid:encode(jid:remove_resource(CreatorJID)),
@@ -107,7 +108,8 @@ set_channel(LServer, Channel, Service, CreatorJID, Hidden, Key) ->
 		      "domain=%(Domain)s",
 		      "jid=%(RawJID)s",
 		      "hidden=%(Hidden)b",
-		      "hmac_key=%(Key)s"]) of
+		      "hmac_key=%(Key)s",
+		      "access_uri=%(AccessUri)s"]) of
 	ok -> ok;
 	_Err -> {error, db_failure}
     end.
