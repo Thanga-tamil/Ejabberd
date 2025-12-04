@@ -19,7 +19,7 @@
 
 %% API
 -export([route/1]).
--export([start/2, stop/1, depends/2, mod_options/1, mod_opt_type/1, process_set_group_info/5, update_group_info_to_members/8,
+-export([start/2, stop/1, depends/2, mod_options/1, mod_opt_type/1, process_set_group_info/5, update_group_info_to_members/7,
   process_local_iq/1, init/1, carboncall_message/4, update_group_status/7, map_status/1]).
 -callback init(binary(), gen_mod:opts()) -> ok | {error, db_failure}.
 
@@ -535,7 +535,7 @@ process_send_composing_status(From, To, SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Group Does Not exists">>});
     {selected, _, GroupMembers} ->
       JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
-      update_group_info_to_members(FromJid, To, _RequestType, GroupId, JIDs, "", SubEl, <<"">>)
+      update_group_info_to_members(FromJid, To, _RequestType, GroupId, JIDs, "", SubEl)
   end,
   fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Composing status send successfully">>}).
 
@@ -562,7 +562,7 @@ process_send_gone_status(From, To, SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Group Does Not exists">>});
     {selected, _, GroupMembers} ->
       JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
-      update_group_info_to_members(FromJid, To, _RequestType, GroupId, JIDs, "", SubEl, <<"">>)
+      update_group_info_to_members(FromJid, To, _RequestType, GroupId, JIDs, "", SubEl)
   end,
 fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Gone status send successfully">>}).
 
@@ -589,7 +589,7 @@ process_send_recall_status(From, To, SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Group Does Not exists">>});
     {selected, _, GroupMembers} ->
       JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
-      update_group_info_to_members(FromJid, To, Status,MsgId, JIDs, <<"8">>, SubEl, <<"">>)
+      update_group_info_to_members(FromJid, To, Status,MsgId, JIDs, <<"8">>, SubEl)
   end,
   fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Recall status send successfully">>}).
 
@@ -656,7 +656,7 @@ process_add_participants(From, To, SubEl, IQ) ->
           sub_els = [#mix_client_join{channel = To,xmlns = <<"urn:xmpp:mix:pam:0">>,affiliation = <<"n">>,
           join = #mix_join{owner = jid:to_string(From), message_id = MessageId ,nick = GroupName, group_create = <<"n">>, custom_attributes = #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, xmlns = <<"urn:xmpp:mix:core:0">>, subscribe = [<<"urn:xmpp:mix:nodes:messages">>,<<"urn:xmpp:mix:nodes:presence">>,
           <<"urn:xmpp:mix:nodes:participants">>,<<"urn:xmpp:mix:nodes:info">>,<<"urn:xmpp:mix:nodes:config">>]}}]}),
-          fly_mod_utils:group_notify_message(From, FromJID, PUser, TUser, <<"2">>, RequestType, MessageId,<<"">>,<<"">>),
+          fly_mod_utils:group_notify_message(From, FromJID, PUser, TUser, <<"2">>, RequestType, MessageId,<<"">>),
           update_group_status(From, To, SubEl, IQ, <<"2">>, Participant, MessageId);
         {selected, _, _GroupMembers} ->
           ok;
@@ -701,7 +701,7 @@ process_remove_participant(From, To, SubEl, IQ) ->
           ok;
           {selected, _, GroupMembers} ->
             JIDs = lists:flatmap(fun([UJid]) -> [UJid] end, GroupMembers),
-            update_group_info_to_members(From, To, Status, Jid, JIDs, <<"5">>, SubEl, <<"">>)
+            update_group_info_to_members(From, To, Status, Jid, JIDs, <<"5">>, SubEl)
         end
   end,
     case catch fly_mod_utils:get_participants(TServer, TUser, ParticipantJid) of
@@ -739,18 +739,6 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
   #jid{user = LUser} = To,
   #jid{lserver = FServer} = From,
   Status = <<"group_profile_updated">>,
-
-  ?INFO_MSG("VCard : ~p", [VCard]), 
-  
-  IncomingNickName = fxml:get_path_s(VCard, [{elem, <<"nickName">>}, cdata]),
-  ?INFO_MSG("IncomingNickName : ~p", [IncomingNickName]),
-
-  IncomingDescription = fxml:get_path_s(VCard, [{elem, <<"description">>}, cdata]),
-  ?INFO_MSG("IncomingDescription : ~p", [IncomingDescription]),
-  
-  IncomingImage = fxml:get_path_s(VCard, [{elem, <<"image">>}, cdata]),
-  ?INFO_MSG("IncomingImage : ~p", [IncomingImage]),
-  
   if NewStatus =:= <<"new">> ->
     mod_vcard:set_vcard(LUser, FServer, VCard),
     ok;
@@ -759,109 +747,21 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
       {selected, _, []} ->
         fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Group does not exists">>});
       {selected, _, GroupMembers} ->
-        
-        GroupInfo = fly_mod_utils:get_existing_group_info(FServer, LUser),
-
-        {selected, [<<"nickname">>, <<"description">>, <<"image">>], [[Nickname, Description, Image]]} = GroupInfo,
-        ?INFO_MSG("Existing Group Info - Nickname: ~p, Description: ~p, Image: ~p", [Nickname, Description, Image]),
-        
         JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
         case mod_vcard:set_vcard(LUser, FServer, VCard) of
           ok ->
             case catch fly_mod_utils:check_group_exists(FServer, LUser) of
               {selected, _, []} ->
-                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"1">>, SubEl, <<"">>);
+                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"1">>, SubEl);
               _ ->
-                ?INFO_MSG("devinprogress -> FServer : ~p LUser : ~p", [FServer, LUser]),
-
-                case catch GroupInfo of
-                    {selected, _, [[OldNick, OldDesc, OldImage]]} ->
-                        % Track changes
-                        Changes = [],
-                        
-                        % First handle nickname changes (since it always has a value)
-                        NewChanges = case {OldNick, IncomingNickName} of
-                            {OldNick, NewNick} when OldNick =:= NewNick ->
-                                ?INFO_MSG("Nickname unchanged for group ~p: ~p", [LUser, NewNick]),
-                                Changes;
-                            {OldNick, NewNick} ->
-                                ?INFO_MSG("Nickname updated for group ~p from ~p to ~p", [LUser, OldNick, NewNick]),
-                                [nickname | Changes]
-                        end,
-
-                        % Then handle description changes - two cases: first add or update
-                        NewChanges2 = case {OldDesc, IncomingDescription} of
-                            {<<>>, <<>>} ->
-                                NewChanges;
-                            {<<>>, NewDesc} when NewDesc =/= <<>> ->
-                                ?INFO_MSG("First description added for group ~p: ~p", [LUser, NewDesc]),
-                                [description | NewChanges];
-                            {OldDesc, NewDesc} when OldDesc =:= NewDesc ->
-                                NewChanges;
-                            {OldDesc, NewDesc} when OldDesc =/= <<>> andalso NewDesc =/= OldDesc ->
-                                ?INFO_MSG("Description updated for group ~p from ~p to ~p", [LUser, OldDesc, NewDesc]),
-                                [description | NewChanges];
-                            _ ->
-                                NewChanges
-                        end,
-
-                        % Finally handle image changes - similar to description: first add or update
-                        FinalChanges = case {OldImage, IncomingImage} of
-                            {<<>>, <<>>} ->
-                                NewChanges2;
-                            {<<>>, NewImage} when NewImage =/= <<>> ->
-                                ?INFO_MSG("First image added for group ~p", [LUser]),
-                                [image | NewChanges2];
-                            {OldImage, NewImage} when OldImage =:= NewImage ->
-                                NewChanges2;
-                            {OldImage, NewImage} when OldImage =/= <<>> andalso NewImage =/= OldDesc ->
-                                ?INFO_MSG("Image updated for group ~p", [LUser]),
-                                [image | NewChanges2];
-                            _ ->
-                                NewChanges2
-                        end,
-
-                        % Then handle the notifications based on what changed
-                        case length(FinalChanges) of
-                            0 -> 
-                                ok;
-                            1 -> % Single field changed - use specific notification codes
-                                [Change] = FinalChanges,
-                                case Change of
-                                    nickname -> 
-                                        update_group_info_to_members(From, To, Status, VCard, JIDs, <<"9">>, SubEl, <<"">>);
-                                    description -> % notify id 10
-                                        case OldDesc of
-                                            <<>> ->
-                                                NewNotifyStr = <<"added the group description \"", IncomingDescription/binary, "\"." >>,
-                                                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"10">>, SubEl, NewNotifyStr);
-                                            _ ->
-                                                UpdateNotifyStr = <<"updated the group description from \"", OldDesc/binary,"\" to \"", IncomingDescription/binary, "\"." >>,
-                                                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"10">>, SubEl, UpdateNotifyStr)
-                                        end;
-                                    image ->
-                                        case OldImage of
-                                            <<>> -> % First time adding image
-                                                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"12">>, SubEl, <<"">>);
-                                            _ -> % Updating existing image
-                                                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"13">>, SubEl, <<"">>)
-                                        end
-                                end;
-                            _ -> % Multiple fields changed - use generic update code
-                                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"4">>, SubEl, <<"">>)
-                        end;
-
-                    Error ->
-                        ?ERROR_MSG("Error fetching group info for group ~p: ~p", [LUser, Error]),
-                        update_group_info_to_members(From, To, Status, VCard, JIDs, <<"4">>, SubEl, <<"">>)
-                end
+                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"4">>, SubEl)
             end,
             fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Group info updated successfully">>});
           _ ->
             fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Group info not updated">>})
         end
     end
-end.
+  end.
 
 process_set_group_info_web(From, To, SubEl, IQ) ->
 
@@ -882,10 +782,10 @@ process_set_group_info_web(From, To, SubEl, IQ) ->
           case catch fly_mod_utils:check_group_exists(FServer, LUser) of
             {selected, _, []} ->
               Notification = <<"1">>,
-              update_group_info_to_members(From, To, Status, VCard, JIDs, Notification, SubEl, <<"">>);
+              update_group_info_to_members(From, To, Status, VCard, JIDs, Notification, SubEl);
             _ ->
               Notification = <<"4">>,
-              update_group_info_to_members(From, To, Status, VCard, JIDs, Notification, SubEl, <<"">>)
+              update_group_info_to_members(From, To, Status, VCard, JIDs, Notification, SubEl)
           end,
           fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Group info updated successfully">>});
         _ ->
@@ -919,7 +819,7 @@ process_make_admin(From, To, SubEl, IQ) ->
         fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Group does not exists">>});
         {selected, _, GroupMembers} ->
           JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
-          update_group_info_to_members(From, To, Status, fly_mod_utils:get_user_from_string_jid(ParticipantData), JIDs, <<"5">>, SubEl, <<"">>),
+          update_group_info_to_members(From, To, Status, fly_mod_utils:get_user_from_string_jid(ParticipantData), JIDs, <<"5">>, SubEl),
           fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Admin updated successfully">>})
       end;
     {updated, 0} ->
@@ -948,7 +848,7 @@ case catch fly_mod_utils:admin_user(Server, TUser, User) of
           ok;
           {selected, _, GroupMembers} ->
             JIDs = lists:flatmap(fun([UJid]) -> [UJid] end, GroupMembers),
-            update_group_info_to_members(From, To, RequestType, fly_mod_utils:get_user_from_string_jid(ParticipantData), JIDs, <<"6">>, SubEl, <<"">>)
+            update_group_info_to_members(From, To, RequestType, fly_mod_utils:get_user_from_string_jid(ParticipantData), JIDs, <<"6">>, SubEl)
         end;
           true ->
             case catch fly_mod_utils:get_group_users(Server, TUser) of
@@ -957,8 +857,8 @@ case catch fly_mod_utils:admin_user(Server, TUser, User) of
               {selected, _, GroupMembers} ->
                 JIDs = lists:flatmap(fun([UJid]) -> [UJid] end, GroupMembers),
                 Status = <<"new_admin_added">>,
-                update_group_info_to_members(From, To, Status, Jid, JIDs, <<"5">>, SubEl, <<"">>),
-                update_group_info_to_members(From, To, RequestType, fly_mod_utils:get_user_from_string_jid(ParticipantData), JIDs, <<"6">>, SubEl, <<"">>)
+                update_group_info_to_members(From, To, Status, Jid, JIDs, <<"5">>, SubEl),
+                update_group_info_to_members(From, To, RequestType, fly_mod_utils:get_user_from_string_jid(ParticipantData), JIDs, <<"6">>, SubEl)
             end
       end,
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Admin removed successfully">>})
@@ -1038,7 +938,7 @@ process_admin_exit_group(From, To, SubEl, IQ) ->
           ok;
           {selected, _, GroupMembers} ->
             JIDs = lists:flatmap(fun([UJid]) -> [UJid] end, GroupMembers),
-            update_group_info_to_members(From, To, Status, Jid, JIDs, <<"5">>, SubEl, <<"">>)
+            update_group_info_to_members(From, To, Status, Jid, JIDs, <<"5">>, SubEl)
 
         end
   end,
@@ -1101,7 +1001,7 @@ process_admin_remove_admin(From, To, SubEl, IQ) ->
           ok;
           {selected, _, GroupMembers} ->
             JIDs = lists:flatmap(fun([UJid]) -> [UJid] end, GroupMembers),
-            update_group_info_to_members(From, To, Status, Jid, JIDs, <<"5">>, SubEl, <<"">>)
+            update_group_info_to_members(From, To, Status, Jid, JIDs, <<"5">>, SubEl)
 
         end
   end,
@@ -1175,7 +1075,7 @@ process_user_exit_group(From, To, SubEl, IQ, RequestFrom) ->
                 true ->
                   Status = <<"admin_exit_group">>
                 end,
-                update_group_info_to_members(FromUser, To, AdminStatus, Jid, JIDs, <<"5">>, SubEl, <<"">>)
+                update_group_info_to_members(FromUser, To, AdminStatus, Jid, JIDs, <<"5">>, SubEl)
             end
       end,
     mod_mix:process_mix_core(#iq{from = ParticipantJid ,  to = To, type = set ,id = MessageId,
@@ -1795,7 +1695,7 @@ process_get_removed_user(From, _To, SubEl, IQ, _RequestType) ->
 %%
 %%%============================================================================================
 
-update_group_info_to_members(ActionUser, GroupFrom, Status, Data, Members, Notification, SubEl, GroupDescription) ->
+update_group_info_to_members(ActionUser, GroupFrom, Status, Data, Members, Notification, SubEl) ->
   #jid{user = AUser, lserver = _AServer} = ActionUser,
   ActionDoneBy = list_to_binary(binary_to_list(AUser) ++ "@" ++ binary_to_list(_AServer)),
   #jid{user = FUser, lserver = _FServer} = GroupFrom,
@@ -1814,7 +1714,7 @@ update_group_info_to_members(ActionUser, GroupFrom, Status, Data, Members, Notif
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
         #jid{user = TUser, lserver = TServer} = RouteToJid,
-        fly_mod_utils:group_notify_message(ActionUser, RouteToJid, Data, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp),<<"">>),
+        fly_mod_utils:group_notify_message(ActionUser, RouteToJid, Data, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp)),
         Packet = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(GroupFrom)}, {<<"type">>, <<"normal">>}, {<<"id">>,MessageId}, {<<"to">>, jid:to_string(RouteToJid)}],
           children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, Status}, {<<"done_by">>, ActionDoneBy}, {<<"new_admin">>, ParticipantJid}]}]},
             #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}],
@@ -1835,7 +1735,7 @@ Status == <<"remove_admin">> ->
   lists:foreach(fun(To) ->
     RouteToJid = jid:make(To, _AServer, <<>>),
     #jid{user = TUser, lserver = TServer} = RouteToJid,
-    fly_mod_utils:group_notify_message(ActionUser, RouteToJid, Data, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp),<<"">>),
+    fly_mod_utils:group_notify_message(ActionUser, RouteToJid, Data, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp)),
     Packet = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(GroupFrom)}, {<<"type">>, <<"normal">>}, {<<"id">>,MessageId}, {<<"to">>, jid:to_string(RouteToJid)}],
       children = [#xmlel{name = <<"event">>, attrs = [{<<"xmlns">>, "http://jabber.org/protocol/pubsub#event"}],children = [#xmlel{name = <<"info">>, attrs = [{<<"status">>, Status}, {<<"done_by">>, ActionDoneBy},{<<"remove_admin">>, ParticipantJid}]}]},
         #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(FlatTimeStamp)}],children = []}]},
@@ -1883,8 +1783,7 @@ Status == <<"remove_admin">> ->
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
         #jid{user = TUser, lserver = TServer} = RouteToJid,
-        EncryptedDescriptionNotifier = fly_mod_security:aes_encrpyt_group_desc_notifier(MessageId, <<"ddc0f15cc2c90fca">>, GroupDescription),
-        fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp), EncryptedDescriptionNotifier),
+        fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp)),
         Packet = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupFrom)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
           children = [
@@ -1981,7 +1880,7 @@ update_group_status(From, To, SubEl, IQ, MsgStatus, Participant, MessageId) ->
   fly_mod_utils:update_group_count(FServer, TUser),
   case catch fly_mod_utils:get_group_users(FServer, TUser) of
     {selected, _, []} ->
-      fly_mod_utils:group_notify_message(From, From, PUser, TUser, MsgStatus, RequestType, MessageId, <<"">>,<<"">>),
+      fly_mod_utils:group_notify_message(From, From, PUser, TUser, MsgStatus, RequestType, MessageId, <<"">>),
       fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, result_type = <<"Group Does Not exists">>});
     {selected, _, GroupMembers} ->
       JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
@@ -1992,19 +1891,19 @@ update_group_status(From, To, SubEl, IQ, MsgStatus, Participant, MessageId) ->
       end,
       lists:foreach(fun(Touser) ->
         RouteToJid = jid:make(Touser, FServer, <<>>),
-        fly_mod_utils:group_notify_message(From, RouteToJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>,<<"">>)
+        fly_mod_utils:group_notify_message(From, RouteToJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>)
       end, NewJids),
       case RequestType of
         <<"admin_remove_admin">> ->
-          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>,<<"">>);
+          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>);
         <<"remove_participant">> ->
-          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>,<<"">>);
+          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>);
         <<"admin_remove_participant">> ->
-          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>,<<"">>);
+          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>);
         <<"admin_exit_group">> ->
-          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>,<<"">>);
+          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>);
         <<"user_exit_group">> ->
-          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>,<<"">>);
+          fly_mod_utils:group_notify_message(From, ParticipantJid, PUser, TUser, MsgStatus, RequestType, MessageId,<<"">>);
         _ ->
           ok
       end
