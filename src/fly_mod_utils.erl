@@ -1770,7 +1770,7 @@ check_group_exists(FServer, GroupId) ->
     [<<"SELECT from_user FROM message_status WHERE from_user  = '">>,GroupId,<<"';">>]).
 
 get_existing_group_info(FServer, LUser) ->
-  ejabberd_sql:sql_query([<<"SELECT nickname, description, image FROM vcard_search WHERE username = '">>,LUser,<<"' ;">>]).
+  ejabberd_sql:sql_query("SELECT nickname, description, image FROM vcard_search WHERE username = ?", [LUser]).
 
 group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser}, TUser, Groupid,NotifyId, RequestType, Msgid, TimeStamp, Txt)->
   % MsgId = get_iq_message_id(8),
