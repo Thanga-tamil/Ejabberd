@@ -73,17 +73,22 @@ aes_decrpyt(Key, Base64Crypt) ->
       false
   end.
 
-  aes_encrpyt_group_desc_notifier(Key, Iv, Base64Crypts) ->
-    
-    JSON = jiffy:encode(#{<<"message_type">> => <<"group_notifier_text">>,<<"message">> => Base64Crypts}),
+    aes_encrpyt_group_desc_notifier(Key, Iv, Base64Crypts) ->
+
+    JSON = "{\"message_type\":\"0\",\"message\":\"" ++ binary_to_list(Base64Crypts)++ "\"}",
     ?LOG_INFO("JSON ~p", [JSON]),
 
-    Decrypt = crypto:crypto_one_time(aes_256_cbc,get_hash_key(binary_to_list(Key)),Iv,JSON,[{encrypt, true}, {padding, pkcs_padding}]),
+    Text = jiffy:decode(JSON),
+    ?LOG_INFO("Text ~p", [Text]),
+
+    Base64Crypt = binary_to_list(http_uri:decode(jiffy:encode(Text))),
+    ?INFO_MSG("Base64Crypt ~p", [Base64Crypt]),
+
+    Decrypt = crypto:crypto_one_time(aes_256_cbc, get_hash_key(binary_to_list(Key)), Iv, Base64Crypt, [{encrypt,true},{padding,pkcs_padding}]),
 
     EncryptedText = base64:encode(Decrypt),
-
     ?INFO_MSG("EncryptedTexts ~p", [EncryptedText]),
-    
+
     EncryptedText.
 
   aes_encrpyt_license(Key, Iv, Base64Crypts) ->
