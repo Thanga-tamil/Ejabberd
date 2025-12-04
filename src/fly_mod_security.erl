@@ -11,7 +11,7 @@
 -author("Contus").
 
 -export([depends/2, mod_options/1, aes_decrpyt/2,aes_encrpyt_license/3,has_more_resources/3,get_user_resource/3,aes_encrpyt_license/5,
-  close_sessions/3, aes_decrpyt_license/3,aes_encrpyt_group_desc_notifier/3]).
+  close_sessions/3, aes_decrpyt_license/3]).
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
 -define(AES256_BLOCK_SIZE, 16).
@@ -72,24 +72,6 @@ aes_decrpyt(Key, Base64Crypt) ->
     true ->
       false
   end.
-
-    aes_encrpyt_group_desc_notifier(Key, Iv, Base64Crypts) ->
-
-    JSON = "{\"message_type\":\"0\",\"message\":\"" ++ binary_to_list(Base64Crypts)++ "\"}",
-    ?LOG_INFO("JSON ~p", [JSON]),
-
-    Text = jiffy:decode(JSON),
-    ?LOG_INFO("Text ~p", [Text]),
-
-    Base64Crypt = binary_to_list(http_uri:decode(jiffy:encode(Text))),
-    ?INFO_MSG("Base64Crypt ~p", [Base64Crypt]),
-
-    Decrypt = crypto:crypto_one_time(aes_256_cbc, get_hash_key(binary_to_list(Key)), Iv, Base64Crypt, [{encrypt,true},{padding,pkcs_padding}]),
-
-    EncryptedText = base64:encode(Decrypt),
-    ?INFO_MSG("EncryptedTexts ~p", [EncryptedText]),
-
-    EncryptedText.
 
   aes_encrpyt_license(Key, Iv, Base64Crypts) ->
 
