@@ -98,7 +98,7 @@
   get_group_chat_messages/7,
   get_message_status/2,
   get_groupmessage_status/2,
-  group_notify_message/9,
+  group_notify_message/8,
   get_blockedlist/2,
   check_group_exists/2,
   set_web_password/2,
@@ -1769,7 +1769,7 @@ check_group_exists(FServer, GroupId) ->
   ejabberd_sql:sql_query(FServer,
     [<<"SELECT from_user FROM message_status WHERE from_user  = '">>,GroupId,<<"';">>]).
 
-group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser}, TUser, Groupid,NotifyId, RequestType, Msgid, TimeStamp, Txt)->
+group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser}, TUser, Groupid,NotifyId, RequestType, Msgid, TimeStamp)->
   % MsgId = get_iq_message_id(8),
 
   Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
@@ -1787,7 +1787,7 @@ group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser},
   ejabberd_sql:sql_query(
     AServer,
     [<<"insert into message_status (from_notification,to_notification,from_user,to_user,message_id, edit_message_id, message_notification,chat_type, message_time,txt,received_at,seen_at,meta_data) values
-     ('">>,FromNotification, <<"','">>,TUser, <<"','">>,Groupid, <<"','">>,FUser,  <<"','">>,Msgid, <<"','">>,Msgid, <<"','">>,NotifyId, <<"','normal','">>,Currenttime, <<"','">>,Txt,<<"','0000-00-00 00:00:00','0000-00-00 00:00:00','{}') ON DUPLICATE KEY UPDATE to_user = '">>, FUser, <<"',message_id = '">>, Msgid, <<"' ;">>]),
+     ('">>,FromNotification, <<"','">>,TUser, <<"','">>,Groupid, <<"','">>,FUser,  <<"','">>,Msgid, <<"','">>,Msgid, <<"','">>,NotifyId, <<"','normal','">>,Currenttime, <<"','','0000-00-00 00:00:00','0000-00-00 00:00:00','{}') ON DUPLICATE KEY UPDATE to_user = '">>, FUser, <<"',message_id = '">>, Msgid, <<"' ;">>]),
 
   case catch update_recent_groupchat(AServer,Groupid,FUser,Msgid,AUser,NotifyId,<<"normal">>,<<"notification">>,TUser,<<"2">>,Currenttime) of
     {updated,1} ->
