@@ -72,9 +72,7 @@ on_user_send_packet({#message{from = From,to = To,type = _Type, id = MessageId }
     end,
   Delivered = xmpp:get_subtag(Pkt, #delivered{}),
     if Delivered =/= false ->
-      EncMsg = fly_mod_utils:get_encrypted_message_content(FServer, MessageId),
-      MsgContent = fly_mod_security:aes_decrpyt(MessageId, EncMsg),
-      ?LOG_INFO("Delivered recieved for msgId: ~p msgContent: ~p", [MessageId, MsgContent]),
+      ?LOG_INFO("Delivered recieved for msgId: ~p ", [MessageId]),
       store_offline_user_send(xmpp:decode(TimeStampedPacket), _C2SState, From, To, MessageId);
       true ->
       ok
