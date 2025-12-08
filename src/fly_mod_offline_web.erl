@@ -70,6 +70,13 @@ on_user_send_packet({#message{from = From,to = To,type = _Type, id = MessageId }
       true ->
       ok
     end,
+  Delivered = xmpp:get_subtag(Pkt, #delivered{}),
+    if Delivered =/= false ->
+      ?LOG_INFO("Delivered recieved for msgId: ~p ", [MessageId]),
+      store_offline_user_send(xmpp:decode(TimeStampedPacket), _C2SState, From, To, MessageId);
+      true ->
+      ok
+    end,  
   case xmpp:get_text(Pkt#message.body) of
     <<>> ->
       ok;
@@ -89,35 +96,41 @@ on_user_send_packet(Acc) ->
   Acc.
 
 store_offline_user_send(Packet, _C2SState, #jid{luser = FUser, lserver = FServer, lresource = LResource} = From, To, MessageId) ->
+
   fly_mod_offline_push:send_own_offline_message(From, To, xmpp:encode(Packet)),
+  
   case fly_mod_utils:get_mobile_user_message(FUser, FServer) of
     true ->
       {U, S, R} = jid:tolower(From),
       Sender = jid:make({U, S, R}),
       Dest = jid:make({U, S, <<>>}),
-      case fly_mod_utils:is_carbon_copy(Packet) of
+      
+      case fly_mod_utils:is_carbon_copy(Packet) of 
         false ->
           NewPacket = build_forward_packet(From, Packet, Sender, Dest, sent),
           ContentAcknowledge = xmpp:get_subtag(Packet, #chatcontent{}),
-  if (ContentAcknowledge =:= false)  ->
-      ok;
-    true ->
-          if ContentAcknowledge == false ->
-            MessageType = <<"">>,
-            Topicid = <<"">>,
-            MetaData = <<"">>,
-            MentionList = <<"">>,
-            EditMsgid = MessageId;
+          
+          if (ContentAcknowledge =:= false)  -> 
+            ok;
+          true ->
+            
+            if ContentAcknowledge == false ->
+              MessageType = <<"">>,
+              Topicid = <<"">>,
+              MetaData = <<"">>,
+              MentionList = <<"">>,
+              EditMsgid = MessageId;
             true ->
               {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,MentionList,_} = ContentAcknowledge
-          end,
+            end,
 
-          if EditMsgid =/= MessageId ->
-            ejabberd_sql:sql_query(FServer, [<<"delete from spool where username = '">>,FUser, <<"' and message_id ='">>,MessageId, <<"';">>]);
-            true ->
-              ok
-      end
-    end,
+            if EditMsgid =/= MessageId ->
+              ejabberd_sql:sql_query(FServer, [<<"delete from spool where username = '">>,FUser, <<"' and message_id ='">>,MessageId, <<"';">>]);
+              true ->
+                ok
+            end
+
+          end,
           mod_offline:store_packet({_C2SState,NewPacket});
         true ->
           ok
