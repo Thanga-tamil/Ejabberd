@@ -1320,7 +1320,7 @@ update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
 
   ejabberd_sql:sql_query(
     Server,
-    [<<"update chat_recent set status = 2 where  to_user ='">>,User,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>]).
+    [<<"update chat_recent set status = 2 where  to_user ='">>,TUser,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>]).
 
 %% Update message delivery status
 %%
