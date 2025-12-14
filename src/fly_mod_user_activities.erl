@@ -681,7 +681,7 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
   ejabberd_router:route(FromJid, ToJid, XmlBody1),
   fly_mod_stanza_ack:send_ack_response(FromJid, ToJid, OldMessageId, <<"delivered">>),
   TResource = ejabberd_sm:get_user_resources(TUser, TServer),
-      if length(TResource) =:= 0 ->
+      if length(TResource) =/= 0 ->
         ReceivedTimeStampedPacket = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
         mod_offline:store_packet({FromJid, xmpp:decode(ReceivedTimeStampedPacket)});
       true ->
