@@ -754,47 +754,42 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
                             _ -> EditMsgId0
                         end,
 
-						if (EditMsgId =:= MessageId) or (EditMsgId =:= <<"">>) ->
+                        InsertHead =
+                          <<"INSERT INTO message_status ",
+                            "(from_user,to_user,status,recent,message_id,mentioned_user_ids,",
+                            "edit_message_id,message_type,txt,chat_type,from_notification,",
+                            "message_time,to_notification,message_notification,received_at,seen_at,meta_data) VALUES ">>,
 
-							InsertHead =
-							<<"INSERT INTO message_status ",
-								"(from_user,to_user,status,recent,message_id,mentioned_user_ids,",
-								"edit_message_id,message_type,txt,chat_type,from_notification,",
-								"message_time,to_notification,message_notification,received_at,seen_at,meta_data) VALUES ">>,
+                        RecentHead =
+                          <<"INSERT INTO chat_recent ",
+                            "(from_user,to_user,message_id,message_from,txt,chat_type,message_type,",
+                            "notification_to,unread,message_time,meta_data) VALUES ">>,
 
-							RecentHead =
-							<<"INSERT INTO chat_recent ",
-								"(from_user,to_user,message_id,message_from,txt,chat_type,message_type,",
-								"notification_to,unread,message_time,meta_data) VALUES ">>,
+                        DuplicateStmt =
+                          <<" ON DUPLICATE KEY UPDATE to_user=VALUES(to_user),message_id=VALUES(message_id);">>,
 
-							DuplicateStmt =
-							<<" ON DUPLICATE KEY UPDATE to_user=VALUES(to_user),message_id=VALUES(message_id);">>,
+                        RecentDuplicateStmt =
+                          <<" ON DUPLICATE KEY UPDATE message_id=VALUES(message_id),message_from=VALUES(message_from),",
+                            "chat_type=VALUES(chat_type),message_type=VALUES(message_type),notification_to=VALUES(notification_to),",
+                            "unread=unread+VALUES(unread),status=0,recall_status=0,favourite_status=0,",
+                            "message_time=VALUES(message_time),meta_data=VALUES(meta_data),created_at=NOW();">>,
 
-							RecentDuplicateStmt =
-							<<" ON DUPLICATE KEY UPDATE message_id=VALUES(message_id),message_from=VALUES(message_from),",
-								"chat_type=VALUES(chat_type),message_type=VALUES(message_type),notification_to=VALUES(notification_to),",
-								"unread=unread+VALUES(unread),status=0,recall_status=0,favourite_status=0,",
-								"message_time=VALUES(message_time),meta_data=VALUES(meta_data),created_at=NOW();">>,
+                        % batch insert
+                        send_in_batches(Subscribers, BatchSize, fun(Batch) ->
+                            Values = [build_message_values(FromUser, ToUser, MessageId, EditMsgId,
+                                                           MessageType, MessageSend, MentionList,
+                                                           FlatTimeStampNew, MetaData, SUser)
+                                      || #jid{luser = ToUser} <- Batch],
+                            RecentValues = [build_recent_values(FromUser, ToUser, MessageId,
+                                                               SUser, MessageType,
+                                                               FlatTimeStampNew, MetaData)
+                                            || #jid{luser = ToUser} <- Batch],
+                            FinalQ = [InsertHead, join_binaries(Values, <<",">>), DuplicateStmt],
+                            RecentQ = [RecentHead, join_binaries(RecentValues, <<",">>), RecentDuplicateStmt],
+                            ejabberd_sql:sql_query(LServer, [FinalQ]),
+                            ejabberd_sql:sql_query(LServer, [RecentQ])
+                        end),
 
-							% batch insert
-							send_in_batches(Subscribers, BatchSize, fun(Batch) ->
-								Values = [build_message_values(FromUser, ToUser, MessageId, EditMsgId,
-															MessageType, MessageSend, MentionList,
-															FlatTimeStampNew, MetaData, SUser)
-										|| #jid{luser = ToUser} <- Batch],
-								RecentValues = [build_recent_values(FromUser, ToUser, MessageId,
-																SUser, MessageType,
-																FlatTimeStampNew, MetaData)
-												|| #jid{luser = ToUser} <- Batch],
-								FinalQ = [InsertHead, join_binaries(Values, <<",">>), DuplicateStmt],
-								RecentQ = [RecentHead, join_binaries(RecentValues, <<",">>), RecentDuplicateStmt],
-								ejabberd_sql:sql_query(LServer, [FinalQ]),
-								ejabberd_sql:sql_query(LServer, [RecentQ])
-							end);
-					true ->
-						ejabberd_sql:sql_query(LServer, [<<"update  message_status set status = 0, mentioned_user_ids  = '">>, MentionList, <<"' , edit_status = 1, received_at = '0000-00-00 00:00:00' ,seen_at = '0000-00-00 00:00:00',  edit_message_id = '">>, EditMsgId, <<"' where message_id = '">>, MessageId, <<"' ;">>]),
-						ejabberd_sql:sql_query(LServer, [<<"update chat_recent set status = 0,  txt  = '">>, MsgData , <<"' where message_id = '">>, MessageId, <<"';">>])
-					end,
                         ejabberd_sql:sql_query(LServer,
                           [<<"INSERT INTO chat_message_edit_history ",
                              "(from_user,to_user,message_id,edit_message_id,chat_type,msg,meta_data) VALUES ('">>,
