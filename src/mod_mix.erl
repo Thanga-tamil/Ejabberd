@@ -52,7 +52,7 @@
 
 -callback init(binary(), gen_mod:opts()) -> ok | {error, db_failure}.
 -callback set_channel(binary(), binary(), binary(),
-		      jid:jid(), boolean(), binary()) ->
+		      jid:jid(), boolean(), binary(), binary()) ->
     ok | {error, db_failure}.
 -callback get_channels(binary(), binary()) ->
     {ok, [binary()]} | {error, db_failure}.
@@ -247,7 +247,7 @@ process_disco_items(IQ) ->
 
 -spec process_mix_core(iq()) -> iq().
 process_mix_core(#iq{type = set, to = #jid{luser = <<>>},
-		     sub_els = [#mix_create{}]} = IQ) ->
+		     sub_els = [#mix_create{},#xmlel{name = <<"accessUri">>, children = _}]} = IQ) ->
     process_mix_create(IQ);
 process_mix_core(#iq{type = set, to = #jid{luser = <<>>},
 		     sub_els = [#mix_destroy{}]} = IQ) ->
@@ -355,8 +355,9 @@ format_status(_Opt, Status) ->
 %%% Internal functions
 %%%===================================================================
 -spec process_mix_create(iq()) -> iq().
-process_mix_create(#iq{to = To, from = From,
-		       sub_els = [#mix_create{channel = Chan, xmlns = XmlNs}]} = IQ) ->
+process_mix_create(#iq{to = To, from = From, sub_els = SubEls} = IQ) ->
+    #mix_create{channel = Chan, xmlns = XmlNs} = lists:keyfind(mix_create, 1, SubEls), 
+    #xmlel{name = <<"accessUri">>, children = [{xmlcdata, AccessUri}]} = lists:keyfind(<<"accessUri">>, 2, SubEls),
     Host = To#jid.lserver,
     ServerHost = ejabberd_router:host_of_route(Host),
     Mod = gen_mod:db_mod(ServerHost, ?MODULE),
@@ -374,7 +375,7 @@ process_mix_create(#iq{to = To, from = From,
 	      {error, notfound} ->
 		  Key = xmpp_util:hex(p1_rand:bytes(20)),
 		  Mod:set_channel(ServerHost, Chan1, Host,
-				  Creator, Chan == <<>>, Key);
+				  Creator, Chan == <<>>, Key, AccessUri);
 	      {error, db_failure} = Err ->
 		  Err
 	  end,

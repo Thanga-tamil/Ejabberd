@@ -324,7 +324,7 @@ get_bulk_user_device(LServer, Members, Resources, Type,Fromuser) ->
   FromUser = get_user_from_string_jid(Fromuser),
   ejabberd_sql:sql_query(
     LServer,
-    [<<"SELECT username, device_token ,user_type, push_server_type  FROM chat_users_details WHERE  username  in ('">>, Members, <<"') and  device_token != '' and device_token != 'null' and (device_type = 'android' or device_type = 'flutter-android' or  device_type = 'flutter-ios') and username != '">>, FromUser, <<"' and device_id not in  ('">>, Resources, <<"' );">>]).
+    [<<"SELECT username, device_token ,user_type, push_server_type  FROM chat_users_details WHERE  username  in ('">>, Members, <<"') and  device_token != '' and device_token != 'null' and (device_type = 'android' or device_type = 'flutter-android' or  device_type = 'flutter-ios')  and device_id not in  ('">>, Resources, <<"' );">>]).
 
 get_bulk_user_device(LServer, Members, Resources, Type,Mode,Fromuser) ->
   FromUser = get_user_from_string_jid(Fromuser),
@@ -1320,7 +1320,7 @@ update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
 
   ejabberd_sql:sql_query(
     Server,
-    [<<"update chat_recent set status = 2 where  to_user ='">>,User,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>]).
+    [<<"update chat_recent set status = 2 where  to_user ='">>,TUser,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>]).
 
 %% Update message delivery status
 %%

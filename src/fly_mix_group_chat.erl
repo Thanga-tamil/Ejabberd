@@ -188,8 +188,19 @@ create_group(From, To, SubEl, IQ) ->
     CustomAttributes = fxml:get_tag_cdata(CustAtr)
   end,
   % Creates Group
-  mod_mix:process_mix_core(#iq{type = set, from = From, to = To, id = MessageId,
-        sub_els = [#mix_create{channel = Channel,xmlns = <<"urn:xmpp:mix:core:0">>}]}),
+  AccessUri = generate_group_access_uri(GroupName),
+  CreateIQ = #iq{
+    type = set, 
+    from = From, 
+    to = To, 
+    id = MessageId,
+    sub_els = [
+      #mix_create{channel = Channel, xmlns = <<"urn:xmpp:mix:core:0">>},
+      #xmlel{name = <<"accessUri">>, attrs = [], children = [{xmlcdata, AccessUri}]}
+    ]
+  },
+  mod_mix:process_mix_core(CreateIQ),
+
   % Adds Owner
   mod_mix_pam:process_iq(#iq{from = From, to = From, type = set,id = MessageId1,
         sub_els = [#mix_client_join{channel = GroupJID, xmlns = <<"urn:xmpp:mix:pam:0">>,affiliation = <<"o">>,
@@ -200,6 +211,28 @@ create_group(From, To, SubEl, IQ) ->
   fly_mod_offline_push:groupcreationfunction(From, groupcreation, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes),
  
   fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, group_id = Channel, result_type = <<"Group Created successfully">>}).
+
+generate_group_access_uri(GroupName) when is_binary(GroupName) ->
+    Slug = generate_slug(GroupName),
+    Token = random_token(),
+    <<Slug/binary, "-", Token/binary>>.
+
+generate_slug(Str) when is_binary(Str) ->
+    Lower = string:lowercase(Str),
+    Step1 = re:replace(Lower, <<"[^a-z0-9\\s-]">>, <<>>, [global, {return, binary}]),
+    Step2 = re:replace(Step1, <<"\\s+">>, <<"-">>, [global, {return, binary}]),
+    Step3 = re:replace(Step2, <<"-+">>, <<"-">>, [global, {return, binary}]),
+    re:replace(Step3, <<"^-|-$">>, <<>>, [global, {return, binary}]);
+
+generate_slug(_) ->
+    <<>>.
+
+random_token() ->
+    Int = crypto:strong_rand_bytes(9),
+    Num = binary:decode_unsigned(Int),
+    Base36 = string:lowercase(integer_to_list(Num, 36)),
+    list_to_binary(lists:sublist(Base36, 7)).
+
 
 create_group_service(From, To, SubEl, IQ) ->
   #jid{lserver = TServer} = To,
