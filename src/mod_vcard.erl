@@ -448,6 +448,8 @@ set_vcard(User, LServer, VCARD) ->
 	    {error, badarg};
 	LUser ->
 	    VCardEl = xmpp:encode(VCARD),
+        ?LOG_INFO("..set_vcard.."),
+        ?LOG_INFO("VCardEl ~p", [VCardEl]),
 	    VCardSearch = make_vcard_search(User, LUser, LServer, VCardEl),
 	    Mod = gen_mod:db_mod(LServer, ?MODULE),
             case Mod:set_vcard(LUser, LServer, VCardEl, VCardSearch) of
