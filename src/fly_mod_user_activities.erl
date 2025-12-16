@@ -230,6 +230,8 @@ process_iq_set(From, _To, RequestType, IQ) ->
       read_all(From, RequestType, SubEl, IQ);
     <<"poll_acknowledge">> ->
       poll_ack(From, RequestType, SubEl, IQ);
+    <<"privacy_setting">> -> 
+      privacy_setting(From, RequestType, SubEl, IQ);
     no_such_subtag ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"no_such_subtag">>, result_type = <<"unknown request">>});
     empty_value ->
@@ -734,6 +736,39 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   fly_mod_utils:remove_poll_offline(FServer, MResource,PollMsgId),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Ack successfully">>}).
 
+
+% privacy_setting %  
+  privacy_setting(From, RequestType, SubEl, IQ) ->
+  #jid{user = FUser, lserver = FServer,lresource = LResource} = From,
+
+  ?LOG_INFO("privacy_setting.."),
+
+  Type = fxml:get_path_s(SubEl, [{attr, <<"type">>}]),
+  Action = fxml:get_path_s(SubEl, [{attr, <<"action">>}]),
+
+  ?LOG_INFO("Type: ~p", [Type]),
+  ?LOG_INFO("Action: ~p", [Action]),
+
+  if Type =:= <<"seen_receipt">> -> 
+    fly_mod_utils:set_seen_receipt(FServer, FUser, fxml:get_path_s(SubEl, [{attr, <<"action">>}]));
+  Type =:= <<"hide_profile">> ->
+    fly_mod_utils:set_hide_profile(FServer, FUser, fxml:get_path_s(SubEl, [{attr, <<"action">>}]))
+  end,
+
+  XmlBody = 
+  #xmlel{
+    name = <<"iq">>,
+    attrs = [{<<"from">>, From}, {<<"to">>, From}, {<<"type">>, <<"result">>}],
+    children = [
+      #xmlel{name = <<"query">>,
+      attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>}, {<<"status">>, RequestType},{<<"type">>, Type},{<<"action">>, Action}],
+      children = []}]
+    },
+      
+  ejabberd_router:route(From, From, XmlBody),
+  
+  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Privacy settings updated successfully">>}).
+  
   acknowledge(From,RequestType,SubEl,IQ) ->
   #jid{user = FUser, lserver = FServer,lresource = LResource} = From,
   MsgId = fxml:get_path_s(SubEl, [{attr, <<"id">>}]),
