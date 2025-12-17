@@ -186,7 +186,7 @@
   set_user_settings/2, get_archived_chats/1,update_recent_unread_chat/2,update_recent_group_unread_chat/3,
   update_block_status_user/3,update_block_status_group/3,get_contact_permission/1,update_vcard_date/2,get_user_resources/2,
   get_user_resources/3,get_mobile_user_message/2,get_mobile_user_resource/2,get_push_type/1,get_meta_chat_web/4,poll_vote_update/8,
-  remove_poll_offline/3,get_existing_group_info/2]).
+  remove_poll_offline/3,get_existing_group_info/2,get_country_code/2]).
 
 -include("logger.hrl").
 
@@ -2243,3 +2243,6 @@ get_mobile_user_resource(TUser, TServer) ->
     length(Resources) =:= 2 -> false;
     length(Resources) > 2 -> false
   end.
+
+get_country_code(FServer, TUserId) -> 
+  ejabberd_sql:sql_query(FServer, [<<"select country_code from chat_users_details where username='">>,TUserId,<<"' limit 1;">>]).

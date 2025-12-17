@@ -222,8 +222,22 @@ update_call_status(From, RequestType, SubEl, IQ) ->
           end
         end;
     <<"CALLING">> ->
-      send_payload(CallStatus, SubEl),
-      fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>});
+      Users = fxml:get_subtag(SubEl, <<"users">>),
+      TUserJid = fxml:get_subtag(Users, <<"user">>),
+      TUserId = TUserJid#xmlel.name,
+      TUserCountryCode = fly_mod_utils:get_country_code(FServer, TUserId),
+      ?LOG_INFO("TUserCountryCode: ~p", [TUserCountryCode]),
+      
+      CountryCodes = ejabberd_config:get_option({restricted_country_code, FServer}),
+      ?LOG_INFO("Restricted Country Codes: ~p", [CountryCodes]),
+
+      case lists:member(TUserCountryCode, CountryCodes) of
+        true -> 
+          fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Call not allowed in your country">>});
+        false ->
+          send_payload(CallStatus, SubEl),
+          fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>})
+      end;
     <<"JOINED">> ->
       RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),
       CallType = fxml:get_path_s(SubEl, [{attr, <<"call_type">>}]),
