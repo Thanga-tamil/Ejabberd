@@ -737,30 +737,21 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Ack successfully">>}).
 
 
-% privacy_setting %  
   privacy_setting(From, RequestType, SubEl, IQ) ->
   #jid{user = FUser, lserver = FServer,lresource = LResource} = From,
-
-  ?LOG_INFO("privacy_setting.."),
 
   Type = fxml:get_path_s(SubEl, [{attr, <<"type">>}]),
   Action = fxml:get_path_s(SubEl, [{attr, <<"action">>}]),
 
-  ?LOG_INFO("Type: ~p", [Type]),
-  ?LOG_INFO("Action: ~p", [Action]),
-
   if Type =:= <<"seen_receipt">> -> 
-    fly_mod_utils:set_seen_receipt(FServer, FUser, fxml:get_path_s(SubEl, [{attr, <<"action">>}]));
+    fly_mod_utils:set_seen_receipt(FServer, FUser, Action);
   Type =:= <<"hide_profile">> ->
-    fly_mod_utils:set_hide_profile(FServer, FUser, fxml:get_path_s(SubEl, [{attr, <<"action">>}]))
+    fly_mod_utils:set_hide_profile(FServer, FUser, Action)
   end,
-
-  RandomId = fly_mod_utils:get_iq_message_id(7),
-  ?LOG_INFO("RandomId: ~p", [RandomId]),
 
   XmlBody = #xmlel{
     name = <<"iq">>,
-    attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, jid:to_string(From)}, {<<"type">>, <<"result">>}, {<<"id">>, RandomId}],
+    attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, jid:to_string(From)}, {<<"type">>, <<"result">>}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}],
     children = [
       #xmlel{name = <<"query">>,
       attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>}, {<<"status">>, RequestType},{<<"type">>, Type},{<<"action">>, Action}],
