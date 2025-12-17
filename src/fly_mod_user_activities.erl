@@ -603,16 +603,18 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"user logged out successfully">>}).
 
   message_delivery(_From, RequestType, SubEl,IQ) ->
-  MessageFrom = fxml:get_path_s(SubEl, [{attr, <<"message_from">>}]),
-  MessageTo = fxml:get_path_s(SubEl, [{attr, <<"message_to">>}]),
-  OldMessageId = fxml:get_path_s(SubEl, [{attr, <<"message_id">>}]),
-  GroupId = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
-  LResource = fxml:get_path_s(SubEl, [{attr, <<"device_id">>}]),
-  MessageId = fly_mod_utils:get_iq_message_id(16),
-  MsgId = fly_mod_utils:get_iq_message_id(16),
-  FromJid = jid:from_string(MessageFrom),
+  
+  MessageFrom     = fxml:get_path_s(SubEl, [{attr, <<"message_from">>}]),
+  MessageTo       = fxml:get_path_s(SubEl, [{attr, <<"message_to">>}]),
+  OldMessageId    = fxml:get_path_s(SubEl, [{attr, <<"message_id">>}]),
+  GroupId         = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
+  LResource       = fxml:get_path_s(SubEl, [{attr, <<"device_id">>}]),
+  MessageId       = fly_mod_utils:get_iq_message_id(16),
+  MsgId           = fly_mod_utils:get_iq_message_id(16),
+  FromJid         = jid:from_string(MessageFrom),
 
   #jid{user = FUser, lserver = FServer} = FromJid,
+  
   if (MessageTo =:= <<"">>) or (MessageTo =:= <<>>) ->
       case catch fly_mod_utils:get_message_from(FServer,  OldMessageId) of
             {seleced, _, []} ->
@@ -624,16 +626,20 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
     true ->
       ToJid = jid:from_string(MessageTo),
       #jid{user = TUser, lserver = TServer} = ToJid
-end,
+  end,
+  
   Substring = string:str(binary_to_list(LResource),binary_to_list(<<"Mobile-">>)),
   if Substring =:= 1 ->
     MResource = fly_mod_utils:get_device_from_resource(LResource);
   true ->
     MResource = LResource
   end,
+
   fly_mod_utils:update_offline(FServer, OldMessageId,MResource),
   fly_mod_utils:update_delivery(FromJid, TUser, OldMessageId, GroupId),
+  
   BusyMsg = fly_mod_utils:get_userbusy_message(FServer, TUser, FUser),
+
   if BusyMsg =/= <<"">> andalso GroupId =:= <<"">> ->
     BodyString = fly_mod_security:aes_encrpyt_license(MsgId, <<"ddc0f15cc2c90fca">>, BusyMsg),
     MsgBody3 = XML = #xmlel{name = <<"message">>, attrs = [{<<"xmlns">>, <<"jabber:client">>},{<<"from">>, MessageFrom}, {<<"to">>, MessageTo},
@@ -656,9 +662,10 @@ end,
       end,
       fly_mod_stanza_ack:store_in_table(FServer,FUser,TUser,MsgId,BodyString,<<"chat">>,<<"auto_text">>,<<"">>,  <<"{}">> ,<<"0">>,<<"">>, ReceivedFlatTimeStamps),
       fly_mod_utils:insert_status(FromJid, ToJid, MsgId,<<"auto_text">>,<<"">>, <<"{}">>, <<"chat">>,<<"">>,<<"0">>,BodyString,ReceivedFlatTimeStamps,MsgId);
-true ->
+  true ->
     ok
-end,
+  end,
+
   case catch fly_mod_utils:message_status(FServer, OldMessageId, TUser) of
                                     {selected, _, []} ->
                                       GStatus = <<"0">>;
@@ -666,7 +673,7 @@ end,
                                       GStatus = GroupStatus;
                                     _ ->
                                       GStatus = <<"0">>
-                                  end,
+  end,
   XmlBody = #xmlel{name = <<"message">>, attrs = [{<<"from">>, MessageFrom}, {<<"to">>, MessageTo}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
   children = [#xmlel{name = <<"delivered">>, attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"id">>, OldMessageId},{<<"message_status">>, GStatus}, {<<"group_id">>, GroupId}], children = []}]},
   ReceivedTimestamp = now_to_microseconds(erlang:now()),
@@ -676,7 +683,7 @@ end,
   ejabberd_router:route(FromJid, ToJid, XmlBody1),
   fly_mod_stanza_ack:send_ack_response(FromJid, ToJid, OldMessageId, <<"delivered">>),
   TResource = ejabberd_sm:get_user_resources(TUser, TServer),
-      if length(TResource) =:= 0 ->
+      if length(TResource) =/= 0 ->
         ReceivedTimeStampedPacket = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
         mod_offline:store_packet({FromJid, xmpp:decode(ReceivedTimeStampedPacket)});
       true ->
