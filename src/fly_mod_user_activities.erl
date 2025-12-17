@@ -758,7 +758,7 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   RandomId = fly_mod_utils:get_iq_message_id(7),
   ?LOG_INFO("RandomId: ~p", [RandomId]),
 
-  #xmlel{
+  XmlBody = #xmlel{
     name = <<"iq">>,
     attrs = [{<<"from">>, From}, {<<"to">>, From}, {<<"type">>, <<"result">>}, {<<"id">>, RandomId}],
     children = [
