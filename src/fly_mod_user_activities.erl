@@ -746,9 +746,6 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   Type = fxml:get_path_s(SubEl, [{attr, <<"type">>}]),
   Action = fxml:get_path_s(SubEl, [{attr, <<"action">>}]),
 
-  FromJid = jid:from_string(From),
-  ?LOG_INFO("FromJid: ~p", [FromJid]),
-
   ?LOG_INFO("Type: ~p", [Type]),
   ?LOG_INFO("Action: ~p", [Action]),
 
@@ -763,14 +760,14 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
 
   XmlBody = #xmlel{
     name = <<"iq">>,
-    attrs = [{<<"from">>, jid:to_string(FromJid)}, {<<"to">>, jid:to_string(FromJid)}, {<<"type">>, <<"result">>}, {<<"id">>, RandomId}],
+    attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, jid:to_string(From)}, {<<"type">>, <<"result">>}, {<<"id">>, RandomId}],
     children = [
       #xmlel{name = <<"query">>,
       attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>}, {<<"status">>, RequestType},{<<"type">>, Type},{<<"action">>, Action}],
       children = []}]
     },
       
-  ejabberd_router:route(From, FromJid, XmlBody),
+  ejabberd_router:route(From, From, XmlBody),
   
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Privacy settings updated successfully">>}).
   
