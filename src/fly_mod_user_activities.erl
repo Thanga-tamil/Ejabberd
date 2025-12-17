@@ -755,10 +755,12 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
     fly_mod_utils:set_hide_profile(FServer, FUser, fxml:get_path_s(SubEl, [{attr, <<"action">>}]))
   end,
 
-  XmlBody = 
+  RandomId = fly_mod_utils:get_iq_message_id(7),
+  ?LOG_INFO("RandomId: ~p", [RandomId]),
+
   #xmlel{
     name = <<"iq">>,
-    attrs = [{<<"from">>, From}, {<<"to">>, From}, {<<"type">>, <<"result">>}],
+    attrs = [{<<"from">>, From}, {<<"to">>, From}, {<<"type">>, <<"result">>}, {<<"id">>, RandomId}],
     children = [
       #xmlel{name = <<"query">>,
       attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>}, {<<"status">>, RequestType},{<<"type">>, Type},{<<"action">>, Action}],
