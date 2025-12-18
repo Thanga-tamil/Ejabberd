@@ -10,7 +10,7 @@
 -behaviour(gen_mod).
 
 %% API
--export([start/2, stop/1, depends/2, process_local_iq/1, filter_packet/1, mod_options/1]).
+-export([start/2, stop/1, depends/2, process_local_iq/1, filter_packet/1, mod_options/1, mod_opt_type/1]).
 
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
@@ -555,14 +555,11 @@ now_to_microseconds({Mega, Sec, Micro}) ->
 
 depends(_, _) ->
     [].
+
 mod_options(_) ->
     [{restricted_country_code, []}].
+
 mod_opt_type(restricted_country_code) ->
     econf:list(econf:binary());
 mod_opt_type(_) ->
-    [].    
-  % depends(_, _) ->
-  %   [].
-
-  % mod_options(_) ->
-  %   [].
+    [].
