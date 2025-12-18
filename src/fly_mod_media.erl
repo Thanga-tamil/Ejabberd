@@ -72,7 +72,6 @@ process_iq_set(From, To, RequestType, IQ) ->
       fly_mod_utils:generate_subel(IQ, #media_call_activities{type = _Status, result_type = <<"unknown request">>})
   end.
 
-
 %%<iq type="set" id="dasdwq">
 %%<query xmlns="jabber:iq:media_call_activities" status="call_status"
 %% room_id = "assdfsdfsd" call_status = "ATTENDED/ENDED/ENDED">
@@ -228,7 +227,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
       TUserCountryCode = fly_mod_utils:get_country_code(FServer, TUserId),
       ?LOG_INFO("TUserCountryCode: ~p", [TUserCountryCode]),
       
-      CountryCodes = ejabberd_config:get_option({restricted_country_code, FServer}),
+      CountryCodes = ejabberd_config:get_option({restricted_country_code, FServer}, []),
       ?LOG_INFO("Restricted Country Codes: ~p", [CountryCodes]),
 
       case lists:member(TUserCountryCode, CountryCodes) of
@@ -554,8 +553,16 @@ now_to_microseconds({Mega, Sec, Micro}) ->
   %%Epoch time in milliseconds from 1 Jan 1970
   (Mega * 1000000 + Sec) * 1000000 + Micro.
 
-  depends(_, _) ->
+depends(_, _) ->
     [].
+mod_options(_) ->
+    [{restricted_country_code, []}].
+mod_opt_type(restricted_country_code) ->
+    econf:list(econf:binary());
+mod_opt_type(_) ->
+    [].    
+  % depends(_, _) ->
+  %   [].
 
-  mod_options(_) ->
-    [].
+  % mod_options(_) ->
+  %   [].
