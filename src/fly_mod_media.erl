@@ -223,11 +223,19 @@ update_call_status(From, RequestType, SubEl, IQ) ->
     <<"CALLING">> ->
       Users = fxml:get_subtag(SubEl, <<"users">>),
       TUserJid = fxml:get_subtag(Users, <<"user">>),
-      TUserId = TUserJid#xmlel.name,
-      TUserCountryCode = fly_mod_utils:get_country_code(FServer, TUserId),
-      ?LOG_INFO("TUserCountryCode: ~p", [TUserCountryCode]),
+      ?LOG_INFO("TUserJid: ~p", [TUserJid]),
+      TUserId = TUserJid#jid.luser,
+      ?LOG_INFO("TUserId: ~p", [TUserId]),
+      CountryCodeResult = fly_mod_utils:get_country_code(FServer, TUserId),
+      ?LOG_INFO("CountryCodeResult: ~p", [CountryCodeResult]),
       
-      CountryCodes = ejabberd_config:get_option({restricted_country_code, FServer}, []),
+      TUserCountryCode = case CountryCodeResult of
+        {selected, _, [[Code]]} -> Code;
+        {selected, _, []} -> <<"">>;
+        _ -> <<"">>
+      end,
+      
+      CountryCodes = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code, []),
       ?LOG_INFO("Restricted Country Codes: ~p", [CountryCodes]),
 
       case lists:member(TUserCountryCode, CountryCodes) of
