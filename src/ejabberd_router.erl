@@ -381,7 +381,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 -spec do_route(stanza()) -> ok.
 do_route(OrigPacket) ->
-    ?DEBUG("Route:~n~ts", [xmpp:pp(OrigPacket)]),
+    ?LOG_INFO("Route:~n~ts", [xmpp:pp(OrigPacket)]),  % this should be in the debug level
     case ejabberd_hooks:run_fold(filter_packet, OrigPacket, []) of
 	drop ->
 	    ok;
@@ -394,11 +394,14 @@ do_route(OrigPacket) ->
 		    LDstDomain = To#jid.lserver,
 		    case find_routes(LDstDomain) of
 			[] ->
+			    ?LOG_INFO("ejabberd_s2s router"),
 			    ejabberd_s2s:route(Packet);
 			[Route] ->
+			    ?LOG_INFO("do_route overloading with 2 args"),
 			    do_route(Packet, Route);
 			Routes ->
 			    From = xmpp:get_from(Packet),
+			    ?LOG_INFO("balancing_route"),
 			    balancing_route(From, To, Packet, Routes)
 		    end,
 		    ok
