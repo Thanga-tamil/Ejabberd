@@ -241,8 +241,13 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
 
     T when (T == message_seen) ->
       ElementAcknowledge = xmpp:get_subtag(Packet, #seen{}),
-      {seen,Id,_,_,_Time,ReceiptStatus} = ElementAcknowledge,
-      ?LOG_INFO("Seen Status: ~p", [ReceiptStatus]),
+      ?LOG_INFO("Seen Element: ~p", [ElementAcknowledge]),
+      %{seen,<<"7d494104-edfa-4367-be0e-b9e70e661b48">>,<<>>,<<"0">>,<<"1">>,<<>>}
+      {seen,Id,_,_,ReceiptStatus} = ElementAcknowledge,
+      ?LOG_INFO("Seen ReceiptStatus: ~p", [ReceiptStatus]),
+      ?LOG_INFO("Seen Id: ~p", [Id]),
+      {seen,I1,I2,I3,I4,I5} = ElementAcknowledge,
+      ?LOG_INFO("seen elms: ~p,~p,~p,~p,~p", [I1, I2, I3, I4, I5]),
       case ReceiptStatus of 
           <<"1">> ->
 
