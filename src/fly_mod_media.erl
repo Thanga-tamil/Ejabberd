@@ -237,7 +237,6 @@ update_call_status(From, RequestType, SubEl, IQ) ->
       end,
       ?LOG_INFO("TUserId: ~p", [TUserId]),
 
-
       CountryCodeResult = fly_mod_utils:get_country_code(FServer, TUserId),
       ?LOG_INFO("CountryCodeResult: ~p", [CountryCodeResult]),
       
@@ -247,7 +246,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
         _ -> <<"">>
       end,
       
-      CountryCodes = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code, []),
+      CountryCodes = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code),
       ?LOG_INFO("Restricted Country Codes: ~p", [CountryCodes]),
 
       case lists:member(TUserCountryCode, CountryCodes) of
