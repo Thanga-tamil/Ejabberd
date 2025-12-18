@@ -222,10 +222,16 @@ update_call_status(From, RequestType, SubEl, IQ) ->
         end;
     <<"CALLING">> ->
       Users = fxml:get_subtag(SubEl, <<"users">>),
-      TUserJid = fxml:get_subtag(Users, <<"user">>),
-      ?LOG_INFO("TUserJid: ~p", [TUserJid]),
-      TUserId = TUserJid#jid.luser,
+      TUserJidEl = fxml:get_subtag(Users, <<"user">>),
+      ?LOG_INFO("TUserJidEl: ~p", [TUserJidEl]),
+
+      JidBin = fxml:get_tag_cdata(TUserJidEl),
+      ?LOG_INFO("JidBin: ~p", [JidBin]),
+
+      Jid = jid:from_binary(JidBin),
+      TUserId = Jid#jid.luser,
       ?LOG_INFO("TUserId: ~p", [TUserId]),
+
       CountryCodeResult = fly_mod_utils:get_country_code(FServer, TUserId),
       ?LOG_INFO("CountryCodeResult: ~p", [CountryCodeResult]),
       
