@@ -251,8 +251,8 @@ update_call_status(From, RequestType, SubEl, IQ) ->
 
       case lists:member(TUserCountryCode, CountryCodes) of
         true -> 
-          ?LOG_INFO("Call not allowed in your country"),
-          fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Call not allowed in your country">>});
+          ?LOG_INFO("Call not allowed in destination country"),
+          fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Call not allowed in destination country">>});
         false ->
           send_payload(CallStatus, SubEl),
           fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>})
