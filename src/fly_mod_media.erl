@@ -245,12 +245,13 @@ update_call_status(From, RequestType, SubEl, IQ) ->
         {selected, _, []} -> <<"">>;
         _ -> <<"">>
       end,
-      
+      ?LOG_INFO("TUserCountryCode: ~p", [TUserCountryCode]),
       CountryCodes = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code),
       ?LOG_INFO("Restricted Country Codes: ~p", [CountryCodes]),
 
       case lists:member(TUserCountryCode, CountryCodes) of
         true -> 
+          ?LOG_INFO("Call not allowed in your country"),
           fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Call not allowed in your country">>});
         false ->
           send_payload(CallStatus, SubEl),
