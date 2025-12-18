@@ -757,17 +757,17 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   end,
 
   XmlBody = #xmlel{
-    name = <<"iq">>,
+    name = <<"message">>,
     attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, jid:to_string(From)}, {<<"type">>, <<"result">>}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}],
     children = [
-      #xmlel{name = <<"query">>,
+      #xmlel{name = <<"privacy">>,
       attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>}, {<<"status">>, RequestType},{<<"type">>, Type},{<<"action">>, Action}],
       children = []}]
     },
       
-  ejabberd_router:route(From, From, XmlBody).
+  ejabberd_router:route(From, From, XmlBody),
   
-  %fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Privacy settings updated successfully">>}).
+  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Privacy settings updated successfully">>}).
   
   acknowledge(From,RequestType,SubEl,IQ) ->
   #jid{user = FUser, lserver = FServer,lresource = LResource} = From,

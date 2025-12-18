@@ -256,6 +256,8 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           _ -> 0
       end,
       ?LOG_INFO("ReadReceipt Value: ~p", [ReadReceipt]),  
+      fly_mod_utils:update_msg_seen_receipt(FServer, Id, ReadReceipt),
+      ?LOG_INFO("..."),
       send_ack_response(From, To, Id,  <<"seen">>),
       NewSeenPacket = xmpp:set_from_to(Packet,From, To),
       GetSeenTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
