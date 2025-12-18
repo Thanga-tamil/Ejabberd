@@ -248,8 +248,9 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
       ?LOG_INFO("Seen Id: ~p", [Id]),
       {seen,I1,I2,I3,I4,I5} = ElementAcknowledge,
       ?LOG_INFO("seen elms: ~p,~p,~p,~p,~p", [I1, I2, I3, I4, I5]),
+      
       case ReceiptStatus of 
-          <<"1">> ->
+          <<"0">> ->
 
           send_ack_response(From, To, Id,  <<"seen">>),
           NewSeenPacket = xmpp:set_from_to(Packet,From, To),
@@ -264,6 +265,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
               SeenTimeStampedPacket = NewSeenPacket
           end,
           fly_mod_utils:update_recent_group_unread_chat(Id,FUser,FServer),
+          fly_mod_utils:update_msg_seen_receipt(FServer, Id, ReceiptStatus),
           case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
             true ->
               mod_offline:store_packet({SeenTimeStampedPacket,xmpp:decode(SeenTimeStampedPacket)});
@@ -271,7 +273,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
               ok
           end;
 
-          <<"0">> ->
+          <<"1">> ->
 
              send_ack_response(From, To, Id,  <<"seen">>),
           NewSeenPacket = xmpp:set_from_to(Packet,From, To),
@@ -286,6 +288,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
               SeenTimeStampedPacket = NewSeenPacket
           end,
           fly_mod_utils:update_recent_group_unread_chat(Id,FUser,FServer),
+          fly_mod_utils:update_msg_seen_receipt(FServer, Id, ReceiptStatus),
           case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
             true ->
               mod_offline:store_packet({SeenTimeStampedPacket,xmpp:decode(SeenTimeStampedPacket)});
