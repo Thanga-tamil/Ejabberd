@@ -228,9 +228,15 @@ update_call_status(From, RequestType, SubEl, IQ) ->
       JidBin = fxml:get_tag_cdata(TUserJidEl),
       ?LOG_INFO("JidBin: ~p", [JidBin]),
 
-      Jid = jid:from_binary(JidBin),
-      TUserId = Jid#jid.luser,
+      TUserId =
+      case binary:split(JidBin, <<"@">>, [global]) of
+        [User, _Server] ->
+            User;
+        _ ->
+            error
+      end,
       ?LOG_INFO("TUserId: ~p", [TUserId]),
+
 
       CountryCodeResult = fly_mod_utils:get_country_code(FServer, TUserId),
       ?LOG_INFO("CountryCodeResult: ~p", [CountryCodeResult]),
