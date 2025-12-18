@@ -241,9 +241,9 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
 
     T when (T == message_seen) ->
       ElementAcknowledge = xmpp:get_subtag(Packet, #seen{}),
-      {seen, Id, _, ReceiptStatus, _} = ElementAcknowledge,
-      ?LOG_INFO("ReceiptStatus: ~p", [ReceiptStatus]),
-      case ReceiptStatus of
+      {seen,Id,_,_,_Time,ReceiptStatus} = ElementAcknowledge,
+      ?LOG_INFO("Seen Status: ~p", [ReceiptStatus]),
+      case ReceiptStatus of 
           <<"1">> ->
 
           send_ack_response(From, To, Id,  <<"seen">>),
@@ -290,7 +290,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
 
           _ ->
 
-            ?LOG_INFO("ReceiptStatus Unknown: ~p", [ReceiptStatus]),
+            ?LOG_INFO("Seen Status Unknown: ~p", [ReceiptStatus]),
             send_ack_response(From, To, Id,  <<"seen">>),
           NewSeenPacket = xmpp:set_from_to(Packet,From, To),
           GetSeenTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),

@@ -348,11 +348,12 @@
      #elem{name = <<"seen">>,
            xmlns = <<"urn:xmpp:receipts">>,
 	   module = 'seen',
-           result = {seen, '$id', '$time','$message_status', '$group_id'},
+           result = {seen, '$id', '$time','$message_status', '$group_id', '$receipt_status'},
            attrs = [#attr{name = <<"id">>,default = <<"">>},
                     #attr{name = <<"message_status">>,default = <<"">>},
                     #attr{name = <<"group_id">>,default = <<"">>},
-                    #attr{name = <<"time">>,default = <<"">>}]}).
+                    #attr{name = <<"time">>,default = <<"">>},
+                    #attr{name = <<"receipt_status">>,default = <<"">>}]}).
 -xml(poll,
      #elem{name = <<"poll">>,
            xmlns = <<"urn:xmpp:receipts">>,
