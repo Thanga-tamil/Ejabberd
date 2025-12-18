@@ -247,79 +247,36 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
       ?LOG_INFO("Seen ReceiptStatus: ~p", [ReceiptStatus]),
       ?LOG_INFO("Seen Id: ~p", [Id]),
       {seen,I1,I2,I3,I4,I5} = ElementAcknowledge,
-      ?LOG_INFO("seen elms: ~p,~p,~p,~p,~p", [I1, I2, I3, I4, I5]),
+      ?LOG_INFO("seen elms: ~p,~p,~p,~p,~p", [I1, I2, I3, I4, I5]), %dev in progress
       
+      ReadReceipt = 
       case ReceiptStatus of 
-          <<"0">> ->
+          <<"0">> -> 0;
+          <<"1">> -> 1;
+          _ -> 0
+      end,
+      ?LOG_INFO("ReadReceipt Value: ~p", [ReadReceipt]),  
+      send_ack_response(From, To, Id,  <<"seen">>),
+      NewSeenPacket = xmpp:set_from_to(Packet,From, To),
+      GetSeenTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
+      if GetSeenTimestamp =:= false ->
+        SeenTimestamp = now_to_microseconds(erlang:now()),
+        SeenFlatTimeStamp = lists:flatten(io_lib:format("~p", [SeenTimestamp])),
+        SeenXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(SeenFlatTimeStamp)}],
+        children = []},
+        SeenTimeStampedPacket = fxml:append_subtags(xmpp:encode(NewSeenPacket), [SeenXMLTag]);
+      true ->
+        SeenTimeStampedPacket = NewSeenPacket
+        end,
+        fly_mod_utils:update_recent_group_unread_chat(Id,FUser,FServer),
+        fly_mod_utils:update_msg_seen_receipt(FServer, Id, ReadReceipt),
+        case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
+          true ->
+            mod_offline:store_packet({SeenTimeStampedPacket,xmpp:decode(SeenTimeStampedPacket)});
+          false ->
+            ok
+        end;
 
-          send_ack_response(From, To, Id,  <<"seen">>),
-          NewSeenPacket = xmpp:set_from_to(Packet,From, To),
-          GetSeenTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
-          if GetSeenTimestamp =:= false ->
-            SeenTimestamp = now_to_microseconds(erlang:now()),
-            SeenFlatTimeStamp = lists:flatten(io_lib:format("~p", [SeenTimestamp])),
-            SeenXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(SeenFlatTimeStamp)}],
-              children = []},
-            SeenTimeStampedPacket = fxml:append_subtags(xmpp:encode(NewSeenPacket), [SeenXMLTag]);
-            true ->
-              SeenTimeStampedPacket = NewSeenPacket
-          end,
-          fly_mod_utils:update_recent_group_unread_chat(Id,FUser,FServer),
-          fly_mod_utils:update_msg_seen_receipt(FServer, Id, ReceiptStatus),
-          case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
-            true ->
-              mod_offline:store_packet({SeenTimeStampedPacket,xmpp:decode(SeenTimeStampedPacket)});
-            false ->
-              ok
-          end;
-
-          <<"1">> ->
-
-             send_ack_response(From, To, Id,  <<"seen">>),
-          NewSeenPacket = xmpp:set_from_to(Packet,From, To),
-          GetSeenTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
-          if GetSeenTimestamp =:= false ->
-            SeenTimestamp = now_to_microseconds(erlang:now()),
-            SeenFlatTimeStamp = lists:flatten(io_lib:format("~p", [SeenTimestamp])),
-            SeenXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(SeenFlatTimeStamp)}],
-              children = []},
-            SeenTimeStampedPacket = fxml:append_subtags(xmpp:encode(NewSeenPacket), [SeenXMLTag]);
-            true ->
-              SeenTimeStampedPacket = NewSeenPacket
-          end,
-          fly_mod_utils:update_recent_group_unread_chat(Id,FUser,FServer),
-          fly_mod_utils:update_msg_seen_receipt(FServer, Id, ReceiptStatus),
-          case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
-            true ->
-              mod_offline:store_packet({SeenTimeStampedPacket,xmpp:decode(SeenTimeStampedPacket)});
-            false ->
-              ok
-          end;
-
-          _ ->
-
-            ?LOG_INFO("Seen Status Unknown: ~p", [ReceiptStatus]),
-            send_ack_response(From, To, Id,  <<"seen">>),
-          NewSeenPacket = xmpp:set_from_to(Packet,From, To),
-          GetSeenTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
-          if GetSeenTimestamp =:= false ->
-            SeenTimestamp = now_to_microseconds(erlang:now()),
-            SeenFlatTimeStamp = lists:flatten(io_lib:format("~p", [SeenTimestamp])),
-            SeenXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(SeenFlatTimeStamp)}],
-              children = []},
-            SeenTimeStampedPacket = fxml:append_subtags(xmpp:encode(NewSeenPacket), [SeenXMLTag]);
-            true ->
-              SeenTimeStampedPacket = NewSeenPacket
-          end,
-          fly_mod_utils:update_recent_group_unread_chat(Id,FUser,FServer),
-          case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
-            true ->
-              mod_offline:store_packet({SeenTimeStampedPacket,xmpp:decode(SeenTimeStampedPacket)});
-            false ->
-              ok
-          end
-
-       end;
     T when (T == message_recall) ->
       ElementAcknowledge = xmpp:get_subtag(Packet, #recall{}),
       {_,Id,_Time,_ChatType,_GroupId} = ElementAcknowledge,
