@@ -765,9 +765,9 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
       children = []}]
     },
       
-  ejabberd_router:route(From, From, XmlBody),
+  ejabberd_router:route(From, From, XmlBody).
   
-  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Privacy settings updated successfully">>}).
+  %fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Privacy settings updated successfully">>}).
   
   acknowledge(From,RequestType,SubEl,IQ) ->
   #jid{user = FUser, lserver = FServer,lresource = LResource} = From,
