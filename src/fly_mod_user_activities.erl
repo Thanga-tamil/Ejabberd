@@ -558,7 +558,7 @@ user_logout(From, RequestType, SubEl, IQ) ->
         <<"true">>  -> <<"true">>;
         <<"1">>     -> <<"true">>;
         _           -> <<"false">>
-    end.
+    end,
 
   if UserName =:= <<>> ->
     To = jid:make({LUser, LServer, <<>>});
