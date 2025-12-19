@@ -549,6 +549,7 @@ process_get_recent_profile(From, RequestType, SubEl, IQ) ->
 
 user_logout(From, RequestType, SubEl, IQ) ->
   #jid{luser = LUser, lserver = LServer, lresource = LResource} = From,
+  ?INFO_MSG("user_logout - LUser: ~p",[LUser]),
   SocketId = fxml:get_path_s(SubEl, [{attr, <<"socket_id">>}]),
   UserName = fxml:get_path_s(SubEl, [{attr, <<"message_from">>}]),
   DeviceId = fxml:get_path_s(SubEl, [{attr, <<"device_id">>}]),
