@@ -186,7 +186,7 @@
   set_user_settings/2, get_archived_chats/1,update_recent_unread_chat/2,update_recent_group_unread_chat/3,
   update_block_status_user/3,update_block_status_group/3,get_contact_permission/1,update_vcard_date/2,get_user_resources/2,
   get_user_resources/3,get_mobile_user_message/2,get_mobile_user_resource/2,get_push_type/1,get_meta_chat_web/4,poll_vote_update/8,
-  remove_poll_offline/3,get_existing_group_info/2]).
+  remove_poll_offline/3,get_existing_group_info/2,get_users_devices_detail/3]).
 
 -include("logger.hrl").
 
@@ -2242,4 +2242,13 @@ get_mobile_user_resource(TUser, TServer) ->
     length(Resources) =:= 0 -> false;
     length(Resources) =:= 2 -> false;
     length(Resources) > 2 -> false
+  end.
+
+
+get_users_devices_detail(FServer, TUserId, CountryCodes) ->
+  case ejabberd_sql:sql_query(FServer,[<<"select country_code, device_type, device_id from chat_users_details where username='">>,TUserId,<<"' and country_code not in ('">>,CountryCodes,<<"') ;">>]) of
+    {selected, _Cols, Rows} ->
+      Rows;
+    _ ->
+      []
   end.
