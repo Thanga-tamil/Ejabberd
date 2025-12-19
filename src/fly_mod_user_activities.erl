@@ -162,6 +162,7 @@ process_local_iq(#iq{from = From, to = To, type = Type, sub_els = [#user_activit
 
 %% Set method for the IQ
 process_iq_set(From, _To, RequestType, IQ) ->
+  ?INFO_MSG("process_iq_set - RequestType 1: ~p",[RequestType]),
   SubEl = fxml:get_subtag_with_xmlns(IQ, <<"query">>, <<"jabber:iq:user_activities">>),
   case RequestType of
     <<"set_web_password">> ->
@@ -183,6 +184,7 @@ process_iq_set(From, _To, RequestType, IQ) ->
     <<"hide_lastseen">> ->
       hide_lastseen(From, SubEl,IQ);
     <<"user_logout">> ->
+      ?INFO_MSG("process_iq_set - RequestType 2: ~p",[RequestType]),
       user_logout(From, RequestType, SubEl, IQ);
     <<"user_logout_by_admin">> ->
       user_logout_by_admin(From, RequestType, SubEl, IQ);
@@ -548,6 +550,7 @@ process_get_recent_profile(From, RequestType, SubEl, IQ) ->
   end.
 
 user_logout(From, RequestType, SubEl, IQ) ->
+  ?INFO_MSG("user_logout - RequestType: ~p",[RequestType]),
   #jid{luser = LUser, lserver = LServer, lresource = LResource} = From,
   ?INFO_MSG("user_logout - LUser: ~p",[LUser]),
   SocketId = fxml:get_path_s(SubEl, [{attr, <<"socket_id">>}]),
