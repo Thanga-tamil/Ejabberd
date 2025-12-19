@@ -552,7 +552,13 @@ user_logout(From, RequestType, SubEl, IQ) ->
   SocketId = fxml:get_path_s(SubEl, [{attr, <<"socket_id">>}]),
   UserName = fxml:get_path_s(SubEl, [{attr, <<"message_from">>}]),
   DeviceId = fxml:get_path_s(SubEl, [{attr, <<"device_id">>}]),
-  SimBindLogout = fxml:get_path_s(SubEl, [{attr, <<"sim_bind_logout">>}]),
+  % SimBindLogout = fxml:get_path_s(SubEl, [{attr, <<"sim_bind_logout">>}]),
+  SimBindLogout =
+    case fxml:get_path_s(SubEl, [{attr, <<"sim_bind_logout">>}]) of
+        <<"true">>  -> <<"true">>;
+        <<"1">>     -> <<"true">>;
+        _           -> <<"false">>
+    end.
 
   if UserName =:= <<>> ->
     To = jid:make({LUser, LServer, <<>>});
