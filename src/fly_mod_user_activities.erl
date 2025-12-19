@@ -559,6 +559,7 @@ user_logout(From, RequestType, SubEl, IQ) ->
         <<"1">>     -> <<"true">>;
         _           -> <<"false">>
     end,
+  ?INFO_MSG("user_logout - SimBindLogout: ~p",[SimBindLogout]),
 
   if UserName =:= <<>> ->
     To = jid:make({LUser, LServer, <<>>});
@@ -566,13 +567,15 @@ user_logout(From, RequestType, SubEl, IQ) ->
     To = jid:make({UserName, LServer, <<>>})
   end,
   MessageId = <<(get_string()) / binary>>,
-  
+  ?INFO_MSG("user_logout - MessageId: ~p",[MessageId]),
   XmlBody = #xmlel{name = <<"message">>,
     attrs = [{<<"from">>, jid:to_string(To)}, {<<"to">>, jid:to_string(To)}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
     children = [#xmlel{name = <<"logout">>,
       attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"type">>, <<"logout">>}, {<<"socket_id">>, SocketId}, {<<"device_id">>, DeviceId}, {<<"sim_bind_logout">>, SimBindLogout}],
       children = []}]},
+  ?INFO_MSG("user_logout - XmlBody 1: ~p",[XmlBody]),
   ejabberd_router:route(To, To, XmlBody),
+  ?INFO_MSG("user_logout - XmlBody 2: ~p",[XmlBody]),
 
     % NewPacket = #xmlel{name = <<"message">>,
     %   attrs = [{<<"from">>, jid:to_string(To)}, {<<"to">>, jid:to_string(From)}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
@@ -581,6 +584,7 @@ user_logout(From, RequestType, SubEl, IQ) ->
     %     children = []}]},
     mod_offline:store_packet({To, xmpp:decode(XmlBody)}),
   Resources = ejabberd_sm:get_user_resources(LUser, LServer),
+  ?INFO_MSG("user_logout - Resources: ~p",[Resources]),
   if length(Resources) =:= 1 ->
     push_to_rosters(To, #xmlel{name = <<"presence">>,
       attrs = [{<<"type">>, <<"unavailable">>}],
