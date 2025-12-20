@@ -225,9 +225,8 @@ update_call_status(From, RequestType, SubEl, IQ) ->
       Users       = fxml:get_subtag(SubEl, <<"users">>),
       TUserJidEl  = fxml:get_subtag(Users, <<"user">>),
       JidBin      = fxml:get_tag_cdata(TUserJidEl), ?INFO_MSG("_jid: ~p", [JidBin]),
-      TUserId     = JidBin#jid.luser,
-      TServer     = JidBin#jid.lserver,
-      % TUserId     = case binary:split(JidBin, <<"@">>) of [User, _] -> User; _ -> error end, 
+      TUserId     = case binary:split(JidBin, <<"@">>) of [User, _] -> User; _ -> error end, 
+      TServer     = case binary:split(JidBin, <<"@">>) of [_, Server] -> Server; _ -> error end, 
       ?INFO_MSG("_userid: ~p", [TUserId]),
       ?INFO_MSG("_tServer: ~p", [TServer]),
 
@@ -430,17 +429,18 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
     binary_to_list(fxml:get_tag_cdata(U)) ++ "," end, Users#xmlel.children),
     UserLists = binary_to_list(list_to_binary(UserList)),
     UsersList = lists:sublist(UserLists, 1, length(UserLists) - 1),
-    lists:foreach(fun(U) ->
+    lists:foreach(fun(ToJid) ->
       % User = fxml:get_tag_cdata(U),
-      [ToUser, _] = binary:split(U, <<"@">>),
+      #jid{user = ToUser, lserver = ToServer, lresource = ToRes} = ToJid,
+      % [ToUser, _] = binary:split(U, <<"@">>),
       % ToJid = jid:from_string(User),
       MessageId = fly_mod_utils:get_iq_message_id(7),
-      NewPacket = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(From)},  {<<"id">>,MessageId}, {<<"type">>, <<"chat">>}, {<<"to">>, U}],
+      NewPacket = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(From)},  {<<"id">>,MessageId}, {<<"type">>, <<"chat">>}, {<<"to">>, jid:to_string(ToJid)}],
       children = [
         #xmlel{name = <<"mediacall">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:call">>}, {<<"room_id">>, RoomId},  {<<"call_link">>, CallLink},{<<"meta_data">>, MetaData}, {<<"caller_name">>, CallerName}, {<<"call_mode">>, CallMode},{<<"call_status">>, CallStatus}, {<<"call_type">>, CallType},  {<<"call_time">>, CallTime},  {<<"group_id">>, GroupId}], children = [Users]},
         fly_mod_utils:get_custom_attributes(SubEl)
       ]},
-        ejabberd_router:route(From, U, NewPacket),
+        ejabberd_router:route(From, ToJid, NewPacket),
       case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
         true ->
           fly_mod_offline_push:send_offline_message({ From,xmpp:decode(NewPacket,?NS_CLIENT, Opts)});
