@@ -230,20 +230,27 @@ update_call_status(From, RequestType, SubEl, IQ) ->
           [User, _] -> User;
           _ -> error
         end,
+      ?INFO_MSG("_userid: ~p", [TUserId]),
 
       Ccodes = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code), ?INFO_MSG("restricted codes: ~p", [Ccodes]),
 
       DevList = fly_mod_utils:get_users_devices_detail(FServer, TUserId, Ccodes), ?INFO_MSG("device list: ~p", [DevList]),
 
-      URes = ejabberd_sm:get_user_resources(JidBin, FServer), ?INFO_MSG("user resource: ~p", [URes]),
+      URes = ejabberd_sm:get_user_resources(TUserId, FServer), ?INFO_MSG("user resource: ~p", [URes]),
       
-      SameURes = ejabberd_sm:user_resources(JidBin, FServer), ?INFO_MSG("!SameURes! user resource: ~p", [SameURes]),
+      CrtRes = ejabberd_sm:get_user_present_resources(TUserId, FServer), ?INFO_MSG("current resource: ~p", [CrtRes]),
       
-      % ?LOG_INFO("Call not allowed in destination country"),
-      % fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"The person you are trying to reach is in call restricted region.">>}),
+      % retrieved device type if equals to user resources.. allow call 
+      DeviceTypeToAllow = get_device_type(URes), ?INFO_MSG("device type to allow: ~p", [DeviceTypeToAllow]),
+      
+      if length(URes) =/= 0 -> 
+        send_payload(CallStatus, SubEl),
+        fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>});
+      true -> 
+        ?LOG_INFO("..call not allowed.."),
+        fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"The person you are trying to reach is in call restricted region.">>})
+      end;
 
-      send_payload(CallStatus, SubEl),
-      fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>});
     <<"JOINED">> ->
       RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),
       CallType = fxml:get_path_s(SubEl, [{attr, <<"call_type">>}]),
@@ -324,6 +331,15 @@ update_call_status(From, RequestType, SubEl, IQ) ->
     _Status ->
       fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Unknown call status">>})
   end.
+
+
+get_device_type(Resource) when is_binary(Resource) ->
+    case binary:split(Resource, <<"-">>, [{parts, 2}]) of
+        [Device, _Id] ->
+            Device;
+        _ ->
+            <<"unknown">>
+    end.
 
 send_payload(CallStatus, SubEl)->
   RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),
