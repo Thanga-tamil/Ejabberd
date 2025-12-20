@@ -243,11 +243,13 @@ update_call_status(From, RequestType, SubEl, IQ) ->
       % retrieved device type and it if equals to user resources.. allow call 
       DeviceTypeToAllow = case URes of [Res | _] -> get_device_type(Res); [] -> <<"unknown">> end, ?INFO_MSG("device type to allow: ~p", [DeviceTypeToAllow]),
       
-      case URes of
-        [_ | _] ->
+      IsAllowed = case DevList of [] -> false; _ -> lists:any(fun([_Country, DeviceType]) -> DeviceType =:= DeviceTypeToAllow end, DevList) end,
+
+      case IsAllowed of
+        true ->
           send_payload(CallStatus, SubEl),
           fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>});
-        [] ->
+        false ->
           ?LOG_INFO("..call not allowed.."),
           fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"The person you are trying to reach is in call restricted region.">>})
       end;
