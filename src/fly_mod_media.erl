@@ -221,32 +221,22 @@ update_call_status(From, RequestType, SubEl, IQ) ->
           end
         end;
     <<"CALLING">> ->
+      
       Users       = fxml:get_subtag(SubEl, <<"users">>),
       TUserJidEl  = fxml:get_subtag(Users, <<"user">>),
-      JidBin      = fxml:get_tag_cdata(TUserJidEl),
-      ?INFO_MSG("_jid: ~p", [JidBin]),
-      TUserId =
-        case binary:split(JidBin, <<"@">>) of
-          [User, _] -> User;
-          _ -> error
-        end,
-      ?INFO_MSG("_userid: ~p", [TUserId]),
+      JidBin      = fxml:get_tag_cdata(TUserJidEl), ?INFO_MSG("_jid: ~p", [JidBin]),
+      TUserId     = case binary:split(JidBin, <<"@">>) of [User, _] -> User; _ -> error end, ?INFO_MSG("_userid: ~p", [TUserId]),
 
-      Ccodes = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code), ?INFO_MSG("restricted codes: ~p", [Ccodes]),
-
-      DevList = fly_mod_utils:get_users_devices_detail(FServer, TUserId, Ccodes), ?INFO_MSG("device list: ~p", [DevList]),
-
-      URes = ejabberd_sm:get_user_resources(TUserId, FServer), ?INFO_MSG("user resource: ~p", [URes]),
+      Ccodes      = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code), ?INFO_MSG("restricted codes: ~p", [Ccodes]),
+      DevList     = fly_mod_utils:get_users_devices_detail(FServer, TUserId, Ccodes), ?INFO_MSG("device list: ~p", [DevList]),
+      URes        = ejabberd_sm:get_user_resources(TUserId, FServer), ?INFO_MSG("user resource: ~p", [URes]),
       
-      CrtRes = ejabberd_sm:get_user_present_resources(TUserId, FServer), ?INFO_MSG("current resource: ~p", [CrtRes]),
-      
-      % retrieved device type and it if equals to user resources.. allow call 
-      DeviceTypeToAllow = case URes of [Res | _] -> get_device_type(Res); [] -> <<"unknown">> end, ?INFO_MSG("device type to allow: ~p", [DeviceTypeToAllow]),
-      
-      IsAllowed = case DevList of [] -> false; _ -> lists:any(fun([_Country, DeviceType]) -> DeviceType =:= DeviceTypeToAllow end, DevList) end,
+      DeviceTypeToAllow   = case URes of [Res | _] -> normalize(get_device_type(Res)); [] -> <<"unknown">> end, ?INFO_MSG("device type to allow: ~p", [DeviceTypeToAllow]),
+      IsAllowed           = case DevList of [] -> false; _ -> lists:any(fun([_Country, DeviceType]) -> DeviceType =:= DeviceTypeToAllow end, DevList) end,
 
       case IsAllowed of
         true ->
+          ?LOG_INFO("..call allowed.."),
           send_payload(CallStatus, SubEl),
           fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>});
         false ->
@@ -341,6 +331,9 @@ get_device_type(<<"Mobile-", _/binary>>) ->
   <<"Mobile">>;
 get_device_type(_) -> 
   <<"unknown">>.
+
+normalize(Device) when is_binary(Device) ->
+  binary:lowercase(Device).
 
 send_payload(CallStatus, SubEl)->
   RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),
