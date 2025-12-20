@@ -240,8 +240,8 @@ update_call_status(From, RequestType, SubEl, IQ) ->
       
       CrtRes = ejabberd_sm:get_user_present_resources(TUserId, FServer), ?INFO_MSG("current resource: ~p", [CrtRes]),
       
-      % retrieved device type if equals to user resources.. allow call 
-      DeviceTypeToAllow = get_device_type(URes), ?INFO_MSG("device type to allow: ~p", [DeviceTypeToAllow]),
+      % retrieved device type and it if equals to user resources.. allow call 
+      DeviceTypeToAllow = case URes of [Res | _] -> get_device_type(Res); [] -> <<"unknown">> end, ?INFO_MSG("device type to allow: ~p", [DeviceTypeToAllow]),
       
       if length(URes) =/= 0 -> 
         send_payload(CallStatus, SubEl),
@@ -334,12 +334,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
 
 
 get_device_type(Resource) when is_binary(Resource) ->
-    case binary:split(Resource, <<"-">>, [{parts, 2}]) of
-        [Device, _Id] ->
-            Device;
-        _ ->
-            <<"unknown">>
-    end.
+    case binary:split(Resource, <<"-">>, [{parts, 2}]) of [Device, _Id] -> Device; _ -> <<"unknown">> end.
 
 send_payload(CallStatus, SubEl)->
   RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),
