@@ -243,12 +243,13 @@ update_call_status(From, RequestType, SubEl, IQ) ->
       % retrieved device type and it if equals to user resources.. allow call 
       DeviceTypeToAllow = case URes of [Res | _] -> get_device_type(Res); [] -> <<"unknown">> end, ?INFO_MSG("device type to allow: ~p", [DeviceTypeToAllow]),
       
-      if length(URes) =/= 0 -> 
-        send_payload(CallStatus, SubEl),
-        fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>});
-      true -> 
-        ?LOG_INFO("..call not allowed.."),
-        fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"The person you are trying to reach is in call restricted region.">>})
+      case URes of
+        [_ | _] ->
+          send_payload(CallStatus, SubEl),
+          fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>});
+        [] ->
+          ?LOG_INFO("..call not allowed.."),
+          fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"The person you are trying to reach is in call restricted region.">>})
       end;
 
     <<"JOINED">> ->
@@ -332,9 +333,12 @@ update_call_status(From, RequestType, SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Unknown call status">>})
   end.
 
-
-get_device_type(Resource) when is_binary(Resource) ->
-    case binary:split(Resource, <<"-">>, [{parts, 2}]) of [Device, _Id] -> Device; _ -> <<"unknown">> end.
+get_device_type(<<"Web-", _/binary>>) -> 
+  <<"Web">>;
+get_device_type(<<"Mobile-", _/binary>>) -> 
+  <<"Mobile">>;
+get_device_type(_) -> 
+  <<"unknown">>.
 
 send_payload(CallStatus, SubEl)->
   RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),
