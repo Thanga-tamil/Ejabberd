@@ -228,11 +228,11 @@ update_call_status(From, RequestType, SubEl, IQ) ->
       case fxml:get_path_s(SubEl, [{attr, <<"call_mode">>}]) of 
         <<"onetomany">> -> 
           UserList = lists:map(fun(U) -> JidBin = fxml:get_tag_cdata(U), [UserId, _] = binary:split(JidBin, <<"@">>), UserId end, Users#xmlel.children),
-          ?LOG_INFO("_UserList ~p", [UserList]),
+          ?LOG_INFO("user_list ~p", [UserList]),
           GroupId = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
           if GroupId =/= <<"">> -> 
-            DevList = fly_mod_utils:get_users_devices_detail(FServer, UserList, Ccodes),
-            ?LOG_INFO("_DevList ~p", [DevList]),
+            DevList = fly_mod_utils:get_users_devices_detail(FServer, sql_in(UserList), sql_in(Ccodes)),
+            ?LOG_INFO("device_list ~p", [DevList]),
             case DevList of 
               [] -> 
                 fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"The persons you are trying to reach is in call restricted region.">>});
@@ -354,6 +354,11 @@ get_device_type(<<"Mobile-", _/binary>>) ->  <<"Mobile">>;
 get_device_type(_) -> <<"unknown">>.
 
 normalize(Bin) when is_binary(Bin) -> list_to_binary(string:lowercase(binary_to_list(Bin))).
+
+sql_in(List) when is_list(List), List =/= [] ->
+  JoinedIolist = lists:join(<<",">>, [<< "'", V/binary, "'" >> || V <- List]), Joined = iolist_to_binary(JoinedIolist), << "(", Joined/binary, ")" >>;
+sql_in([]) -> <<"(NULL)">>.
+
 
 send_payload(CallStatus, SubEl, TargetJids)->
   RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),
