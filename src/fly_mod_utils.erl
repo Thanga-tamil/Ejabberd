@@ -12,6 +12,7 @@
 -author("Contus").
 
 -export([check_user_exists/2,
+  get_rosters_to_update_privacy/2,
   check_users_exists/2,
   check_roster_exists/3,
   add_sync_roster/4,
@@ -186,7 +187,8 @@
   set_user_settings/2, get_archived_chats/1,update_recent_unread_chat/2,update_recent_group_unread_chat/3,
   update_block_status_user/3,update_block_status_group/3,get_contact_permission/1,update_vcard_date/2,get_user_resources/2,
   get_user_resources/3,get_mobile_user_message/2,get_mobile_user_resource/2,get_push_type/1,get_meta_chat_web/4,poll_vote_update/8,
-  remove_poll_offline/3,get_existing_group_info/2,set_seen_receipt/3,set_hide_profile/3,update_msg_seen_receipt/3]).
+  remove_poll_offline/3,get_existing_group_info/2,set_seen_receipt/3,set_hide_profile/3,update_msg_seen_receipt/3,
+  get_user_privacy/2]).
 
 -include("logger.hrl").
 
@@ -2251,3 +2253,11 @@ set_seen_receipt(FServer, FUser, Action) ->
   
 set_hide_profile(FServer, FUser, Action) -> 
   ejabberd_sql:sql_query(FServer,[<<"insert into privacy_settings (username, hide_profile, created_at) value ('">>,FUser,<<"', '">>,Action,<<"', now()) on duplicate key update hide_profile='">>,Action,<<"', updated_at = now();">>]).
+
+get_user_privacy(Server, User) ->
+  ejabberd_sql:sql_query(Server,[<<"select hide_profile from privacy_settings where username='">>,User,<<"';">>]).
+
+get_rosters_to_update_privacy(User, Server) -> 
+  ejabberd_sql:sql_query(Server,
+  [<<"select case when r.username = '">>,User,<<"' then r.jid when r.jid_username = '">>,User,<<"' then concat(r.username, c.domain, c.xmpp_host) end as jids 
+     from rosterusers as r left join chat_settings as c on c.domain = '@' where (r.username = '">>,User,<<"' or r.jid_username = '">>,User,<<"');">>]).

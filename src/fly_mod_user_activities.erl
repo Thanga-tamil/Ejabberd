@@ -537,16 +537,20 @@ process_get_recent_profile(From, RequestType, SubEl, IQ) ->
         [UserName,  Vcard] = G,
         VCard = case fxml_stream:parse_element(Vcard) of
                     {error, _Reason} -> [];
-                    VCARD -> [VCARD]
+                    VCARD -> 
+                      ProfilePrivacy = fly_mod_utils:get_user_privacy(FServer, UserName),
+                      case ProfilePrivacy of
+                        <<"0">> ->
+                          ?LOG_INFO("user_privacy remove subtag image"),
+                          [xml:remove_subtags(VCARD, <<"image">>)];
+                        _ ->
+                          [VCARD]
+                      end
                   end,
-        #xmlel{name = <<"vcarddetails">>, attrs = [{<<"username">>,  UserName }],
-          children = VCard}
-                          end,
-        UserProfiles),
+        #xmlel{name = <<"vcarddetails">>, attrs = [{<<"username">>,  UserName }], children = VCard} 
+      end, UserProfiles),
 
-      ProfileXml = [#xmlel{name = <<"vcard">>, children = SubEls1}],
-
-      fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType ,sub_els = ProfileXml})
+      fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType ,sub_els = [#xmlel{name = <<"vcard">>, children = SubEls1}]})
   end.
 
 user_logout(From, RequestType, SubEl, IQ) ->
@@ -746,15 +750,9 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
 
   privacy_setting(From, RequestType, SubEl, IQ) ->
   #jid{user = FUser, lserver = FServer,lresource = LResource} = From,
-
+  
   Type = fxml:get_path_s(SubEl, [{attr, <<"type">>}]),
   Action = fxml:get_path_s(SubEl, [{attr, <<"action">>}]),
-
-  if Type =:= <<"seen_receipt">> -> 
-    fly_mod_utils:set_seen_receipt(FServer, FUser, Action);
-  Type =:= <<"hide_profile">> ->
-    fly_mod_utils:set_hide_profile(FServer, FUser, Action)
-  end,
 
   XmlBody = #xmlel{
     name = <<"message">>,
@@ -765,7 +763,44 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
       children = []}]
     },
       
-  ejabberd_router:route(From, From, XmlBody),
+  BareJidFrom = jid:make(FUser, FServer),
+
+  case Type of
+    
+    <<"seen_receipt">> ->
+      fly_mod_utils:set_seen_receipt(FServer, FUser, Action),
+      ejabberd_router:route(BareJidFrom, BareJidFrom, XmlBody);
+    
+      <<"hide_profile">> ->
+      fly_mod_utils:set_hide_profile(FServer, FUser, Action),
+      ejabberd_router:route(BareJidFrom, BareJidFrom, XmlBody),
+      case fly_mod_utils:get_mobile_user_message(FUser, FServer) of
+        true ->
+          mod_offline:store_packet({FUser, xmpp:decode(XmlBody)});
+        false ->
+          ok
+      end,
+      lists:foreach(fun(R) -> 
+        #jid{luser = TUser, lserver = TServer, lresource = TRes} = R,
+        ToJid = jid:make(TUser, TServer),
+        ?LOG_INFO("route to roster, ToJid: ~p", [ToJid]),
+        Packet = 
+          #xmlel{
+            name = <<"message">>,
+            attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, jid:to_string(ToJid)}, {<<"type">>, <<"result">>}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}],
+            children = [
+              #xmlel{name = <<"privacy">>,
+              attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>}, {<<"status">>, RequestType},{<<"type">>, Type},{<<"action">>, Action}],
+              children = []}]
+            },
+            
+        ejabberd_router:route(BareJidFrom, ToJid, Packet)
+      end,
+      fly_mod_utils:get_rosters_to_update_privacy(FUser, FServer) );
+      
+    _ -> 
+      ok
+  end,
   
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Privacy settings updated successfully">>}).
   
