@@ -434,7 +434,13 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
   MsgId = fxml:get_attr_s(<<"id">>,Packet#xmlel.attrs),
   Rs = has_more_resources(Recipient#jid.luser,Recipient#jid.server),
 
-  CallMode = fxml:get_attr_s(<<"call_mode">>,Packet#xmlel.children#xmlel.attrs),
+  CallMode =
+    case lists:keyfind(<<"mediacall">>, #xmlel.name, Packet#xmlel.children) of
+        #xmlel{attrs = Attrs} ->
+            fxml:get_attr_s(<<"call_mode">>, Attrs);
+        false ->
+            <<"">>
+    end,
   Ccodes = gen_mod:get_module_opt(Recipient#jid.server, fly_mod_offline_push, restricted_country_code), 
   ?LOG_INFO("call_mode ~p",[CallMode]),
   ?INFO_MSG("restricted codes: ~p", [Ccodes]),
@@ -2388,8 +2394,10 @@ mod_opt_type(rabbitmq_password) -> fun iolist_to_binary/1;
 mod_opt_type(iqdisc) -> fun gen_iq_handler:check_type/1;
 mod_opt_type(db_type) ->
   fun(T) -> ejabberd_config:v_db(?MODULE, T) end;
+mod_opt_type(restricted_country_code) ->
+    econf:list(econf:binary());
 mod_opt_type(_) ->
-  [db_type, iqdisc, rabbitmq_host, rabbitmq_username, rabbitmq_password, rabbitmq_exchange].
+  [db_type, iqdisc, rabbitmq_host, rabbitmq_username, rabbitmq_password, rabbitmq_exchange, restricted_country_code].
 
 depends(_, _) ->
   [].
@@ -2398,4 +2406,6 @@ mod_options(_Host) ->
   [{rabbitmq_host, undefined},
     {rabbitmq_username, undefined},
     {rabbitmq_exchange, undefined},
-    {rabbitmq_password, undefined}].
+    {rabbitmq_password, undefined},
+    {restricted_country_code, []}].
+
