@@ -442,8 +442,8 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
             <<"">>
     end,
   Ccodes = gen_mod:get_module_opt(Recipient#jid.server, fly_mod_offline_push, restricted_country_code), 
-  ?LOG_INFO("call_mode ~p",[CallMode]),
-  ?INFO_MSG("restricted codes: ~p", [Ccodes]),
+  ?LOG_INFO("push mod.. call_mode ~p",[CallMode]),
+  ?INFO_MSG("push mod.. restricted codes: ~p", [Ccodes]),
 
   DeviceDetails = 
   if CallMode =:= <<"onetoone">> ->

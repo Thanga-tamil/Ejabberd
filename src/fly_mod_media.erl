@@ -234,7 +234,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
           GroupId = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
           if GroupId =/= <<"">> -> 
             ?LOG_INFO("group call by group Id"),
-            send_payload(CallStatus, SubEl, <<"">>),
+            send_payload(CallStatus, SubEl, []),
             fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>});
           false -> 
             ?LOG_INFO("group id is empty, [one_to_one]")
@@ -290,11 +290,11 @@ update_call_status(From, RequestType, SubEl, IQ) ->
       CallerName = fxml:get_path_s(SubEl, [{attr, <<"caller_name">>}]),
       MetaData = fxml:get_path_s(SubEl, [{attr, <<"meta_data">>}]),
       FromJid = jid:from_string(CallFromJID),
-      send_call_message(FromJid,SubEl,<<"">>,CallStatus,RoomId,CallType,CallMode,CallTime,GroupId,CallLink,CallerName,MetaData, <<"">>),
+      send_call_message(FromJid,SubEl,<<"">>,CallStatus,RoomId,CallType,CallMode,CallTime,GroupId,CallLink,CallerName,MetaData, []),
       fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call JOINED status updated successfully">>});
 
     <<"INVITEUSERS">> ->
-      send_payload(CallStatus, SubEl, <<"">>),
+      send_payload(CallStatus, SubEl, []),
       fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>});
 
     <<"RECEIVED">> ->
