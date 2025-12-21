@@ -429,15 +429,24 @@ get_string() ->
 %% @param binary ChatType
 %% @param record SubEl
 %% @return atom
-send_push_notifications(Sender, Recipient, ChatType,
-    SubEl, Packet, State) ->
+send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
   %% if Sender#jid.luser =/= Recipient#jid.luser ->
-  MsgId = fxml:get_attr_s(<<"id">>,
-    Packet#xmlel.attrs),
+  MsgId = fxml:get_attr_s(<<"id">>,Packet#xmlel.attrs),
   Rs = has_more_resources(Recipient#jid.luser,Recipient#jid.server),
-  case catch
-    fly_mod_utils:get_user_device(Recipient#jid.server, Recipient#jid.luser, Rs, ChatType)
-  of
+
+  CallMode = fxml:get_attr_s(<<"call_mode">>,Packet#xmlel.children#xmlel.attrs),
+  Ccodes = gen_mod:get_module_opt(Recipient#jid.server, fly_mod_offline_push, restricted_country_code), 
+  ?LOG_INFO("call_mode ~p",[CallMode]),
+  ?INFO_MSG("restricted codes: ~p", [Ccodes]),
+
+  DeviceDetails = 
+  if CallMode =:= <<"onetoone">> ->
+    fly_mod_utils:get_user_device_exclude_restricted_countries(Recipient#jid.server, Recipient#jid.luser, Rs, ChatType, Ccodes);
+    true ->
+      fly_mod_utils:get_user_device(Recipient#jid.server, Recipient#jid.luser, Rs, ChatType)
+  end,
+
+  case catch DeviceDetails of
     {selected, _, []} -> ?INFO_MSG("~p user online", [Recipient#jid.luser]),
       device_token_is_empty;
       {selected, _, Tokens} ->

@@ -25,6 +25,7 @@
   get_vcard_from_search/2,
   get_user_device/2,
   get_user_device/4,
+  get_user_device_exclude_restricted_countries/5,
   get_user_for_ios_group_device/3,
   get_group_participants/2,
   get_roster_and_recent_jid/1,
@@ -309,6 +310,15 @@ get_user_device(LServer, LUser, LResource, ChatType) ->
       [<<"SELECT  device_type,device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE  username = '">>, LUser, <<"'  and ( device_token != '' and device_token != 'null'  and device_type !='') and device_id != ''  and device_id not in  ('">>, LResource, <<"' );">>])
       % end
   end.
+
+get_user_device_exclude_restricted_countries(LServer, LUser, LResource, ChatType, Codes) ->
+    if LResource =:= "" ->
+      ejabberd_sql:sql_query(LServer,
+      [<<"SELECT  device_type, device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE username = '">>, LUser, <<"' and ( device_token != '' and device_token != 'null'  and device_type !='') and device_id != '' and country_code not in ('">>,Codes,<<"') ;">>]);
+      true ->
+      ejabberd_sql:sql_query(LServer,
+      [<<"SELECT  device_type,device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE  username = '">>, LUser, <<"'  and ( device_token != '' and device_token != 'null'  and device_type !='') and device_id != ''  and device_id not in  ('">>, LResource, <<"' ) and country_code not in ('">>,Codes,<<"') ;">>])
+    end.
 
 get_user_for_ios_group_device(LServer, LUser, LResource) ->
   if LResource =:= "" ->

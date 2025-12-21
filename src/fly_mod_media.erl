@@ -222,58 +222,60 @@ update_call_status(From, RequestType, SubEl, IQ) ->
         end;
     <<"CALLING">> ->
 
+      Users = fxml:get_subtag(SubEl, <<"users">>),
+
       case fxml:get_path_s(SubEl, [{attr, <<"call_mode">>}]) of 
         <<"onetomany">> -> 
-          ?LOG_INFO("group call mode");
-          true -> 
-          ?LOG_INFO("one to one call")
-        end,
-        
-      Users       = fxml:get_subtag(SubEl, <<"users">>),
-      % if users length is more than 1 , then allow the call without checking device type
-      UserList = lists:map(fun(U) -> binary_to_list(fxml:get_tag_cdata(U)) ++ "," end, Users#xmlel.children),
-      GroupId = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
-      
-      if GroupId =/= <<"">> -> 
-        ?LOG_INFO("group call by group Id");
-        false -> 
-          ?LOG_INFO("group id is empty, [one_to_one]")
-        end,
+          UserList = lists:map(fun(U) -> binary_to_list(fxml:get_tag_cdata(U)) ++ "," end, Users#xmlel.children),
+          ?INFO_MSG("user list: ~p", [UserList]),
+          ?INFO_MSG("user list size: ~p", [length(UserList)]),
+          ?LOG_INFO("group call mode"),
+          
+          GroupId = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
+          if GroupId =/= <<"">> -> 
+            ?LOG_INFO("group call by group Id"),
+            send_payload(CallStatus, SubEl, <<"">>),
+            fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>});
+          false -> 
+            ?LOG_INFO("group id is empty, [one_to_one]")
+          end;
 
+          <<"onetoone">> -> 
 
-      ?INFO_MSG("user list: ~p", [UserList]),
-      ?INFO_MSG("user list size: ~p", [length(UserList)]),
+          ?LOG_INFO("one to one call"),
 
-      TUserJidEl  = fxml:get_subtag(Users, <<"user">>),
-      JidBin      = fxml:get_tag_cdata(TUserJidEl), ?INFO_MSG("_jid: ~p", [JidBin]),
-      TUserId     = case binary:split(JidBin, <<"@">>) of [User, _] -> User; _ -> error end,  ?INFO_MSG("_userid: ~p", [TUserId]),
-      TServer     = case binary:split(JidBin, <<"@">>) of [_, Server] -> Server; _ -> error end,  ?INFO_MSG("_tServer: ~p", [TServer]),
-      Ccodes      = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code), ?INFO_MSG("restricted codes: ~p", [Ccodes]),
-      DevList     = fly_mod_utils:get_users_devices_detail(FServer, TUserId, Ccodes), ?INFO_MSG("device list: ~p", [DevList]),
-      URes        = ejabberd_sm:get_user_resources(TUserId, FServer), ?INFO_MSG("user resource: ~p", [URes]),
-      ToAllow     = case URes of [Res | _] -> normalize(get_device_type(Res)); [] -> <<"unknown">> end, ?INFO_MSG("device type to allow: ~p", [ToAllow]),
+          TUserJidEl  = fxml:get_subtag(Users, <<"user">>),
+          JidBin      = fxml:get_tag_cdata(TUserJidEl), ?INFO_MSG("_jid: ~p", [JidBin]),
+          TUserId     = case binary:split(JidBin, <<"@">>) of [User, _] -> User; _ -> error end,  ?INFO_MSG("_userid: ~p", [TUserId]),
+          TServer     = case binary:split(JidBin, <<"@">>) of [_, Server] -> Server; _ -> error end,  ?INFO_MSG("_tServer: ~p", [TServer]),
+          Ccodes      = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code), ?INFO_MSG("restricted codes: ~p", [Ccodes]),
+          DevList     = fly_mod_utils:get_users_devices_detail(FServer, TUserId, Ccodes), ?INFO_MSG("device list: ~p", [DevList]),
+          URes        = ejabberd_sm:get_user_resources(TUserId, FServer), ?INFO_MSG("user resource: ~p", [URes]),
+          ToAllow     = case URes of [Res | _] -> normalize(get_device_type(Res)); [] -> <<"unknown">> end, ?INFO_MSG("device type to allow: ~p", [ToAllow]),
 
-      IsAllowed = 
-      case {DevList, URes} of 
-        {[], _} -> false; 
-        {_DevList, []} -> true; % allow background case [ need to push notification for particular device by using device_id ]
-        {_DevList, _URes} -> lists:any(fun([_Country, DeviceType]) -> normalize(DeviceType) =:= ToAllow end, DevList)
-      end,
+          IsAllowed = 
+          case {DevList, URes} of 
+            {[], _} -> false;  % no device details, restrict the call
+            {_DevList, []} -> true; % device details found but no resource found, send push for that particular device_id
+            {_DevList, _URes} -> lists:any(fun([_Country, DeviceType]) -> normalize(DeviceType) =:= ToAllow end, DevList)
+          end,
 
-      case IsAllowed of
-        true ->
-          ResLeg = length(URes), % if length is 0.. need to send push notification for that particular resources
-                                 % if length is not 0.. route the IQ to that particular resources
+          case IsAllowed of
+            true ->
+              % ResLeg = length(URes), % if length is 0.. need to send push notification for that particular resources  % if length is not 0.. route the IQ to that particular resources
 
-          ?LOG_INFO("..call allowed.."),
-          ToJidsWithRes = lists:map(fun(R) -> jid:make(TUserId, TServer, R) end, URes),
-          ?LOG_INFO("maked jids: ~p", [ToJidsWithRes]),
-          send_payload(CallStatus, SubEl, ToJidsWithRes),
-          fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>});
-        false ->
-          ?LOG_INFO("..call not allowed.."),
-          fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"The person you are trying to reach is in call restricted region.">>})
-      end;
+              ?LOG_INFO("..call allowed.."),
+              ToJidsWithRes = lists:map(fun(R) -> jid:make(TUserId, TServer, R) end, URes),
+              ?LOG_INFO("maked jids: ~p", [ToJidsWithRes]),
+              send_payload(CallStatus, SubEl, ToJidsWithRes),
+              fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>});
+            false ->
+              ?LOG_INFO("..call not allowed.."),
+              fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"The person you are trying to reach is in call restricted region.">>})
+          end;
+        _ -> 
+          ?LOG_INFO("call mode not matched, stop.")
+        end;
 
     <<"JOINED">> ->
       RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),
