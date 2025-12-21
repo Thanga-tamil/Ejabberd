@@ -222,7 +222,28 @@ update_call_status(From, RequestType, SubEl, IQ) ->
         end;
     <<"CALLING">> ->
 
+      case fxml:get_path_s(SubEl, [{attr, <<"call_mode">>}]) of 
+        <<"onetomany">> -> 
+          ?LOG_INFO("group call mode");
+          true -> 
+          ?LOG_INFO("one to one call")
+        end,
+        
       Users       = fxml:get_subtag(SubEl, <<"users">>),
+      % if users length is more than 1 , then allow the call without checking device type
+      UserList = lists:map(fun(U) -> binary_to_list(fxml:get_tag_cdata(U)) ++ "," end, Users#xmlel.children),
+      GroupId = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
+      
+      if GroupId =/= <<"">> -> 
+        ?LOG_INFO("group call by group Id");
+        false -> 
+          ?LOG_INFO("group id is empty, [one_to_one]")
+        end,
+
+
+      ?INFO_MSG("user list: ~p", [UserList]),
+      ?INFO_MSG("user list size: ~p", [length(UserList)]),
+
       TUserJidEl  = fxml:get_subtag(Users, <<"user">>),
       JidBin      = fxml:get_tag_cdata(TUserJidEl), ?INFO_MSG("_jid: ~p", [JidBin]),
       TUserId     = case binary:split(JidBin, <<"@">>) of [User, _] -> User; _ -> error end,  ?INFO_MSG("_userid: ~p", [TUserId]),
@@ -448,7 +469,7 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
         UsersList = lists:sublist(UserLists, 1, length(UserLists) - 1),
         lists:foreach(fun(U) ->
           User = fxml:get_tag_cdata(U),
-          [ToUser, _] = binary:split(U, <<"@">>),
+          [ToUser, _] = binary:split(User, <<"@">>),
           ToJid = jid:from_string(User),
           MessageId = fly_mod_utils:get_iq_message_id(7),
           NewPacket = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(From)},  {<<"id">>,MessageId}, {<<"type">>, <<"chat">>}, {<<"to">>, jid:to_string(ToJid)}],
@@ -459,7 +480,7 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
             ejabberd_router:route(From, ToJid, NewPacket),
           case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
             true ->
-              fly_mod_offline_push:send_offline_message({ From,xmpp:decode(NewPacket,?NS_CLIENT, Opts)});
+              fly_mod_offline_push:send_offline_message({From,xmpp:decode(NewPacket,?NS_CLIENT, Opts)});
             false ->
               ok
           end,
