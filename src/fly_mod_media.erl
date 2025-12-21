@@ -223,6 +223,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
     <<"CALLING">> ->
 
       Users = fxml:get_subtag(SubEl, <<"users">>),
+      Ccodes      = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code), ?INFO_MSG("restricted codes: ~p", [Ccodes]),
 
       case fxml:get_path_s(SubEl, [{attr, <<"call_mode">>}]) of 
         <<"onetomany">> -> 
@@ -234,10 +235,18 @@ update_call_status(From, RequestType, SubEl, IQ) ->
           GroupId = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
           if GroupId =/= <<"">> -> 
             ?LOG_INFO("group call by group Id"),
-            send_payload(CallStatus, SubEl, []),
-            fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>});
+            DevList = fly_mod_utils:get_users_devices_detail(FServer, UserList, Ccodes), ?INFO_MSG("device list: ~p", [DevList]),
+            case DevList of 
+              [] -> 
+                ?LOG_INFO("device list is empty, [onetomany]"),
+                fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"The persons you are trying to reach is in call restricted region.">>});
+              _ -> 
+                send_payload(CallStatus, SubEl, []),
+                fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>}),
+                ?LOG_INFO("device list is not empty, [onetomany]")
+              end;
           false -> 
-            ?LOG_INFO("group id is empty, [one_to_one]")
+            ?LOG_INFO("group id is empty.")
           end;
 
           <<"onetoone">> -> 
@@ -248,7 +257,6 @@ update_call_status(From, RequestType, SubEl, IQ) ->
           JidBin      = fxml:get_tag_cdata(TUserJidEl), ?INFO_MSG("_jid: ~p", [JidBin]),
           TUserId     = case binary:split(JidBin, <<"@">>) of [User, _] -> User; _ -> error end,  ?INFO_MSG("_userid: ~p", [TUserId]),
           TServer     = case binary:split(JidBin, <<"@">>) of [_, Server] -> Server; _ -> error end,  ?INFO_MSG("_tServer: ~p", [TServer]),
-          Ccodes      = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code), ?INFO_MSG("restricted codes: ~p", [Ccodes]),
           DevList     = fly_mod_utils:get_users_devices_detail(FServer, TUserId, Ccodes), ?INFO_MSG("device list: ~p", [DevList]),
           URes        = ejabberd_sm:get_user_resources(TUserId, FServer), ?INFO_MSG("user resource: ~p", [URes]),
           ToAllow     = case URes of [Res | _] -> normalize(get_device_type(Res)); [] -> <<"unknown">> end, ?INFO_MSG("device type to allow: ~p", [ToAllow]),
@@ -262,7 +270,9 @@ update_call_status(From, RequestType, SubEl, IQ) ->
 
           case IsAllowed of
             true ->
-              % ResLeg = length(URes), % if length is 0.. need to send push notification for that particular resources  % if length is not 0.. route the IQ to that particular resources
+              % length(URes), 
+              % if length is 0.. need to send push notification for that particular resources  
+              % if length is not 0.. route the IQ to that particular resources
 
               ?LOG_INFO("..call allowed.."),
               ToJidsWithRes = lists:map(fun(R) -> jid:make(TUserId, TServer, R) end, URes),
