@@ -558,7 +558,7 @@ user_logout(From, RequestType, SubEl, IQ) ->
   SocketId = fxml:get_path_s(SubEl, [{attr, <<"socket_id">>}]),
   UserName = fxml:get_path_s(SubEl, [{attr, <<"message_from">>}]),
   DeviceId = fxml:get_path_s(SubEl, [{attr, <<"device_id">>}]),
-  % SimBindLogout = fxml:get_path_s(SubEl, [{attr, <<"sim_bind_logout">>}]),
+  ?LOG_INFO("user_logout sub_els: ~p", [SubEl]),
   SimBindLogout =
     case fxml:get_path_s(SubEl, [{attr, <<"sim_bind_logout">>}]) of
         <<"true">>  -> <<"true">>;
