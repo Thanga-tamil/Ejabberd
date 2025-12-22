@@ -766,7 +766,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
                             "notification_to,unread,message_time,meta_data) VALUES ">>,
 
                         DuplicateStmt =
-                          <<" ON DUPLICATE KEY UPDATE to_user=VALUES(to_user),message_id=VALUES(message_id);">>,
+                          <<" ON DUPLICATE KEY UPDATE to_user=VALUES(to_user),message_id=VALUES(message_id),edit_message_id=VALUES(edit_message_id);">>,
 
                         RecentDuplicateStmt =
                           <<" ON DUPLICATE KEY UPDATE message_id=VALUES(message_id),message_from=VALUES(message_from),",
