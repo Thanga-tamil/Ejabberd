@@ -765,6 +765,7 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   Action = fxml:get_path_s(SubEl, [{attr, <<"action">>}]),
 
   BareJidFrom = jid:make({FUser, FServer, <<>>}),
+  ?LOG_INFO("BareJidFrom: ~p", [BareJidFrom]),
 
   XmlBody = #xmlel{
     name = <<"message">>,
@@ -779,6 +780,7 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
     
     <<"seen_receipt">> ->
       fly_mod_utils:set_seen_receipt(FServer, FUser, Action),
+      ?LOG_INFO("ejabberd_sm:get_user_resources(FUser, FServer): ~p", [ejabberd_sm:get_user_resources(FUser, FServer)]),
       lists:foreach(fun(R) ->
         ejabberd_router:route(From, jid:make(FUser, FServer, R), XmlBody)
         end, ejabberd_sm:get_user_resources(FUser, FServer));
@@ -795,7 +797,7 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
       lists:foreach(fun(R) -> 
         #jid{luser = TUser, lserver = TServer, lresource = TRes} = R,
         ToJid = jid:make(TUser, TServer),
-        ?LOG_INFO("hide_profile.. route stanza to roster: ~p", [ToJid]),
+        ?LOG_INFO("route to roster, ToJid: ~p", [ToJid]),
         Packet = 
           #xmlel{
             name = <<"message">>,
