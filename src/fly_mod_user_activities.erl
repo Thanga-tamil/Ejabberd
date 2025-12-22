@@ -754,23 +754,27 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   Type = fxml:get_path_s(SubEl, [{attr, <<"type">>}]),
   Action = fxml:get_path_s(SubEl, [{attr, <<"action">>}]),
 
+  BareJidFrom = jid:make({FUser, FServer, <<>>}),
+  ?LOG_INFO("BareJidFrom: ~p", [BareJidFrom]),
+
   XmlBody = #xmlel{
     name = <<"message">>,
-    attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, jid:to_string(From)}, {<<"type">>, <<"result">>}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}],
+    attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, jid:to_string(BareJidFrom)}, {<<"type">>, <<"result">>}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}],
     children = [
       #xmlel{name = <<"privacy">>,
       attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>}, {<<"status">>, RequestType},{<<"type">>, Type},{<<"action">>, Action}],
       children = []}]
     },
       
-  BareJidFrom = jid:make(FUser, FServer),
-
   case Type of
     
     <<"seen_receipt">> ->
       fly_mod_utils:set_seen_receipt(FServer, FUser, Action),
-      ejabberd_router:route(BareJidFrom, BareJidFrom, XmlBody);
-    
+      ?LOG_INFO("ejabberd_sm:get_user_resources(FUser, FServer): ~p", [ejabberd_sm:get_user_resources(FUser, FServer)]),
+      lists:foreach(fun(R) ->
+        ejabberd_router:route(From, jid:make(FUser, FServer, R), XmlBody)
+        end, ejabberd_sm:get_user_resources(FUser, FServer));
+      
       <<"hide_profile">> ->
       fly_mod_utils:set_hide_profile(FServer, FUser, Action),
       ejabberd_router:route(BareJidFrom, BareJidFrom, XmlBody),
