@@ -254,7 +254,12 @@ update_call_status(From, RequestType, SubEl, IQ) ->
           IsAllowed   = case {DevList, URes} of 
                           {[], _} -> false; 
                           {_DevList, []} -> true;
-                          {_DevList, _URes} -> lists:any(fun([_Country, DeviceType]) -> normalize(DeviceType) =:= ToAllow end, DevList)
+                          {_DevList, _URes} -> 
+                            lists:any(fun([_Country, DeviceType]) -> 
+                              ?LOG_INFO("normalize(DeviceType) ~p =:= ToAllow ~p", [normalize(DeviceType), ToAllow]),
+                              normalize(DeviceType) =:= ToAllow 
+                            end, 
+                            DevList)
                         end,
 
           case IsAllowed of

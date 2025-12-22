@@ -2261,7 +2261,7 @@ get_mobile_user_resource(TUser, TServer) ->
 
 get_users_devices_detail(FServer, TUserIds, Codes) ->
   case ejabberd_sql:sql_query(FServer,
-  [<<"select country_code, case when device_type in ('android', 'ios') then 'mobile' else device_type end as type from chat_users_details where username in ">>,TUserIds,<<" and (country_code not in ">>,Codes,<<" or country_code is null);">>]) of
+  [<<"select country_code, case when device_type in ('android', 'ios') then 'Mobile' else device_type end as type from chat_users_details where username in ">>,TUserIds,<<" and (country_code not in ">>,Codes,<<" or country_code is null);">>]) of
     {selected, _Cols, Rows} ->
       Rows;
     _ ->
