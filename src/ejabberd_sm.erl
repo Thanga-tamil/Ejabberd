@@ -914,7 +914,6 @@ get_resource_sessions(User, Server, Resource) ->
                 _ ->
                     % pick oldest session (lists:min uses #session.sid ordering)
         	OldSession = lists:min(SsWeb),
-		?INFO_MSG("OldSession ~p", [OldSession]),
                 %     #session{sid = {_, Pid}} = OldSession,
 
                 %     % avoid recursive replacements

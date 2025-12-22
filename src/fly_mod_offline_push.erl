@@ -625,8 +625,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     Server = To#jid.server,
     ToUser = To#jid.luser,
     ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #seen{}),
-    {seen,MessageId,_,_Time,_GroupId} = ElementAcknowledge,
-
+    {seen,MessageId,_,_Time,_,_GroupId} = ElementAcknowledge,
     SendFrom = list_to_binary(binary_to_list(FromUser) ++
       "@" ++ binary_to_list(Server)),
     SendTo = list_to_binary(binary_to_list(ToUser) ++
