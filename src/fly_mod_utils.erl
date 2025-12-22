@@ -2278,6 +2278,13 @@ get_user_privacy(Server, User) ->
   ejabberd_sql:sql_query(Server,[<<"select hide_profile from privacy_settings where username='">>,User,<<"';">>]).
 
 get_rosters_to_update_privacy(User, Server) -> 
-  ejabberd_sql:sql_query(Server,
+  case ejabberd_sql:sql_query(Server,
   [<<"select case when r.username = '">>,User,<<"' then r.jid when r.jid_username = '">>,User,<<"' then concat(r.username, c.domain, c.xmpp_host) end as jids 
-     from rosterusers as r left join chat_settings as c on c.domain = '@' where (r.username = '">>,User,<<"' or r.jid_username = '">>,User,<<"');">>]).
+     from rosterusers as r left join chat_settings as c on c.domain = '@' where (r.username = '">>,User,<<"' or r.jid_username = '">>,User,<<"');">>]) of 
+    {selected, _Cols, Rows} ->
+      Rows;
+    _ ->
+      []
+  end.
+
+
