@@ -235,7 +235,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
             ?LOG_INFO("device_list ~p", [DevList]),
             case DevList of 
               [] -> 
-                fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"The persons you are trying to reach is in call restricted region.">>});
+                fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"Calling isn't supported in the UAE">>});
               _ -> 
                 send_payload(CallStatus, SubEl, []),
                 fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>})
@@ -266,7 +266,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
               fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>});
             false ->
               ?LOG_INFO("call no allowed"),
-              fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"The person you are trying to reach is in call restricted region.">>})
+              fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling isn't supported in the UAE">>})
           end;
         _ -> 
           ok
