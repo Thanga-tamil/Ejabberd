@@ -248,7 +248,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
           TUserJidEl  = fxml:get_subtag(Users, <<"user">>),
           JidBin      = fxml:get_tag_cdata(TUserJidEl),
           [TU,TS]     = binary:split(JidBin, <<"@">>),
-          DevList     = fly_mod_utils:get_users_devices_detail(FServer, TU, Ccodes),
+          DevList     = fly_mod_utils:get_users_devices_detail(FServer, sql_in([TU]), sql_in(Ccodes)),
           URes        = ejabberd_sm:get_user_resources(TU, FServer),
           ToAllow     = case URes of [Res | _] -> normalize(get_device_type(Res)); [] -> <<"unknown">> end,
           IsAllowed   = case {DevList, URes} of 
