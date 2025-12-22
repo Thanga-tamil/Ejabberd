@@ -221,52 +221,57 @@ update_call_status(From, RequestType, SubEl, IQ) ->
           end
         end;
     <<"CALLING">> ->
-      Users = fxml:get_subtag(SubEl, <<"users">>),
-      TUserJidEl = fxml:get_subtag(Users, <<"user">>),
-      JidBin = fxml:get_tag_cdata(TUserJidEl),
-      TUserId =
-        case binary:split(JidBin, <<"@">>) of
-          [User, _] -> User;
-          _ -> error
-        end,
-      CountryCodes = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code),
-      ?LOG_INFO("Restricted Country Codes: ~p", [CountryCodes]),
-      
-      DeviceList = fly_mod_utils:get_users_devices_detail(FServer, TUserId, CountryCodes),
-      ActiveResources = ejabberd_sm:get_user_resources(TUserId, FServer),
-      
-      ?LOG_INFO("DeviceList: ~p", [DeviceList]),
-      ?LOG_INFO("ActiveResources: ~p", [ActiveResources]),
-      
-      AllowedResources =
-        lists:foldl(
-          fun([_Country, DeviceType, _DeviceId], Acc) ->
-            Prefix = <<DeviceType/binary, "-">>,
-            Matches = [Res || Res <- ActiveResources,
-                              binary:match(Res, Prefix) =:= {0, byte_size(Prefix)}],
-            Matches ++ Acc
-          end,
-          [],
-          DeviceList
-        ),
-      
-      AllowedResourcesUnique = lists:usort(AllowedResources),
-      ?LOG_INFO("AllowedResources: ~p", [AllowedResourcesUnique]),
-      
-      case AllowedResourcesUnique of
-        [] ->
-          ?LOG_INFO("Call not allowed in destination country"),
-          fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"The person you are trying to reach is in call restricted region.">>});
-        Resources ->
-          lists:foreach(fun(Res) ->
-            ToJID = jid:make(TUserId, FServer, Res),
-            ?LOG_INFO("Routing CALLING IQ to resource ~p", [Res]),
-            send_calling_payload(CallStatus, SubEl, ToJID)
-            end,
-            Resources
-          ),
-          fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>})
-      end;
+
+      Users  = fxml:get_subtag(SubEl, <<"users">>),
+      Ccodes = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code),
+
+      case fxml:get_path_s(SubEl, [{attr, <<"call_mode">>}]) of 
+        <<"onetomany">> -> 
+          UserList = lists:map(fun(U) -> JidBin = fxml:get_tag_cdata(U), [UserId, _] = binary:split(JidBin, <<"@">>), UserId end, Users#xmlel.children),
+          ?LOG_INFO("user_list ~p", [UserList]),
+          GroupId = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
+          if GroupId =/= <<"">> -> 
+            DevList = fly_mod_utils:get_users_devices_detail(FServer, sql_in(UserList), sql_in(Ccodes)),
+            ?LOG_INFO("device_list ~p", [DevList]),
+            case DevList of 
+              [] -> 
+                fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"The persons you are trying to reach is in call restricted region.">>});
+              _ -> 
+                send_payload(CallStatus, SubEl, []),
+                fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>})
+              end;
+          false -> 
+            ok
+          end;
+
+        <<"onetoone">> -> 
+          TUserJidEl  = fxml:get_subtag(Users, <<"user">>), ?LOG_INFO("TUserJidEl ~p", [TUserJidEl]),
+          JidBin      = fxml:get_tag_cdata(TUserJidEl), ?LOG_INFO("JidBin ~p", [JidBin]),
+          [TU,TS]     = binary:split(JidBin, <<"@">>), ?LOG_INFO("TU ~p, TS ~p", [TU,TS]),
+          DevList     = fly_mod_utils:get_users_devices_detail(FServer, sql_in([TU]), sql_in(Ccodes)), ?LOG_INFO("DevList ~p", [DevList]),
+          URes        = ejabberd_sm:get_user_resources(TU, FServer), ?LOG_INFO("URes ~p", [URes]),
+          ToAllow     = case URes of [Res | _] -> normalize(get_device_type(Res)); [] -> <<"unknown">> end, ?LOG_INFO("ToAllow ~p", [ToAllow]),
+          IsAllowed   = case {DevList, URes} of 
+                          {[], _} -> false; 
+                          {_DevList, []} -> true;
+                          {_DevList, _URes} -> lists:any(fun([_Country, DeviceType]) -> normalize(DeviceType) =:= ToAllow end, DevList)
+                        end,
+
+          case IsAllowed of
+            true ->
+              ?LOG_INFO("call allowed"),
+              TargetJids = lists:map(fun(TR) -> jid:make(TU, TS, TR) end, URes),
+              ?LOG_INFO("TargetJids ~p", [TargetJids]),
+              send_payload(CallStatus, SubEl, TargetJids),
+              fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>});
+            false ->
+              ?LOG_INFO("call no allowed"),
+              fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"The person you are trying to reach is in call restricted region.">>})
+          end;
+        _ -> 
+          ok
+        end;
+
     <<"JOINED">> ->
       RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),
       CallType = fxml:get_path_s(SubEl, [{attr, <<"call_type">>}]),
@@ -280,11 +285,11 @@ update_call_status(From, RequestType, SubEl, IQ) ->
       CallerName = fxml:get_path_s(SubEl, [{attr, <<"caller_name">>}]),
       MetaData = fxml:get_path_s(SubEl, [{attr, <<"meta_data">>}]),
       FromJid = jid:from_string(CallFromJID),
-      send_call_message(FromJid,SubEl,<<"">>,CallStatus,RoomId,CallType,CallMode,CallTime,GroupId,CallLink,CallerName,MetaData, <<"">>),
+      send_call_message(FromJid,SubEl,<<"">>,CallStatus,RoomId,CallType,CallMode,CallTime,GroupId,CallLink,CallerName,MetaData, []),
       fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call JOINED status updated successfully">>});
 
     <<"INVITEUSERS">> ->
-      send_payload(CallStatus, SubEl),
+      send_payload(CallStatus, SubEl, []),
       fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>});
 
     <<"RECEIVED">> ->
@@ -348,22 +353,18 @@ update_call_status(From, RequestType, SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Unknown call status">>})
   end.
 
-send_payload(CallStatus, SubEl)->
-  RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),
-  CallType = fxml:get_path_s(SubEl, [{attr, <<"call_type">>}]),
-  Timestamp = now_to_microseconds(erlang:now()),
-  CallTime = lists:flatten(io_lib:format("~p", [Timestamp])),
-  CallMode = fxml:get_path_s(SubEl, [{attr, <<"call_mode">>}]),
-  GroupId = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
-  CallFromJID = fxml:get_path_s(SubEl, [{attr, <<"call_from">>}]),
-  CallLink = fxml:get_path_s(SubEl, [{attr, <<"call_link">>}]),
-  CallerName = fxml:get_path_s(SubEl, [{attr, <<"caller_name">>}]),
-  MetaData = fxml:get_path_s(SubEl, [{attr, <<"meta_data">>}]),
-  FromJid = jid:from_string(CallFromJID),
-  Users = fxml:get_subtag(SubEl, <<"users">>),
-  send_call_message(FromJid,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,GroupId,CallLink,CallerName, MetaData, <<"">>).
+get_device_type(<<"Web-", _/binary>>) -> <<"Web">>;
+get_device_type(<<"Mobile-", _/binary>>) ->  <<"Mobile">>;
+get_device_type(_) -> <<"unknown">>.
 
-send_calling_payload(CallStatus, SubEl, ToJID) ->
+normalize(Bin) when is_binary(Bin) -> list_to_binary(string:lowercase(binary_to_list(Bin))).
+
+sql_in(List) when is_list(List), List =/= [] ->
+  JoinedIolist = lists:join(<<",">>, [<< "'", V/binary, "'" >> || V <- List]), Joined = iolist_to_binary(JoinedIolist), << "(", Joined/binary, ")" >>;
+sql_in([]) -> <<"(NULL)">>.
+
+
+send_payload(CallStatus, SubEl, TargetJids)->
   RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),
   CallType = fxml:get_path_s(SubEl, [{attr, <<"call_type">>}]),
   Timestamp = now_to_microseconds(erlang:now()),
@@ -376,7 +377,9 @@ send_calling_payload(CallStatus, SubEl, ToJID) ->
   MetaData = fxml:get_path_s(SubEl, [{attr, <<"meta_data">>}]),
   FromJid = jid:from_string(CallFromJID),
   Users = fxml:get_subtag(SubEl, <<"users">>),
-  send_call_message(FromJid,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,GroupId,CallLink,CallerName, MetaData, ToJID).
+  send_call_message(FromJid,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,GroupId,CallLink,CallerName, MetaData, TargetJids).
+
+
 
 filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
   #jid{user = FUser, lserver = FServer} = From,
@@ -422,40 +425,59 @@ send_call_to_users(FServer,RoomId,Status,IQ,RequestType,FromJid,CallType,EndTime
       fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call ENDED status updated successfully">>})
   end.
 
-send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,GroupId,CallLink, CallerName, MetaData, ToUserJid) ->
+send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,GroupId,CallLink, CallerName, MetaData, TargetJids) ->
   #jid{user = FUser, lserver = FServer,lresource = LResource} = From,
   Opts = ejabberd_config:codec_options(),
   if CallStatus =:= <<"CALLING">>  ->
     fly_mod_utils:insert_media_call_status(FServer,FUser,FUser,RoomId,CallType,<<"ATTENDED">>,CallTime,CallMode,GroupId,CallLink,MetaData),
-
     UserList = lists:map(fun(U) ->
     binary_to_list(fxml:get_tag_cdata(U)) ++ "," end, Users#xmlel.children),
     UserLists = binary_to_list(list_to_binary(UserList)),
     UsersList = lists:sublist(UserLists, 1, length(UserLists) - 1),
-    lists:foreach(fun(U) ->
-      User = fxml:get_tag_cdata(U),
-      [ToUser, _] = binary:split(User, <<"@">>),
-      ToJid = jid:from_string(User),
-      MessageId = fly_mod_utils:get_iq_message_id(7),
-      NewPacket = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(From)},  {<<"id">>,MessageId}, {<<"type">>, <<"chat">>}, {<<"to">>, User}],
-      children = [
-        #xmlel{name = <<"mediacall">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:call">>}, {<<"room_id">>, RoomId},  {<<"call_link">>, CallLink},{<<"meta_data">>, MetaData}, {<<"caller_name">>, CallerName}, {<<"call_mode">>, CallMode},{<<"call_status">>, CallStatus}, {<<"call_type">>, CallType},  {<<"call_time">>, CallTime},  {<<"group_id">>, GroupId}], children = [Users]},
-        fly_mod_utils:get_custom_attributes(SubEl)
-      ]},
-      % if length(UserLists) =:= 1 ->
-        ejabberd_router:route(From, ToUserJid, NewPacket),
-      % _ ->
-        % ejabberd_router:route(From, ToJid, NewPacket)
-      % end,
-      case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
-        true ->
-          fly_mod_offline_push:send_offline_message({ From,xmpp:decode(NewPacket,?NS_CLIENT, Opts)});
-        false ->
-          ok
-      end,
-      fly_mod_utils:insert_media_call_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,MetaData),
-      fly_mod_utils:insert_call_log_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,list_to_binary(UsersList),LResource,MetaData)
-    end, Users#xmlel.children);
+    case TargetJids of
+      [_ | _] ->
+        lists:foreach(fun(Dest) ->
+          #jid{user = ToUser, lserver = ToServer, lresource = ToRes} = Dest,
+          MessageId = fly_mod_utils:get_iq_message_id(7),
+          NewPacket = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(From)},  {<<"id">>,MessageId}, {<<"type">>, <<"chat">>}, {<<"to">>, jid:to_string(Dest)}],
+          children = [
+            #xmlel{name = <<"mediacall">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:call">>}, {<<"room_id">>, RoomId},  {<<"call_link">>, CallLink},{<<"meta_data">>, MetaData}, {<<"caller_name">>, CallerName}, {<<"call_mode">>, CallMode},{<<"call_status">>, CallStatus}, {<<"call_type">>, CallType},  {<<"call_time">>, CallTime},  {<<"group_id">>, GroupId}], children = [Users]},
+            fly_mod_utils:get_custom_attributes(SubEl)
+          ]},
+            ejabberd_router:route(From, Dest, NewPacket),
+          case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
+            true ->
+              fly_mod_offline_push:send_offline_message({From,xmpp:decode(NewPacket,?NS_CLIENT, Opts)});
+            false ->
+              ok
+          end,
+          fly_mod_utils:insert_media_call_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,MetaData),
+          fly_mod_utils:insert_call_log_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,list_to_binary(UsersList),LResource,MetaData)
+        end, TargetJids);
+       [] ->
+        lists:foreach(fun(U) ->
+          User = fxml:get_tag_cdata(U),
+          [ToUser, _] = binary:split(User, <<"@">>),
+          BareToJid = jid:from_string(User),
+          MessageId = fly_mod_utils:get_iq_message_id(7),
+          NewPacket = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(From)},  {<<"id">>,MessageId}, {<<"type">>, <<"chat">>}, {<<"to">>, jid:to_string(BareToJid)}],
+          children = [
+            #xmlel{name = <<"mediacall">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:call">>}, {<<"room_id">>, RoomId},  {<<"call_link">>, CallLink},{<<"meta_data">>, MetaData}, {<<"caller_name">>, CallerName}, {<<"call_mode">>, CallMode},{<<"call_status">>, CallStatus}, {<<"call_type">>, CallType},  {<<"call_time">>, CallTime},  {<<"group_id">>, GroupId}], children = [Users]},
+            fly_mod_utils:get_custom_attributes(SubEl)
+          ]},
+            ejabberd_router:route(From, BareToJid, NewPacket),
+          case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
+            true ->
+              fly_mod_offline_push:send_offline_message({From,xmpp:decode(NewPacket,?NS_CLIENT, Opts)});
+            false ->
+              ok
+          end,
+          fly_mod_utils:insert_media_call_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,MetaData),
+          fly_mod_utils:insert_call_log_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,list_to_binary(UsersList),LResource,MetaData)
+        end, Users#xmlel.children)
+      end;
+   
+
     % lists:foreach(fun(U) ->
     %   User = fxml:get_tag_cdata(U),
     %   [ToUser, _] = binary:split(User, <<"@">>),

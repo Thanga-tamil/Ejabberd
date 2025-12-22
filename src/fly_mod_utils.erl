@@ -12,6 +12,7 @@
 -author("Contus").
 
 -export([check_user_exists/2,
+  get_rosters_to_update_privacy/2,
   check_users_exists/2,
   check_roster_exists/3,
   add_sync_roster/4,
@@ -25,6 +26,7 @@
   get_vcard_from_search/2,
   get_user_device/2,
   get_user_device/4,
+  get_user_device_exclude_restricted_countries/5,
   get_user_for_ios_group_device/3,
   get_group_participants/2,
   get_roster_and_recent_jid/1,
@@ -186,7 +188,8 @@
   set_user_settings/2, get_archived_chats/1,update_recent_unread_chat/2,update_recent_group_unread_chat/3,
   update_block_status_user/3,update_block_status_group/3,get_contact_permission/1,update_vcard_date/2,get_user_resources/2,
   get_user_resources/3,get_mobile_user_message/2,get_mobile_user_resource/2,get_push_type/1,get_meta_chat_web/4,poll_vote_update/8,
-  remove_poll_offline/3,get_existing_group_info/2,get_users_devices_detail/3]).
+  remove_poll_offline/3,get_existing_group_info/2,get_users_devices_detail/3,set_seen_receipt/3,set_hide_profile/3,update_msg_seen_receipt/3,
+  get_user_privacy/2]).
 
 -include("logger.hrl").
 
@@ -207,6 +210,9 @@ is_carbon_copy(#message{meta = #{carbon_copy := true}}) ->
     true;
 is_carbon_copy(_) ->
     false.
+
+update_msg_seen_receipt(FServer, Id, ReceiptStatus) ->
+  ejabberd_sql:sql_query(FServer,[<<"update chat_message_edit_history set seen_receipt='">>, ReceiptStatus, <<"' WHERE message_id = '">>, Id, <<"' ;">>]).
 
 check_user_exists(LServer, Contact) ->
   ejabberd_sql:sql_query(LServer,
@@ -309,6 +315,15 @@ get_user_device(LServer, LUser, LResource, ChatType) ->
       [<<"SELECT  device_type,device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE  username = '">>, LUser, <<"'  and ( device_token != '' and device_token != 'null'  and device_type !='') and device_id != ''  and device_id not in  ('">>, LResource, <<"' );">>])
       % end
   end.
+
+get_user_device_exclude_restricted_countries(LServer, LUser, LResource, ChatType, Codes) ->
+    if LResource =:= "" ->
+      ejabberd_sql:sql_query(LServer,
+      [<<"SELECT  device_type, device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE username = '">>, LUser, <<"' and ( device_token != '' and device_token != 'null'  and device_type !='') and device_id != '' and country_code not in ('">>,Codes,<<"') ;">>]);
+      true ->
+      ejabberd_sql:sql_query(LServer,
+      [<<"SELECT  device_type,device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE  username = '">>, LUser, <<"'  and ( device_token != '' and device_token != 'null'  and device_type !='') and device_id != ''  and device_id not in  ('">>, LResource, <<"' ) and country_code not in ('">>,Codes,<<"') ;">>])
+    end.
 
 get_user_for_ios_group_device(LServer, LUser, LResource) ->
   if LResource =:= "" ->
@@ -2244,11 +2259,25 @@ get_mobile_user_resource(TUser, TServer) ->
     length(Resources) > 2 -> false
   end.
 
-
-get_users_devices_detail(FServer, TUserId, CountryCodes) ->
-  case ejabberd_sql:sql_query(FServer,[<<"select country_code, device_type, device_id from chat_users_details where username='">>,TUserId,<<"' and country_code not in ('">>,CountryCodes,<<"') ;">>]) of
+get_users_devices_detail(FServer, TUserIds, Codes) ->
+  case ejabberd_sql:sql_query(FServer,
+  [<<"select country_code, case when device_type in ('android', 'ios') then 'mobile' else device_type end as type from chat_users_details where username in ">>,TUserIds,<<" and (country_code not in ">>,Codes,<<" or country_code is null);">>]) of
     {selected, _Cols, Rows} ->
       Rows;
     _ ->
       []
   end.
+
+set_seen_receipt(FServer, FUser, Action) -> 
+  ejabberd_sql:sql_query(FServer,[<<"insert into privacy_settings (username, seen_receipt, created_at) value ('">>,FUser,<<"', '">>,Action,<<"', now()) on duplicate key update seen_receipt='">>,Action,<<"', updated_at = now();">>]).
+  
+set_hide_profile(FServer, FUser, Action) -> 
+  ejabberd_sql:sql_query(FServer,[<<"insert into privacy_settings (username, hide_profile, created_at) value ('">>,FUser,<<"', '">>,Action,<<"', now()) on duplicate key update hide_profile='">>,Action,<<"', updated_at = now();">>]).
+
+get_user_privacy(Server, User) ->
+  ejabberd_sql:sql_query(Server,[<<"select hide_profile from privacy_settings where username='">>,User,<<"';">>]).
+
+get_rosters_to_update_privacy(User, Server) -> 
+  ejabberd_sql:sql_query(Server,
+  [<<"select case when r.username = '">>,User,<<"' then r.jid when r.jid_username = '">>,User,<<"' then concat(r.username, c.domain, c.xmpp_host) end as jids 
+     from rosterusers as r left join chat_settings as c on c.domain = '@' where (r.username = '">>,User,<<"' or r.jid_username = '">>,User,<<"');">>]).

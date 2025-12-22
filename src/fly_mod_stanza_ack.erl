@@ -128,7 +128,6 @@ code_change(_OldVsn, State, _Extra) ->
 %% Function triggers when receive message packets from sender
 on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SState}) ->
   #jid{user = FUser, lserver = FServer, lresource = LResource} = From,
-  ?LOG_INFO("(ack) packet recieved, user: ~p", [FUser]),
   Substring = string:str(binary_to_list(LResource),binary_to_list(<<"Mobile-">>)),
       if Substring =:= 1 ->
         MResource = fly_mod_utils:get_device_from_resource(LResource);
@@ -218,7 +217,6 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
   %%Save the Message to temp storage for 10 sec when server
   case should_acknowledge_on_receive(Packet) of
     T when (T == message_delivered) ->
-      ?LOG_INFO("(mod ack) message_delivered"),
       ElementAcknowledge = xmpp:get_subtag(Packet, #delivered{}),
       {delivered,Id,_,_,_Time} = ElementAcknowledge,
       send_ack_response(From, To, Id, <<"delivered">>),
@@ -242,9 +240,22 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
       end;
 
     T when (T == message_seen) ->
-      ?LOG_INFO("(mod ack) message_seen"),
       ElementAcknowledge = xmpp:get_subtag(Packet, #seen{}),
-      {seen,Id,_,_,_Time} = ElementAcknowledge,
+      ?LOG_INFO("Seen Element: ~p", [ElementAcknowledge]),
+      %{seen,<<"7d494104-edfa-4367-be0e-b9e70e661b48">>,<<>>,<<"0">>,<<"1">>,<<>>}
+      {seen, Id, _, _, ReceiptStatus, _} = ElementAcknowledge,
+      ?LOG_INFO("Seen ReceiptStatus: ~p", [ReceiptStatus]),
+      ?LOG_INFO("Seen Id: ~p", [Id]),
+      {seen,I1,I2,I3,I4,I5} = ElementAcknowledge,
+      ?LOG_INFO("seen elms: ~p,~p,~p,~p,~p", [I1, I2, I3, I4, I5]), %dev in progress
+      
+      ReadReceipt = 
+      case ReceiptStatus of 
+          <<"0">> -> 0;
+          <<"1">> -> 1;
+          _ -> 0
+      end,
+      ?LOG_INFO("ReadReceipt Value: ~p", [ReadReceipt]),  
       send_ack_response(From, To, Id,  <<"seen">>),
       NewSeenPacket = xmpp:set_from_to(Packet,From, To),
       GetSeenTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
@@ -252,20 +263,21 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
         SeenTimestamp = now_to_microseconds(erlang:now()),
         SeenFlatTimeStamp = lists:flatten(io_lib:format("~p", [SeenTimestamp])),
         SeenXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(SeenFlatTimeStamp)}],
-          children = []},
+        children = []},
         SeenTimeStampedPacket = fxml:append_subtags(xmpp:encode(NewSeenPacket), [SeenXMLTag]);
-        true ->
-          SeenTimeStampedPacket = NewSeenPacket
-      end,
-      fly_mod_utils:update_recent_group_unread_chat(Id,FUser,FServer),
-      case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
-        true ->
-          mod_offline:store_packet({SeenTimeStampedPacket,xmpp:decode(SeenTimeStampedPacket)});
-        false ->
-          ok
-      end;
+      true ->
+        SeenTimeStampedPacket = NewSeenPacket
+        end,
+        fly_mod_utils:update_recent_group_unread_chat(Id,FUser,FServer),
+        fly_mod_utils:update_msg_seen_receipt(FServer, Id, integer_to_binary(ReadReceipt)),
+        case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
+          true ->
+            mod_offline:store_packet({SeenTimeStampedPacket,xmpp:decode(SeenTimeStampedPacket)});
+          false ->
+            ok
+        end;
+
     T when (T == message_recall) ->
-      ?LOG_INFO("(ack) message_seen"),
       ElementAcknowledge = xmpp:get_subtag(Packet, #recall{}),
       {_,Id,_Time,_ChatType,_GroupId} = ElementAcknowledge,
       send_ack_response(From, To, Id,  <<"recall">>),
@@ -300,7 +312,6 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
   end,
   case should_acknowledge_on_receipts(Packet) of
     U when (U == received_receipt) ->
-      ?LOG_INFO("(mod ack) received_receipt"),
       ReceiptsElementAcknowledge = xmpp:get_subtag(Packet, #acknowledge{}),
       if ReceiptsElementAcknowledge == false ->
         ok;
@@ -310,7 +321,6 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           fly_mod_utils:remove_offline(FServer, ReceiptId, MResource)
       end;
     U when (U == seen_receipt) ->
-      ?LOG_INFO("(mod ack) seen_receipt"),
       ReceiptsElementAcknowledge = xmpp:get_subtag(Packet, #acknowledge{}),
       if ReceiptsElementAcknowledge == false ->
         ok;
@@ -320,7 +330,6 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           fly_mod_utils:remove_offline(FServer, ReceiptId, MResource)
       end;
     U when (U == recall_receipt) ->
-      ?LOG_INFO("(mod ack) recall_receipt"),
       ReceiptsElementAcknowledge = xmpp:get_subtag(Packet, #acknowledge{}),
       if ReceiptsElementAcknowledge == false ->
         ok;

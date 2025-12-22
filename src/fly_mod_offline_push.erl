@@ -429,72 +429,81 @@ get_string() ->
 %% @param binary ChatType
 %% @param record SubEl
 %% @return atom
-send_push_notifications(Sender, Recipient, ChatType,
-    SubEl, Packet, State) ->
-  %% if Sender#jid.luser =/= Recipient#jid.luser ->
-  MsgId = fxml:get_attr_s(<<"id">>,
-    Packet#xmlel.attrs),
+send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
+  MsgId = fxml:get_attr_s(<<"id">>,Packet#xmlel.attrs),
   Rs = has_more_resources(Recipient#jid.luser,Recipient#jid.server),
-  case catch
-    fly_mod_utils:get_user_device(Recipient#jid.server, Recipient#jid.luser, Rs, ChatType)
-  of
-    {selected, _, []} -> ?INFO_MSG("~p user online", [Recipient#jid.luser]),
+
+  CallMode =
+    case lists:keyfind(<<"mediacall">>, #xmlel.name, Packet#xmlel.children) of
+        #xmlel{attrs = Attrs} ->
+            fxml:get_attr_s(<<"call_mode">>, Attrs);
+        false ->
+            <<"">>
+    end,
+  Ccodes = gen_mod:get_module_opt(Recipient#jid.server, fly_mod_offline_push, restricted_country_code), 
+
+  DeviceDetails = 
+  if CallMode =:= <<"onetoone">> ->
+    fly_mod_utils:get_user_device_exclude_restricted_countries(Recipient#jid.server, Recipient#jid.luser, Rs, ChatType, Ccodes);
+    true ->
+      fly_mod_utils:get_user_device(Recipient#jid.server, Recipient#jid.luser, Rs, ChatType)
+  end,
+
+  case catch DeviceDetails of
+    {selected, _, []} -> 
+      ?INFO_MSG("~p device detail not found", [Recipient#jid.luser]),
       device_token_is_empty;
-      {selected, _, Tokens} ->
+    
+    {selected, _, Tokens} ->
       if ChatType == <<"call">> ->
-            TimestampValue = <<"">>;
-            ChatType == <<"recall">> ->
-            TimestampValue = <<"">>;
-            ChatType == <<"ptt">> ->
-            TimestampValue = <<"">>;
-            ChatType == <<"mediacall">> ->
-            TimestampValue = <<"">>;
-            ChatType == <<"adminblock">> ->
-            TimestampValue = <<"">>;
-          true ->
-            Timestamp = fxml:get_subtag(Packet, <<"timestamp">>),
-            TimestampValue = fxml:get_attr_s(<<"time">>,
-            Timestamp#xmlel.attrs)
+        TimestampValue = <<"">>;
+      ChatType == <<"recall">> ->
+        TimestampValue = <<"">>;
+      ChatType == <<"ptt">> ->
+        TimestampValue = <<"">>;
+      ChatType == <<"mediacall">> ->
+        TimestampValue = <<"">>;
+      ChatType == <<"adminblock">> ->
+        TimestampValue = <<"">>;
+      true ->
+        Timestamp = fxml:get_subtag(Packet, <<"timestamp">>),
+        TimestampValue = fxml:get_attr_s(<<"time">>,
+        Timestamp#xmlel.attrs)
       end,
-      lists:map(fun(G) ->
+      
+      lists:map(fun(G) -> 
         [DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, _DeviceId, UserType,PushType ] = G,
 
-      case catch fly_mod_utils:check_blockedlist(Recipient#jid.server, Recipient#jid.luser,
-        Sender#jid.luser)
-      of
-        {selected, _, [[_T]]} ->
-          if ChatType == <<"poll">> ->
-            ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #poll{}),
-            {poll,_,_,_,_,Chattype,_,_} = ElementAcknowledge,
-            if Chattype =:=<<"normal">> ->
-              call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType,
-              SubEl, Packet,TimestampValue,State);
+        case catch fly_mod_utils:check_blockedlist(Recipient#jid.server, Recipient#jid.luser, Sender#jid.luser) of
+          {selected, _, [[_T]]} ->
+            if ChatType == <<"poll">> ->
+              ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #poll{}),
+              {poll,_,_,_,_,Chattype,_,_} = ElementAcknowledge,
+              if Chattype =:=<<"normal">> ->
+                call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType, SubEl, Packet,TimestampValue,State);
+                true ->
+                  fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
+                  user_blocked
+              end;
               true ->
-                fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
-                user_blocked
+            fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
+            user_blocked
             end;
-            true ->
-          fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
-          user_blocked
-          end;
-        {error,timeout}  ->
-          ok;
-        {selected, _, []} ->
-          call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType,
-          SubEl, Packet,TimestampValue,State)
-      end
+          {error,timeout}  ->
+            ok;
+          {selected, _, []} ->
+            call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType,
+            SubEl, Packet,TimestampValue,State)
+        end
 
-          end,Tokens);
+       end,Tokens);
 
     _Error ->
       ?INFO_MSG("push_message get_user_device_details error is ~p", [_Error]),
       database_error
-    %    end;
-    %    true -> ok
   end.
 
-call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType,
-SubEl, Packet,TimestampValue,State)->
+call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType, SubEl, Packet,TimestampValue,State)->
   case DeviceType of
             <<"">> -> ?INFO_MSG("push_message user device is empty error is ~p", [Recipient#jid.luser]),
               device_type_is_empty;
@@ -616,7 +625,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     Server = To#jid.server,
     ToUser = To#jid.luser,
     ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #seen{}),
-    {seen,MessageId,_,_,_Time} = ElementAcknowledge,
+    {seen,MessageId,_,_Time,_,_GroupId} = ElementAcknowledge,
     SendFrom = list_to_binary(binary_to_list(FromUser) ++
       "@" ++ binary_to_list(Server)),
     SendTo = list_to_binary(binary_to_list(ToUser) ++
@@ -2322,6 +2331,7 @@ has_more_resources(User,LServer) ->
         "";
       true ->
         Resource = fly_mod_utils:get_device_from_resource(R),
+        ?LOG_INFO("get_device_from_resource: ~p", [Resource]), 
         binary_to_list(Resource) ++ "','"
       end
     end,Resources)
@@ -2378,8 +2388,10 @@ mod_opt_type(rabbitmq_password) -> fun iolist_to_binary/1;
 mod_opt_type(iqdisc) -> fun gen_iq_handler:check_type/1;
 mod_opt_type(db_type) ->
   fun(T) -> ejabberd_config:v_db(?MODULE, T) end;
+mod_opt_type(restricted_country_code) ->
+    econf:list(econf:binary());
 mod_opt_type(_) ->
-  [db_type, iqdisc, rabbitmq_host, rabbitmq_username, rabbitmq_password, rabbitmq_exchange].
+  [db_type, iqdisc, rabbitmq_host, rabbitmq_username, rabbitmq_password, rabbitmq_exchange, restricted_country_code].
 
 depends(_, _) ->
   [].
@@ -2388,4 +2400,6 @@ mod_options(_Host) ->
   [{rabbitmq_host, undefined},
     {rabbitmq_username, undefined},
     {rabbitmq_exchange, undefined},
-    {rabbitmq_password, undefined}].
+    {rabbitmq_password, undefined},
+    {restricted_country_code, []}].
+

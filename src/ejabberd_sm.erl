@@ -900,10 +900,6 @@ get_resource_sessions(User, Server, Resource) ->
         true ->
             Mod = get_sm_backend(LServer),
             SsAll = get_sessions(Mod, LUser, LServer),
-	    ?INFO_MSG("LUser ~p", [LUser]),
-	    ?INFO_MSG("LServer ~p", [LServer]),
-	    ?INFO_MSG("LResource ~p", [LResource]),
-	    ?INFO_MSG("SsAll ~p", [SsAll]),
 
             % Filter only existing Web sessions excluding the current resource
             SsWeb = [S || S <- SsAll,
@@ -912,15 +908,12 @@ get_resource_sessions(User, Server, Resource) ->
                              is_web_resource(Res) andalso Res =/= LResource
                          end],
 
-            ?INFO_MSG("all sessions ~p | filtered web session: ~p", [length(SsAll), length(SsWeb)]),
-	    ?INFO_MSG("SsWeb ~p", [SsWeb]),
             case SsWeb of
                 [] ->
                     ok;
                 _ ->
                     % pick oldest session (lists:min uses #session.sid ordering)
         	OldSession = lists:min(SsWeb),
-		?INFO_MSG("OldSession ~p", [OldSession]),
                 %     #session{sid = {_, Pid}} = OldSession,
 
                 %     % avoid recursive replacements
@@ -939,10 +932,6 @@ get_resource_sessions(User, Server, Resource) ->
                 %             replaced
                 %     end
 		#session{sid = {_, C2SPid}, usr = { OldUser, OldServer, OldResource }} = OldSession,
-		?INFO_MSG("C2SPid ~p", [C2SPid]),
-		?INFO_MSG("OldUser ~p", [OldUser]),
-		?INFO_MSG("OldServer ~p", [OldServer]),
-		?INFO_MSG("OldResource ~p", [OldResource]),
 		From = jid:make(<<"123456789">>, LServer, <<"">>),
 		To   = jid:make(OldUser, OldServer, OldResource),
 
