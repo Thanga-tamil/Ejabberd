@@ -72,7 +72,6 @@ on_user_send_packet({#message{from = From,to = To,type = _Type, id = MessageId }
     end,
   Delivered = xmpp:get_subtag(Pkt, #delivered{}),
     if Delivered =/= false ->
-      ?LOG_INFO("Delivered recieved for msgId: ~p ", [MessageId]),
       store_offline_user_send(xmpp:decode(TimeStampedPacket), _C2SState, From, To, MessageId);
       true ->
       ok

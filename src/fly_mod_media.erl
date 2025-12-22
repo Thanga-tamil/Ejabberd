@@ -245,12 +245,12 @@ update_call_status(From, RequestType, SubEl, IQ) ->
           end;
 
         <<"onetoone">> -> 
-          TUserJidEl  = fxml:get_subtag(Users, <<"user">>),
-          JidBin      = fxml:get_tag_cdata(TUserJidEl),
-          [TU,TS]     = binary:split(JidBin, <<"@">>),
-          DevList     = fly_mod_utils:get_users_devices_detail(FServer, sql_in([TU]), sql_in(Ccodes)),
-          URes        = ejabberd_sm:get_user_resources(TU, FServer),
-          ToAllow     = case URes of [Res | _] -> normalize(get_device_type(Res)); [] -> <<"unknown">> end,
+          TUserJidEl  = fxml:get_subtag(Users, <<"user">>), ?LOG_INFO("TUserJidEl ~p", [TUserJidEl]),
+          JidBin      = fxml:get_tag_cdata(TUserJidEl), ?LOG_INFO("JidBin ~p", [JidBin]),
+          [TU,TS]     = binary:split(JidBin, <<"@">>), ?LOG_INFO("TU ~p, TS ~p", [TU,TS]),
+          DevList     = fly_mod_utils:get_users_devices_detail(FServer, sql_in([TU]), sql_in(Ccodes)), ?LOG_INFO("DevList ~p", [DevList]),
+          URes        = ejabberd_sm:get_user_resources(TU, FServer), ?LOG_INFO("URes ~p", [URes]),
+          ToAllow     = case URes of [Res | _] -> normalize(get_device_type(Res)); [] -> <<"unknown">> end, ?LOG_INFO("ToAllow ~p", [ToAllow]),
           IsAllowed   = case {DevList, URes} of 
                           {[], _} -> false; 
                           {_DevList, []} -> true;
@@ -259,9 +259,13 @@ update_call_status(From, RequestType, SubEl, IQ) ->
 
           case IsAllowed of
             true ->
-              send_payload(CallStatus, SubEl, lists:map(fun(TR) -> jid:make(TU, TS, TR) end, URes)),
+              ?LOG_INFO("call allowed"),
+              TargetJids = lists:map(fun(TR) -> jid:make(TU, TS, TR) end, URes),
+              ?LOG_INFO("TargetJids ~p", [TargetJids]),
+              send_payload(CallStatus, SubEl, TargetJids),
               fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>});
             false ->
+              ?LOG_INFO("call no allowed"),
               fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"The person you are trying to reach is in call restricted region.">>})
           end;
         _ -> 
