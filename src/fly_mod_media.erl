@@ -250,22 +250,22 @@ update_call_status(From, RequestType, SubEl, IQ) ->
           [TU,TS]     = binary:split(JidBin, <<"@">>), ?LOG_INFO("TU ~p, TS ~p", [TU,TS]),
           DevList     = fly_mod_utils:get_users_devices_detail(FServer, sql_in([TU]), sql_in(Ccodes)), ?LOG_INFO("DevList ~p", [DevList]),
           URes        = ejabberd_sm:get_user_resources(TU, FServer), ?LOG_INFO("URes ~p", [URes]),
-          ToAllow     = case URes of [Res | _] -> normalize(get_device_type(Res)); [] -> <<"unknown">> end, ?LOG_INFO("ToAllow ~p", [ToAllow]),
+          ToAllow     = case URes of [] -> []; _ -> [ get_device_type(Res) || Res <- URes ] end, ?LOG_INFO("ToAllow ~p", [ToAllow]),
           IsAllowed   = case {DevList, URes} of 
                           {[], _} -> false; 
                           {_DevList, []} -> true;
                           {_DevList, _URes} -> 
-                            lists:any(fun([_Country, DeviceType]) -> 
-                              ?LOG_INFO("normalize(DeviceType) ~p =:= ToAllow ~p", [normalize(DeviceType), ToAllow]),
-                              normalize(DeviceType) =:= ToAllow 
-                            end, 
-                            DevList)
+                                lists:any(fun([_Country, DeviceType]) ->
+                                        lists:member(DeviceType, ToAllow)
+                                    end, DevList)
                         end,
 
           case IsAllowed of
             true ->
               ?LOG_INFO("call allowed"),
-              TargetJids = lists:map(fun(TR) -> jid:make(TU, TS, TR) end, URes),
+              AllowedDevices = [ DeviceType || [_Country, DeviceType] <- DevList ],
+              ?LOG_INFO("pick AllowedDevices from devList to make full jid.. found: ~p", [AllowedDevices]),
+              TargetJids = [ jid:make(TU, TS, Res) || Res <- URes, lists:member(get_device_type(Res), AllowedDevices) ],
               ?LOG_INFO("TargetJids ~p", [TargetJids]),
               send_payload(CallStatus, SubEl, TargetJids),
               fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>});
@@ -358,8 +358,8 @@ update_call_status(From, RequestType, SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Unknown call status">>})
   end.
 
-get_device_type(<<"Web-", _/binary>>) -> <<"Web">>;
-get_device_type(<<"Mobile-", _/binary>>) ->  <<"Mobile">>;
+get_device_type(<<"Web-", _/binary>>) -> <<"web">>;
+get_device_type(<<"Mobile-", _/binary>>) -> <<"mobile">>;
 get_device_type(_) -> <<"unknown">>.
 
 normalize(Bin) when is_binary(Bin) -> list_to_binary(string:lowercase(binary_to_list(Bin))).
