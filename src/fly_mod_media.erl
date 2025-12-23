@@ -235,7 +235,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
             ?LOG_INFO("device_list ~p", [DevList]),
             case DevList of 
               [] -> 
-                fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"The persons you are trying to reach is in call restricted region.">>});
+                fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"Calling isn't supported in the UAE">>});
               _ -> 
                 send_payload(CallStatus, SubEl, [], false),
                 fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>})
@@ -263,7 +263,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
               fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>});
             false ->
               ?LOG_INFO("call not allowed"),
-              fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"The person you are trying to reach is in call restricted region.">>})
+              fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling isn't supported in the UAE">>})
           end;
         _ -> 
           ok
@@ -456,7 +456,7 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
        [] ->
         case Bool of
           true  ->
-          ?LOG_INFO("damn son target jid empty but bool true "),
+          ?LOG_INFO("bool true.. [push]"),
           lists:foreach(fun(U) ->
             User = fxml:get_tag_cdata(U),
             [ToUser, _] = binary:split(User, <<"@">>),
@@ -477,7 +477,7 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
             fly_mod_utils:insert_call_log_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,list_to_binary(UsersList),LResource,MetaData)
           end, Users#xmlel.children);
         false ->
-          ?LOG_INFO("damn son [] "),
+          ?LOG_INFO("fallback"),
           lists:foreach(fun(U) ->
             User = fxml:get_tag_cdata(U),
             [ToUser, _] = binary:split(User, <<"@">>),
