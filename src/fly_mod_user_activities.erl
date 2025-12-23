@@ -806,26 +806,25 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
       end, fly_mod_utils:get_rosters_to_update_privacy(FUser, FServer) ),
 
 
-      case catch fly_mod_utils:get_recent_profile(FServer, FUser, <<"">>) of
-        {selected, _, []} ->
-          ok;
-        {selected, _, UserProfiles} ->
-          ok
-          % lists:foreach(fun(G) ->
-          %   [UserName,  Vcard] = G,
-          %   VCard = case fxml_stream:parse_element(Vcard) of
-          %                 {error, _Reason} -> [];
-          %                           VCARD -> case Action of
-          %                                           <<"0">> ->
-          %                                             ?LOG_INFO("hide_profile remove subtag image"),
-          %                                             [xml:remove_subtags(VCARD, <<"image">>)];
-          %                                           _ ->
-          %                                             [VCARD]
-          %                                       end
-          %            end,
-          %         ejabberd_router:route(BareJidFrom, jid:make(UserName, FServer, <<>>), #xmlel{name = <<"vcarddetails">>, attrs = [{<<"username">>,  UserName}], children = VCard})
-          %         end, UserProfiles)
-        end;
+      % case catch fly_mod_utils:get_recent_profile(FServer, FUser, <<"">>) of
+      %   {selected, _, []} ->
+      %     ok;
+      %   {selected, _, UserProfiles} ->
+      %     lists:foreach(fun(G) ->
+      %       [UserName,  Vcard] = G,
+      %       VCard = case fxml_stream:parse_element(Vcard) of
+      %                     {error, _Reason} -> [];
+      %                               VCARD -> case Action of
+      %                                               <<"0">> ->
+      %                                                 ?LOG_INFO("hide_profile remove subtag image"),
+      %                                                 [xml:remove_subtags(VCARD, <<"image">>)];
+      %                                               _ ->
+      %                                                 [VCARD]
+      %                                           end
+      %                end,
+      %             ejabberd_router:route(BareJidFrom, jid:make(UserName, FServer, <<>>), #xmlel{name = <<"vcarddetails">>, attrs = [{<<"username">>,  UserName}], children = VCard})
+      %             end, UserProfiles)
+      %   end;
       ok;
     _ -> 
       ok
