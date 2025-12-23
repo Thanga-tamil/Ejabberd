@@ -242,11 +242,25 @@ process_sm_iq(#iq{type = get, from = From, to = To, lang = Lang} = IQ) ->
 	[] ->
 	    xmpp:make_iq_result(IQ, #vcard_temp{});
 	Els ->
-        HideImg = case fly_mod_utils:get_hide_profile_privacy(LServer, LUser) of
+        HideImg = fly_mod_utils:get_hide_profile_privacy(LServer, LUser),
+        ?LOG_INFO("hide profile status: ~p", [HideImg]),
+
+        Hide = case HideImg of
                         <<"0">> -> true;
                         _ -> false
                    end,
-        FinalVcard = if HideImg andalso FUser =/= LUser -> xml:remove_subtags(Els, <<"IMAGE">>); true -> Els end,
+        ?LOG_INFO("Hide status: ~p", [Hide]),
+        ?LOG_INFO("FUser: ~p", [FUser]),
+        ?LOG_INFO("LUser: ~p", [LUser]),
+        ?LOG_INFO("FUser =/= LUser: ~p", [FUser =/= LUser]),
+                   
+        FinalVcard = 
+        if Hide andalso FUser =/= LUser 
+        Els1 = xml:remove_subtags(Els, <<"thumbImage">>),
+               xml:remove_subtags(Els1, <<"image">>);
+         true -> 
+            Els 
+        end,
 
         ?LOG_INFO("FinalVcard ~p", [FinalVcard]),
 
