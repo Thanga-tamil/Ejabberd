@@ -246,9 +246,10 @@ process_sm_iq(#iq{type = get, from = From, to = To, lang = Lang} = IQ) ->
         ?LOG_INFO("hide profile status: ~p", [HideImg]),
 
         Hide = case HideImg of
-                        <<"0">> -> true;
-                        _ -> false
-                   end,
+                    {selected, [<<"hide_profile">>], [[<<"0">>]]} -> true;
+                    {selected, [<<"hide_profile">>], [[_]]} -> false;
+                    _ -> false
+               end,
         ?LOG_INFO("Hide status: ~p", [Hide]),
         ?LOG_INFO("FUser: ~p", [FUser]),
         ?LOG_INFO("LUser: ~p", [LUser]),
