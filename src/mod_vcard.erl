@@ -254,13 +254,13 @@ process_sm_iq(#iq{type = get, from = From, to = To, lang = Lang} = IQ) ->
         ?LOG_INFO("LUser: ~p", [LUser]),
         ?LOG_INFO("FUser =/= LUser: ~p", [FUser =/= LUser]),
                    
-        FinalVcard = 
-        if Hide andalso FUser =/= LUser 
-        Els1 = xml:remove_subtags(Els, <<"thumbImage">>),
-               xml:remove_subtags(Els1, <<"image">>);
-         true -> 
-            Els 
-        end,
+            FinalVcard = case Hide andalso FUser =/= LUser of
+                             true ->
+                                 Els1 = xml:remove_subtags(Els, <<"thumbImage">>),
+                                 xml:remove_subtags(Els1, <<"image">>);
+                             false ->
+                                 Els
+                         end,
 
         ?LOG_INFO("FinalVcard ~p", [FinalVcard]),
 
