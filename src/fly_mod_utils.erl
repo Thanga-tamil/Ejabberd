@@ -189,7 +189,7 @@
   update_block_status_user/3,update_block_status_group/3,get_contact_permission/1,update_vcard_date/2,get_user_resources/2,
   get_user_resources/3,get_mobile_user_message/2,get_mobile_user_resource/2,get_push_type/1,get_meta_chat_web/4,poll_vote_update/8,
   remove_poll_offline/3,get_existing_group_info/2,get_users_devices_detail/3,set_seen_receipt/3,set_hide_profile/3,update_msg_seen_receipt/3,
-  get_user_privacy/2]).
+  get_hide_profile_privacy/2]).
 
 -include("logger.hrl").
 
@@ -2274,7 +2274,7 @@ set_seen_receipt(FServer, FUser, Action) ->
 set_hide_profile(FServer, FUser, Action) -> 
   ejabberd_sql:sql_query(FServer,[<<"insert into privacy_settings (username, hide_profile, created_at) value ('">>,FUser,<<"', '">>,Action,<<"', now()) on duplicate key update hide_profile='">>,Action,<<"', updated_at = now();">>]).
 
-get_user_privacy(Server, User) ->
+get_hide_profile_privacy(Server, User) ->
   ejabberd_sql:sql_query(Server,[<<"select hide_profile from privacy_settings where username='">>,User,<<"';">>]).
 
 get_rosters_to_update_privacy(User, Server) -> 
