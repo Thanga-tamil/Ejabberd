@@ -538,7 +538,7 @@ process_get_recent_profile(From, RequestType, SubEl, IQ) ->
         VCard = case fxml_stream:parse_element(Vcard) of
                     {error, _Reason} -> [];
                     VCARD -> 
-                      ProfilePrivacy = fly_mod_utils:get_user_privacy(FServer, UserName),
+                      ProfilePrivacy = fly_mod_utils:get_hide_profile_privacy(FServer, UserName),
                       case ProfilePrivacy of
                         <<"0">> ->
                           ?LOG_INFO("user_privacy remove subtag image"),

@@ -233,6 +233,7 @@ process_sm_iq(#iq{type = set, lang = Lang, from = From} = IQ) ->
 	    xmpp:make_error(IQ, xmpp:err_not_allowed(Txt, Lang))
     end;
 process_sm_iq(#iq{type = get, from = From, to = To, lang = Lang} = IQ) ->
+    #jid{luser = FUser, lserver = FServer} = From,
     #jid{luser = LUser, lserver = LServer} = To,
     case get_vcard(LUser, LServer) of
 	error ->
@@ -241,7 +242,15 @@ process_sm_iq(#iq{type = get, from = From, to = To, lang = Lang} = IQ) ->
 	[] ->
 	    xmpp:make_iq_result(IQ, #vcard_temp{});
 	Els ->
-	    IQ#iq{type = result, to = From, from = To, sub_els = Els}
+        HideImg = case fly_mod_utils:get_hide_profile_privacy(LServer, LUser) of
+                        <<"0">> -> true;
+                        _ -> false
+                   end,
+        FinalVcard = if HideImg andalso FUser =/= LUser -> xml:remove_subtags(Els, <<"IMAGE">>); true -> Els end,
+
+        ?LOG_INFO("FinalVcard ~p", [FinalVcard]),
+
+        IQ#iq{type = result, to = From, from = To, sub_els = FinalVcard}
     end.
 
 -spec process_vcard(iq()) -> iq().
@@ -319,7 +328,8 @@ get_vcard(LUser, LServer) ->
 		     Mod:get_vcard(LUser, LServer)
 	     end,
     case Result of
-	{ok, Els} -> Els;
+	{ok, Els} -> 
+        Els;
 	error -> error
     end.
 
