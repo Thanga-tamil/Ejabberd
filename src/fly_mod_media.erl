@@ -250,15 +250,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
           [TU,TS]     = binary:split(JidBin, <<"@">>), ?LOG_INFO("TU ~p, TS ~p", [TU,TS]),
           DevList     = fly_mod_utils:get_users_devices_detail(FServer, sql_in([TU]), sql_in(Ccodes)), ?LOG_INFO("DevList ~p", [DevList]),
           URes        = ejabberd_sm:get_user_resources(TU, FServer), ?LOG_INFO("URes ~p", [URes]),
-          ToAllow     = case URes of [] -> []; _ -> [ get_device_type(Res) || Res <- URes ] end, ?LOG_INFO("ToAllow ~p", [ToAllow]),
-          IsAllowed   = case {DevList, URes} of 
-                          {[], _} -> false; 
-                          {_DevList, []} -> true;
-                          {_DevList, _URes} -> 
-                                lists:any(fun([_Country, DeviceType]) ->
-                                        lists:member(DeviceType, ToAllow)
-                                    end, DevList)
-                        end,
+          IsAllowed   = case {DevList, URes} of {[], _} -> false; {_DevList, []} -> true; {_DevList, _URes} -> true end,
 
           case IsAllowed of
             true ->
@@ -270,7 +262,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
               send_payload(CallStatus, SubEl, TargetJids),
               fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>});
             false ->
-              ?LOG_INFO("call no allowed"),
+              ?LOG_INFO("call not allowed"),
               fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"The person you are trying to reach is in call restricted region.">>})
           end;
         _ -> 
@@ -441,11 +433,13 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
     UsersList = lists:sublist(UserLists, 1, length(UserLists) - 1),
     case TargetJids of
       [_ | _] ->
+        ?LOG_INFO("proceed at [_ | _] "),
         lists:foreach(fun(Dest) ->
           #jid{user = ToUser, lserver = ToServer, lresource = ToRes} = Dest,
           MessageId = fly_mod_utils:get_iq_message_id(7),
+          NoCopy = #xmlel{name = <<"no-copy">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:hints">>}]},
           NewPacket = #xmlel{name = <<"message">>, attrs = [{<<"from">>, jid:to_string(From)},  {<<"id">>,MessageId}, {<<"type">>, <<"chat">>}, {<<"to">>, jid:to_string(Dest)}],
-          children = [
+          children = [ NoCopy,
             #xmlel{name = <<"mediacall">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:call">>}, {<<"room_id">>, RoomId},  {<<"call_link">>, CallLink},{<<"meta_data">>, MetaData}, {<<"caller_name">>, CallerName}, {<<"call_mode">>, CallMode},{<<"call_status">>, CallStatus}, {<<"call_type">>, CallType},  {<<"call_time">>, CallTime},  {<<"group_id">>, GroupId}], children = [Users]},
             fly_mod_utils:get_custom_attributes(SubEl)
           ]},
@@ -460,6 +454,7 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
           fly_mod_utils:insert_call_log_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,list_to_binary(UsersList),LResource,MetaData)
         end, TargetJids);
        [] ->
+        ?LOG_INFO("damn son [] "),
         lists:foreach(fun(U) ->
           User = fxml:get_tag_cdata(U),
           [ToUser, _] = binary:split(User, <<"@">>),
