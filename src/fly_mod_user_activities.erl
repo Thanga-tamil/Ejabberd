@@ -570,6 +570,10 @@ remove_subtag_from_el(#xmlel{name = <<"vCard">>, attrs = Attrs, children = Child
 remove_subtag_from_el(El, _Name) ->
     El.
 
+is_subtag(#xmlel{name = TagName}, Name) ->
+    TagName =:= Name;
+is_subtag(_, _) ->
+    false.
 
 user_logout(From, RequestType, SubEl, IQ) ->
   #jid{luser = LUser, lserver = LServer, lresource = LResource} = From,
