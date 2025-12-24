@@ -533,51 +533,55 @@ process_get_recent_profile(From, RequestType, SubEl, IQ) ->
     {selected, _, []} ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"No recent chat for you">>});
     {selected, _, UserProfiles} ->
-      SubEls1 = lists:map(fun(G) ->
-        [UserName,  Vcard] = G,
-        VCard = case fxml_stream:parse_element(Vcard) of
-                    {error, _Reason} -> [];
-                    VCARD -> 
-                      HideImg = fly_mod_utils:get_hide_profile_privacy(FServer, UserName),
+                  SubEls1 = 
+                      lists:map(
+                        fun([UserName, VcardBin]) -> 
+                          VCardEls = 
+                          case fxml_stream:parse_element(VcardBin) of 
+                            {error, _} ->
+                              []; 
+                            VCARD -> 
+                              Hide = case fly_mod_utils:get_hide_profile_privacy(FServer, UserName) of
+                                {selected, [<<"hide_profile">>], [[<<"0">>]]} ->
+                                  true;
+                                _ ->
+                                  false
+                                  end,
+                                  
+                              FinalVCard = case Hide of
+                                              true  ->
+                                                strip_images(VCARD);
+                                              false ->
+                                                VCARD
+                                            end,
 
-                      Hide = case HideImg of
-                                  {selected, [<<"hide_profile">>], [[<<"0">>]]} -> true;
-                                  {selected, [<<"hide_profile">>], [[_]]} -> false;
-                                  _ -> false
+                              [FinalVCard]
                             end,
 
-                      case Hide of
-                        true ->
-                          R1 = remove_subtags(VCARD, <<"thumbImage">>),
-                          remove_subtags(R1, <<"image">>);
-                        false ->
-                          VCARD
-                      end
-                  end,
-
-        #xmlel{name = <<"vcarddetails">>, attrs = [{<<"username">>,  UserName }], children = VCard} 
-      end, UserProfiles),
+                            #xmlel{name = <<"vcarddetails">>, attrs = [{<<"username">>,  UserName }], children = VCardEls}
+                        end, UserProfiles),
 
       fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType ,sub_els = [#xmlel{name = <<"vcard">>, children = SubEls1}]})
   end.
 
-remove_subtags(Els, Name) ->
-    case is_list(Els) of
-        true ->
-            [remove_subtag_from_el(El, Name) || El <- Els];
-        false ->
-           remove_subtag_from_el(Els, Name)
-    end.
+strip_images(#xmlel{name = Name, attrs = Attrs, children = Children}) ->
+    #xmlel{
+        name = Name,
+        attrs = Attrs,
+        children = [
+            strip_images(El)
+            || El <- Children,
+               not is_image_tag(El)
+        ]
+    };
+strip_images(Other) ->
+    Other.
 
-remove_subtag_from_el(#xmlel{name = <<"vCard">>, attrs = Attrs, children = Children}, Name) ->
-    #xmlel{name = <<"vCard">>, attrs = Attrs,
-           children = [El || El <- Children, not is_subtag(El, Name)]};
-remove_subtag_from_el(El, _Name) ->
-    El.
-
-is_subtag(#xmlel{name = TagName}, Name) ->
-    TagName =:= Name;
-is_subtag(_, _) ->
+is_image_tag(#xmlel{name = <<"image">>}) ->
+    true;
+is_image_tag(#xmlel{name = <<"thumbImage">>}) ->
+    true;
+is_image_tag(_) ->
     false.
 
 user_logout(From, RequestType, SubEl, IQ) ->
