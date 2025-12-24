@@ -250,11 +250,11 @@ write_roster_version(LUser, LServer, InTransaction) ->
 %%     - the roster version from client don't match current version.
 -spec process_iq_get(iq()) -> iq().
 process_iq_get(#iq{to = To, from = From,
-           sub_els = [#roster_query{ver = RequestedVersion, mix_annotate = MixEnabled}]} = IQ) ->
+		   sub_els = [#roster_query{ver = RequestedVersion, mix_annotate = MixEnabled}]} = IQ) ->
     LUser = To#jid.luser,
     LServer = To#jid.lserver,
     {ItemsToSend, VersionToSend} =
-       case {mod_roster_opt:versioning(LServer),
+	case {mod_roster_opt:versioning(LServer),
 	      mod_roster_opt:store_current_id(LServer)} of
 	    {true, true} when RequestedVersion /= undefined ->
 		case read_roster_version(LUser, LServer) of
@@ -320,59 +320,17 @@ process_iq_get(#iq{to = To, from = From,
 											end,
 					ejabberd_sm:get_user_resources(TUser,TServer))
 		end,
-    % Strip images from returned roster items according to each contact's
-    % privacy setting (hide_profile). This removes <image/> and
-    % <thumbImage/> subtags from vCard tags when needed.
-    ItemsNoImages = case Items of
-    false -> false;
-    List -> strip_images_from_roster_items(List, From)
-    end,
-    % continue building result using ItemsNoImages instead of Items
     xmpp:make_iq_result(
       IQ,
-      case {ItemsNoImages, VersionToSend} of
-      {false, false} ->
-          undefined;
-      {ItemsNoImages, false} ->
-          #roster_query{items = ItemsNoImages, contact_permission = ContactPermission};
-      {ItemsNoImages, Version} ->
-          #roster_query{items = ItemsNoImages,
-                ver = Version, contact_permission = ContactPermission}
+      case {Items, VersionToSend} of
+	  {false, false} ->
+	      undefined;
+	  {Items, false} ->
+	      #roster_query{items = Items, contact_permission = ContactPermission};
+	  {Items, Version} ->
+	      #roster_query{items = Items,
+			    ver = Version, contact_permission = ContactPermission}
       end).
-
-strip_images_from_roster_items(Items, _From) when is_list(Items) ->
-    [strip_images_from_item(Item) || Item <- Items];
-strip_images_from_roster_items(false, _From) -> false.
-
-strip_images_from_item(#roster_item{} = Item) ->
-    %% no vCard stored inside the record itself -> return unchanged
-    Item;
-strip_images_from_item(#xmlel{name = <<"item">>, attrs = Attrs, children = Children}) ->
-    NewChildren = [ case Child of
-                       #xmlel{name = <<"vCard">>} = V -> remove_subtags_from_vcard(V);
-                       X -> X
-                   end || Child <- Children],
-    #xmlel{name = <<"item">>, attrs = Attrs, children = NewChildren};
-strip_images_from_item(Other) ->
-    Other.
-
-remove_subtags_from_vcard(VCardEl) ->
-    R1 = remove_subtag_from_el(VCardEl, <<"thumbImage">>),
-    remove_subtag_from_el(R1, <<"image">>).
-
-remove_subtags(Els, Name) ->
-    [remove_subtag_from_el(El, Name) || El <- Els].
-
-remove_subtag_from_el(#xmlel{name = <<"vCard">>, attrs = Attrs, children = Children}, Name) ->
-    #xmlel{name = <<"vCard">>, attrs = Attrs,
-           children = [El || El <- Children, not is_subtag(El, Name)]};
-remove_subtag_from_el(El, _Name) ->
-    El.
-
-is_subtag(#xmlel{name = TagName}, Name) ->
-    TagName =:= Name;
-is_subtag(_, _) ->
-    false.
 
 -spec run_roster_get_hook(binary(), binary()) -> [#roster_item{}].
 run_roster_get_hook(LUser, LServer) ->
