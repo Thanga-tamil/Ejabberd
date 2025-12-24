@@ -117,8 +117,8 @@ get_roster(LUser, LServer) ->
 	   LServer,
 	   ?SQL("select @(rosterusers.username)s, @(rosterusers.jid)s, @(rosterusers.nick)s, @(rosterusers.subscription)s, "
     "@(rosterusers.ask)s,  @(rosterusers.server)s,  "
-    "@(rosterusers.type)s,@(vcard_search.nickname)s,@(vcard_search.image)s,@(vcard_search.email)s,@(vcard_search.mobilenumber)s,@(vcard_search.thumbimage)s,@(vcard_search.status)s,@(vcard_search.is_block)s from rosterusers JOIN
-    vcard_search ON vcard_search.lusername = rosterusers.jid_username"
+    "@(rosterusers.type)s,@(vcard_search.nickname)s,@(case when p.hide_profile = 1 then vcard_search.image else '' end as image)s,@(vcard_search.email)s,@(vcard_search.mobilenumber)s,@(case when p.hide_profile = 1 then vcard_search.thumbimage else '' end as thumbimage)s,@(vcard_search.status)s,@(vcard_search.is_block)s from rosterusers JOIN
+    vcard_search ON vcard_search.lusername = rosterusers.jid_username LEFT JOIN privacy_settings as p on p.username = rosterusers.jid_username"
     " where rosterusers.username=%(LUser)s and %(LServer)H")) of
         {selected, Items} when is_list(Items) ->
              % JIDGroups = case get_roster_jid_groups(LServer, LUser) of

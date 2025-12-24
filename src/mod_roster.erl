@@ -254,8 +254,7 @@ process_iq_get(#iq{to = To, from = From,
     LUser = To#jid.luser,
     LServer = To#jid.lserver,
     {ItemsToSend, VersionToSend} =
-	case {mod_roster_opt:versioning(LServer),
-	      mod_roster_opt:store_current_id(LServer)} of
+	case {mod_roster_opt:versioning(LServer), mod_roster_opt:store_current_id(LServer)} of
 	    {true, true} when RequestedVersion /= undefined ->
 		case read_roster_version(LUser, LServer) of
 		    error ->
@@ -277,6 +276,7 @@ process_iq_get(#iq{to = To, from = From,
 	    _ ->
 		{run_roster_get_hook(LUser, LServer), false}
 	end,
+	?LOG_INFO("ItemsToSend: ~p", [ItemsToSend]),
     % Store that MIX annotation is enabled (for roster pushes)
     set_mix_annotation_enabled(From, MixEnabled),
     % Only include <channel/> element when MIX annotation is enabled

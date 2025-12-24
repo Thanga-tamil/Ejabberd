@@ -562,7 +562,12 @@ process_get_recent_profile(From, RequestType, SubEl, IQ) ->
   end.
 
 remove_subtags(Els, Name) ->
-    [remove_subtag_from_el(El, Name) || El <- Els].
+    case is_list(Els) of
+        true ->
+            [remove_subtag_from_el(El, Name) || El <- Els];
+        false ->
+           remove_subtag_from_el(Els, Name)
+    end.
 
 remove_subtag_from_el(#xmlel{name = <<"vCard">>, attrs = Attrs, children = Children}, Name) ->
     #xmlel{name = <<"vCard">>, attrs = Attrs,
