@@ -233,16 +233,53 @@ process_sm_iq(#iq{type = set, lang = Lang, from = From} = IQ) ->
 	    xmpp:make_error(IQ, xmpp:err_not_allowed(Txt, Lang))
     end;
 process_sm_iq(#iq{type = get, from = From, to = To, lang = Lang} = IQ) ->
+    #jid{luser = FUser, lserver = FServer} = From,
     #jid{luser = LUser, lserver = LServer} = To,
     case get_vcard(LUser, LServer) of
-	error ->
-	    Txt = ?T("Database failure"),
-	    xmpp:make_error(IQ, xmpp:err_internal_server_error(Txt, Lang));
-	[] ->
-	    xmpp:make_iq_result(IQ, #vcard_temp{});
-	Els ->
-	    IQ#iq{type = result, to = From, from = To, sub_els = Els}
+        error ->
+            Txt = ?T("Database failure"),
+            xmpp:make_error(IQ, xmpp:err_internal_server_error(Txt, Lang));
+        [] ->
+            xmpp:make_iq_result(IQ, #vcard_temp{});
+        Els ->
+            HideImg = fly_mod_utils:get_hide_profile_privacy(LServer, LUser),
+            ?LOG_INFO("hide profile status: ~p", [HideImg]),
+
+            Hide = case HideImg of
+                        {selected, [<<"hide_profile">>], [[<<"0">>]]} -> true;
+                        {selected, [<<"hide_profile">>], [[_]]} -> false;
+                        _ -> false
+                   end,
+            ?LOG_INFO("Hide status: ~p", [Hide]),
+            ?LOG_INFO("FUser: ~p", [FUser]),
+            ?LOG_INFO("LUser: ~p", [LUser]),
+            ?LOG_INFO("FUser =/= LUser: ~p", [FUser =/= LUser]),
+
+            FinalVcard = case Hide andalso FUser =/= LUser of
+                             true ->
+                                 R1 = remove_subtags(Els, <<"thumbImage">>),
+                                 remove_subtags(R1, <<"image">>);
+                             false ->
+                                 Els
+                         end,
+
+            IQ#iq{type = result, to = From, from = To, sub_els = FinalVcard}
     end.
+
+remove_subtags(Els, Name) ->
+    [remove_subtag_from_el(El, Name) || El <- Els].
+
+remove_subtag_from_el(#xmlel{name = <<"vCard">>, attrs = Attrs, children = Children}, Name) ->
+    #xmlel{name = <<"vCard">>, attrs = Attrs,
+           children = [El || El <- Children, not is_subtag(El, Name)]};
+remove_subtag_from_el(El, _Name) ->
+    El.
+
+is_subtag(#xmlel{name = TagName}, Name) ->
+    TagName =:= Name;
+is_subtag(_, _) ->
+    false.
+
 
 -spec process_vcard(iq()) -> iq().
 process_vcard(#iq{type = set, lang = Lang} = IQ) ->
@@ -319,7 +356,8 @@ get_vcard(LUser, LServer) ->
 		     Mod:get_vcard(LUser, LServer)
 	     end,
     case Result of
-	{ok, Els} -> Els;
+	{ok, Els} -> 
+        Els;
 	error -> error
     end.
 
