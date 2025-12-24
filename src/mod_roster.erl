@@ -276,7 +276,6 @@ process_iq_get(#iq{to = To, from = From,
 	    _ ->
 		{run_roster_get_hook(LUser, LServer), false}
 	end,
-	?LOG_INFO("ItemsToSend: ~p", [ItemsToSend]),
     % Store that MIX annotation is enabled (for roster pushes)
     set_mix_annotation_enabled(From, MixEnabled),
     % Only include <channel/> element when MIX annotation is enabled

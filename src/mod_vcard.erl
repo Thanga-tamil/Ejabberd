@@ -263,8 +263,6 @@ process_sm_iq(#iq{type = get, from = From, to = To, lang = Lang} = IQ) ->
                                  Els
                          end,
 
-            ?LOG_INFO("FinalVcard ~p", [FinalVcard]),
-
             IQ#iq{type = result, to = From, from = To, sub_els = FinalVcard}
     end.
 
