@@ -783,9 +783,12 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
         end, ejabberd_sm:get_user_resources(FUser, FServer));
     <<"hide_profile">> ->
       fly_mod_utils:set_hide_profile(FServer, FUser, Action),
-      ejabberd_router:route(BareJidFrom, BareJidFrom, XmlBody),
+      lists:foreach(fun(R) ->
+        ejabberd_router:route(From, jid:make(FUser, FServer, R), XmlBody)
+        end, ejabberd_sm:get_user_resources(FUser, FServer)),
       case fly_mod_utils:get_mobile_user_message(FUser, FServer) of
         true ->
+          ?LOG_INFO("store hide_profile in spool"),
           mod_offline:store_packet({FUser, xmpp:decode(XmlBody)});
         false ->
           ok
