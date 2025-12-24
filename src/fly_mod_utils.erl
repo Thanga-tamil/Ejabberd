@@ -2272,7 +2272,8 @@ set_seen_receipt(FServer, FUser, Action) ->
   ejabberd_sql:sql_query(FServer,[<<"insert into privacy_settings (username, seen_receipt, created_at) value ('">>,FUser,<<"', '">>,Action,<<"', now()) on duplicate key update seen_receipt='">>,Action,<<"', updated_at = now();">>]).
   
 set_hide_profile(FServer, FUser, Action) -> 
-  ejabberd_sql:sql_query(FServer,[<<"insert into privacy_settings (username, hide_profile, created_at) value ('">>,FUser,<<"', '">>,Action,<<"', now()) on duplicate key update hide_profile='">>,Action,<<"', updated_at = now();">>]).
+  ejabberd_sql:sql_query(FServer,[<<"insert into privacy_settings (username, hide_profile, created_at) value ('">>,FUser,<<"', '">>,Action,<<"', now()) on duplicate key update hide_profile='">>,Action,<<"', updated_at = now();">>]),
+  ejabberd_sql:sql_query(FServer,[<<"update vcard set updated_at = now() where username = '">>,FUser,<<"';">>]).
 
 get_hide_profile_privacy(Server, User) ->
   ejabberd_sql:sql_query(Server,[<<"select hide_profile from privacy_settings where username='">>,User,<<"';">>]).

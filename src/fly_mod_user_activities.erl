@@ -538,20 +538,38 @@ process_get_recent_profile(From, RequestType, SubEl, IQ) ->
         VCard = case fxml_stream:parse_element(Vcard) of
                     {error, _Reason} -> [];
                     VCARD -> 
-                      ProfilePrivacy = fly_mod_utils:get_hide_profile_privacy(FServer, UserName),
-                      case ProfilePrivacy of
-                        <<"0">> ->
-                          ?LOG_INFO("user_privacy remove subtag image"),
-                          [xml:remove_subtags(VCARD, <<"image">>)];
-                        _ ->
-                          [VCARD]
+                      HideImg = fly_mod_utils:get_hide_profile_privacy(FServer, UserName),
+
+                      Hide = case HideImg of
+                                  {selected, [<<"hide_profile">>], [[<<"0">>]]} -> true;
+                                  {selected, [<<"hide_profile">>], [[_]]} -> false;
+                                  _ -> false
+                            end,
+
+                      case Hide of
+                        true ->
+                          R1 = remove_subtags(VCARD, <<"thumbImage">>),
+                          remove_subtags(R1, <<"image">>);
+                        false ->
+                          VCARD
                       end
                   end,
+
         #xmlel{name = <<"vcarddetails">>, attrs = [{<<"username">>,  UserName }], children = VCard} 
       end, UserProfiles),
 
       fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType ,sub_els = [#xmlel{name = <<"vcard">>, children = SubEls1}]})
   end.
+
+remove_subtags(Els, Name) ->
+    [remove_subtag_from_el(El, Name) || El <- Els].
+
+remove_subtag_from_el(#xmlel{name = <<"vCard">>, attrs = Attrs, children = Children}, Name) ->
+    #xmlel{name = <<"vCard">>, attrs = Attrs,
+           children = [El || El <- Children, not is_subtag(El, Name)]};
+remove_subtag_from_el(El, _Name) ->
+    El.
+
 
 user_logout(From, RequestType, SubEl, IQ) ->
   #jid{luser = LUser, lserver = LServer, lresource = LResource} = From,
