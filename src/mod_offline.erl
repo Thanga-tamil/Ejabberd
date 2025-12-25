@@ -798,19 +798,28 @@ route_offline_message(#{jid := #jid{luser = LUser, lserver = LServer, lresource 
 		      #offline_msg{expire = Expire} = OffMsg) ->
     case offline_msg_to_route(LServer, OffMsg) of
 	error ->
+	     Id = case OffMsg#offline_msg.packet of
+			#xmlel{} ->
+		        	fxml:get_tag_attr_s(<<"id">>, OffMsg#offline_msg.packet);
+			_ ->
+				<<"unknown">>
+		   end,
+        	?LOG_INFO("Failed to route offline message id ~p for ~ts@~ts/~ts", [Id, LUser, LServer, LResource]),
 	    ok;
 	{route, Msg} ->
+		Id = xmpp:get_id(Msg),
 	    case is_message_expired(Expire, Msg) of
 		true ->
+		    ?LOG_INFO("Offline message id ~p for ~ts@~ts/~ts has expired", [Id, LUser, LServer, LResource]),
 		    ok;
 		false ->
 		    case privacy_check_packet(State, Msg, in) of
 			allow ->
-				Id = xmpp:get_id(Msg),
                 		?INFO_MSG("Routing offline message id ~p for ~ts@~ts/~ts", [Id, LUser, LServer, LResource]),
 				NewMsg = xmpp:set_to(Msg, #jid{luser = LUser, lserver = LServer, lresource = LResource}),
 				ejabberd_router:route(NewMsg);
-			deny -> ok
+			deny -> ?LOG_INFO("privacy_check.. offline message routing deny"),
+				ok
 		    end
 	    end
     end.
