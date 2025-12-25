@@ -241,20 +241,8 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
 
     T when (T == message_seen) ->
       ElementAcknowledge = xmpp:get_subtag(Packet, #seen{}),
-      ?LOG_INFO("Seen Element: ~p", [ElementAcknowledge]),
       {seen, Id, _, _, _GroupId, ReceiptStatus} = ElementAcknowledge,
-      ?LOG_INFO("Seen ReceiptStatus: ~p", [ReceiptStatus]),
-      ?LOG_INFO("Seen Id: ~p", [Id]),
-      {seen,I1,I2,I3,I4,I5} = ElementAcknowledge,
-      ?LOG_INFO("seen elms: ~p,~p,~p,~p,~p", [I1, I2, I3, I4, I5]), %dev in progress
-      
-      ReadReceipt = 
-      case ReceiptStatus of 
-          <<"0">> -> 0;
-          <<"1">> -> 1;
-          _ -> 0
-      end,
-      ?LOG_INFO("ReadReceipt Value: ~p", [ReadReceipt]),  
+      ReadReceipt =  case ReceiptStatus of  <<"0">> -> 0; <<"1">> -> 1; _ -> 0 end,
       send_ack_response(From, To, Id,  <<"seen">>),
       NewSeenPacket = xmpp:set_from_to(Packet,From, To),
       GetSeenTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),

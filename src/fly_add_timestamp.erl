@@ -47,12 +47,7 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
                             if Seen =:= false ->
                             NewXMl = XML;
                             true ->
-                            
-                              ?LOG_INFO("(filter_packet) seen pkt: ~p", [Seen]),
                             {seen, Id,  _, _Time,  GroupId, ReceiptStatus} = Seen,
-                            {seen, I1, I2,    I3, I4,      I5} = Seen,
-                            ?LOG_INFO("(filter_packet) seen elms: ~p,~p,~p,~p,~p", [I1, I2, I3, I4, I5]),
-
                             case catch fly_mod_utils:update_seen(From, TUser, Id, GroupId) of
                               {updated,_} ->
                             case catch fly_mod_utils:message_status(LServer, Id, TUser) of
