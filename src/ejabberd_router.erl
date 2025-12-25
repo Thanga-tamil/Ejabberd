@@ -394,7 +394,7 @@ do_route(OrigPacket) ->
 			case Type of
 				message_seen ->
 					ElementAcknowledge = xmpp:get_subtag(Packet, #seen{}),
-					{seen, _, _, _, ReceiptStatus, _} = ElementAcknowledge,
+					{seen, _Id, _Time, _MessageStatus, _GroupId, ReceiptStatus} = ElementAcknowledge,
 					if ReceiptStatus =:= <<"0">> ->
 						?LOG_INFO("read receipt status is in off.. restrict routing"),
 						ok;

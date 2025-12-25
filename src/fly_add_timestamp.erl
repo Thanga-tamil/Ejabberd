@@ -47,7 +47,12 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
                             if Seen =:= false ->
                             NewXMl = XML;
                             true ->
-                            {seen,Id,_,_Time,_,GroupId} = Seen,
+                            
+                              ?LOG_INFO("(filter_packet) seen pkt: ~p", [Seen]),
+                            {seen, Id,  _, _Time,  GroupId, ReceiptStatus} = Seen,
+                            {seen, I1, I2,    I3, I4,      I5} = Seen,
+                            ?LOG_INFO("(filter_packet) seen elms: ~p,~p,~p,~p,~p", [I1, I2, I3, I4, I5]),
+
                             case catch fly_mod_utils:update_seen(From, TUser, Id, GroupId) of
                               {updated,_} ->
                             case catch fly_mod_utils:message_status(LServer, Id, TUser) of
@@ -61,7 +66,7 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
                           _ ->
                           GStatus = <<"0">>
                           end,
-                          XMLNewTag = #xmlel{name = <<"seen">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:receipts">>}, {<<"id">>, Id},{<<"message_status">>, GStatus}, {<<"group_id">>, GroupId}],
+                          XMLNewTag = #xmlel{name = <<"seen">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:receipts">>}, {<<"id">>, Id},{<<"message_status">>, GStatus}, {<<"group_id">>, GroupId}, {<<"seen_receipt">>, ReceiptStatus}],
                             children = []},
                           NewSeenXMl = fxml:replace_subtag( xmpp:encode(XMLNewTag),xmpp:encode(XML)),
                           NewXMl = xmpp:decode(NewSeenXMl)
