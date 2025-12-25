@@ -740,9 +740,16 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
   #jid{lserver = FServer} = From,
   Status = <<"group_profile_updated">>,
 
+  ?INFO_MSG("VCard : ~p", [VCard]), 
+  
   IncomingNickName = fxml:get_path_s(VCard, [{elem, <<"nickName">>}, cdata]),
+  ?INFO_MSG("IncomingNickName : ~p", [IncomingNickName]),
+
   IncomingDescription = fxml:get_path_s(VCard, [{elem, <<"description">>}, cdata]),
+  ?INFO_MSG("IncomingDescription : ~p", [IncomingDescription]),
+  
   IncomingImage = fxml:get_path_s(VCard, [{elem, <<"image">>}, cdata]),
+  ?INFO_MSG("IncomingImage : ~p", [IncomingImage]),
   
   if NewStatus =:= <<"new">> ->
     mod_vcard:set_vcard(LUser, FServer, VCard),
@@ -756,6 +763,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
         GroupInfo = fly_mod_utils:get_existing_group_info(FServer, LUser),
 
         {selected, [<<"nickname">>, <<"description">>, <<"image">>], [[Nickname, Description, Image]]} = GroupInfo,
+        ?INFO_MSG("Existing Group Info - Nickname: ~p, Description: ~p, Image: ~p", [Nickname, Description, Image]),
         
         JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
         case mod_vcard:set_vcard(LUser, FServer, VCard) of
@@ -764,6 +772,8 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
               {selected, _, []} ->
                 update_group_info_to_members(From, To, Status, VCard, JIDs, <<"1">>, SubEl, <<"">>);
               _ ->
+                ?INFO_MSG("devinprogress -> FServer : ~p LUser : ~p", [FServer, LUser]),
+
                 case catch GroupInfo of
                     {selected, _, [[OldNick, OldDesc, OldImage]]} ->
                         % Track changes
@@ -772,8 +782,10 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                         % First handle nickname changes (since it always has a value)
                         NewChanges = case {OldNick, IncomingNickName} of
                             {OldNick, NewNick} when OldNick =:= NewNick ->
+                                ?INFO_MSG("Nickname unchanged for group ~p: ~p", [LUser, NewNick]),
                                 Changes;
                             {OldNick, NewNick} ->
+                                ?INFO_MSG("Nickname updated for group ~p from ~p to ~p", [LUser, OldNick, NewNick]),
                                 [nickname | Changes]
                         end,
 
@@ -782,10 +794,12 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                             {<<>>, <<>>} ->
                                 NewChanges;
                             {<<>>, NewDesc} when NewDesc =/= <<>> ->
+                                ?INFO_MSG("First description added for group ~p: ~p", [LUser, NewDesc]),
                                 [description | NewChanges];
                             {OldDesc, NewDesc} when OldDesc =:= NewDesc ->
                                 NewChanges;
                             {OldDesc, NewDesc} when OldDesc =/= <<>> andalso NewDesc =/= OldDesc ->
+                                ?INFO_MSG("Description updated for group ~p from ~p to ~p", [LUser, OldDesc, NewDesc]),
                                 [description | NewChanges];
                             _ ->
                                 NewChanges
@@ -796,10 +810,12 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                             {<<>>, <<>>} ->
                                 NewChanges2;
                             {<<>>, NewImage} when NewImage =/= <<>> ->
+                                ?INFO_MSG("First image added for group ~p", [LUser]),
                                 [image | NewChanges2];
                             {OldImage, NewImage} when OldImage =:= NewImage ->
                                 NewChanges2;
-                            {OldImage, NewImage} when OldImage =/= <<>> andalso NewImage =/= OldImage ->
+                            {OldImage, NewImage} when OldImage =/= <<>> andalso NewImage =/= OldDesc ->
+                                ?INFO_MSG("Image updated for group ~p", [LUser]),
                                 [image | NewChanges2];
                             _ ->
                                 NewChanges2
@@ -814,7 +830,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                                 case Change of
                                     nickname -> 
                                         update_group_info_to_members(From, To, Status, VCard, JIDs, <<"9">>, SubEl, <<"">>);
-                                    description ->
+                                    description -> % notify id 10
                                         case OldDesc of
                                             <<>> ->
                                                 NewNotifyStr = <<"added the group description \"", IncomingDescription/binary, "\"." >>,
@@ -825,9 +841,9 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                                         end;
                                     image ->
                                         case OldImage of
-                                            <<>> ->
+                                            <<>> -> % First time adding image
                                                 update_group_info_to_members(From, To, Status, VCard, JIDs, <<"12">>, SubEl, <<"">>);
-                                            _ -> 
+                                            _ -> % Updating existing image
                                                 update_group_info_to_members(From, To, Status, VCard, JIDs, <<"13">>, SubEl, <<"">>)
                                         end
                                 end;
@@ -1867,8 +1883,8 @@ Status == <<"remove_admin">> ->
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
         #jid{user = TUser, lserver = TServer} = RouteToJid,
-        EncDescNotifier = fly_mod_security:aes_encrpyt_group_desc_notifier(MessageId, <<"ddc0f15cc2c90fca">>, GroupDescription),
-        fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp), EncDescNotifier),
+        EncryptedDescriptionNotifier = fly_mod_security:aes_encrpyt_group_desc_notifier(MessageId, <<"ddc0f15cc2c90fca">>, GroupDescription),
+        fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp), EncryptedDescriptionNotifier),
         Packet = #xmlel{name = <<"message">>,
           attrs = [{<<"from">>, jid:to_string(GroupFrom)},  {<<"id">>,MessageId}, {<<"type">>, <<"normal">>}, {<<"to">>, jid:to_string(RouteToJid)}],
           children = [
@@ -1879,7 +1895,7 @@ Status == <<"remove_admin">> ->
                 #xmlel{
                     name = <<"info">>,
                     attrs = [
-                        {<<"status">>, case Notification of <<"9">> -> <<"group_name_updated">>; <<"10">> -> <<"group_description_updated">>; <<"12">> -> <<"group_icon_added">>; <<"13">> -> <<"group_icon_updated">>; <<"4">> -> <<"group_profile_updated">>; _ -> Status end},
+                        {<<"status">>, Status},
                         {<<"done_by">>, ActionDoneBy},
                         {<<"gstatus">>, TStatus},
                         {<<"description">>, Description},
@@ -1888,8 +1904,7 @@ Status == <<"remove_admin">> ->
                         {<<"invite_uri">>, InviteUri},
                         {<<"messagemode">>, MessageMode},
                         {<<"accessmode">>, AccessMode},
-                        {<<"customfeatures">>, CustomFeatures},
-                        {<<"description_notifier">>, EncDescNotifier}
+                        {<<"customfeatures">>, CustomFeatures}
                     ],
                     children = [Data]
                 }
