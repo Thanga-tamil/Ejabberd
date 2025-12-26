@@ -1441,7 +1441,7 @@ process_iq_get(From, To, SubEl, IQ) ->
 process_get_participants(From, To, _SubEl, IQ, RequestType) ->
 
   #jid{luser = FUser, lserver = Server} = From,
-  #jid{user = TUser, lserver = TServer} = To,
+  #jid{user = TUser} = To,
 
   case catch fly_mod_utils:get_group_participants(Server, TUser) of
 
@@ -1470,8 +1470,8 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
 
         IsAdminBlockedElement = #xmlel{name = <<"is_admin_blocked">>, attrs = [], children = [{xmlcdata, IsAdminBlocked}]},
 
-        ?LOG_INFO("(get_participants) FUser: ~p TUser: ~p", [FUser, TUser]),
-        VcardElement = #xmlel{name = <<"user_profile">>, attrs = [], children = [mod_vcard:remove_tag(UserVCard, FUser, TUser, TServer)]},
+        ?LOG_INFO("(get_participants) FUser: ~p TUser: ~p", [FUser, UserId]),
+        VcardElement = #xmlel{name = <<"user_profile">>, attrs = [], children = [mod_vcard:remove_tag(UserVCard, FUser, UserId, Server)]},
 
         #xmlel{name = <<"participant">>, attrs = [], children = [JidElement, AffiliationElement, ItemIdElement, CreatedElement, IsAdminBlockedElement, VcardElement]}
 
