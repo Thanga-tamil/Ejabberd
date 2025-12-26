@@ -518,17 +518,28 @@ get_and_del_spool_msg_t(LServer, LUser, LResource) ->
  
 	?LOG_INFO("ExistResult, ~p", [ExistResult]),
         DeviceToUse =
-          case ExistResult of
-              {selected, _, [[CountBin]]} when is_binary(CountBin) -> 
-                  Count = binary_to_integer(CountBin),
-                  if Count > 0 ->
-                       UResource;
-                  true ->
-                      DeviceID
-                  end;
-              _ -> 
-                  DeviceID
-          end,
+	case ExistResult of
+		{selected, [[CountBin]]} when is_binary(CountBin) ->
+		case binary_to_integer(CountBin) > 0 of
+			true -> UResource;
+			false -> DeviceID
+		end;
+
+		{selected, [[CountInt]]} when is_integer(CountInt) ->
+		case CountInt > 0 of
+			true -> UResource;
+			false -> DeviceID
+		end;
+
+		{selected, [{CountInt}]} when is_integer(CountInt) ->
+		case CountInt > 0 of
+			true -> UResource;
+			false -> DeviceID
+		end;
+
+		_ ->
+		DeviceID
+	end,
 
         % Fetch 100 messages for that device
         ?LOG_INFO("DeviceToUse, ~p", [DeviceToUse]),
