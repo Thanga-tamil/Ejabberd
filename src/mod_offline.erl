@@ -723,6 +723,7 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
 			   OffMsgs
 		   end;
 	       _ ->
+		   ?LOG_INFO("No OffMsgs found for user ~ts@~ts/~ts", [LUser, LServer, LResource]),
 		   []
 	   end,
 

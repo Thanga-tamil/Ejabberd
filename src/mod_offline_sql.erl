@@ -210,6 +210,7 @@ end.
 pop_messages(LUser, LServer,LResource) ->
 case get_and_del_spool_msg_t(LServer, LUser,LResource) of
 	{atomic, {selected, Rs}} ->
+	      ?LOG_INFO("Popped ~p offline messages for user ~ts@~ts/~ts", [length(Rs), LUser, LServer, LResource]),
 	    {ok, lists:flatmap(
 		   fun({_, XML}) ->
 			   case xml_to_offline_msg(XML) of
