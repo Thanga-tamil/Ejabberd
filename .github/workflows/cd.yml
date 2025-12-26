@@ -1,6 +1,6 @@
 on:
   push:
-    branches: ["hotfix/carbon_msg_loss"]
+    branches: ["production"]
 
 env:
   IMAGE_TAG: ${{ github.sha }}
