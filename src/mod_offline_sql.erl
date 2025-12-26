@@ -54,12 +54,13 @@ sql_schemas() ->
                 columns =
                     [#sql_column{name = <<"username">>, type = text},
                      #sql_column{name = <<"server_host">>, type = text},
+		     #sql_column{name = <<"device_id">>, type = text},
                      #sql_column{name = <<"xml">>, type = {text, big}},
                      #sql_column{name = <<"seq">>, type = bigserial},
                      #sql_column{name = <<"created_at">>, type = timestamp,
                                  default = true}],
                 indices = [#sql_index{
-                              columns = [<<"server_host">>, <<"username">>]},
+                              columns = [<<"server_host">>, <<"username">>, <<"device_id">>]},
                            #sql_index{
                               columns = [<<"created_at">>]}]}]}].
 
@@ -502,22 +503,20 @@ el_to_offline_msg(El) ->
 %                 Result
 %         end
 %     end,
-
 %     ejabberd_sql:sql_transaction(LServer, F).
 
 get_and_del_spool_msg_t(LServer, LUser, LResource) ->
     CleanResource = re:replace(binary_to_list(LResource), "Mobile-", "", [{return, list}]),
     UResource = iolist_to_binary(CleanResource),
-     DeviceID = <<"MF-01-mobile">>,
+    DeviceID = <<"MF-01-mobile">>,
 
+    ?LOG_INFO("Getting offline messages for user ~ts@~ts/~ts", [LUser, LServer, LResource]),
+    ?LOG_INFO("CleanResource ~p, UResource ~p", [CleanResource, UResource]),
     F = fun() ->
-        % Check if any message exists for UResource
-        ExistQ = io_lib:format(
-          "select count(username) from spool where username='~s' and device_id='~s' and server_host='~s' limit 1;",
-          [LUser, UResource, LServer]
-        ),
-        ExistResult = ejabberd_sql:sql_query_t(lists:flatten(ExistQ)),
+	ExistQ = ?SQL("select @(count(username))s from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H ;"),
+	ExistResult = ejabberd_sql:sql_query_t(ExistQ),
  
+	?LOG_INFO("ExistResult, ~p", [ExistResult]),
         DeviceToUse =
           case ExistResult of
               {selected, _, [[CountBin]]} when is_binary(CountBin) -> 
@@ -532,7 +531,7 @@ get_and_del_spool_msg_t(LServer, LUser, LResource) ->
           end,
 
         % Fetch 100 messages for that device
-
+        ?LOG_INFO("DeviceToUse, ~p", [DeviceToUse]),
         FetchQ = ?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H order by seq limit 100;"),
         DeleteQ = ?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H limit 100;"),
 
