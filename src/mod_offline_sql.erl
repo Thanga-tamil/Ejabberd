@@ -211,7 +211,7 @@ end.
 pop_messages(LUser, LServer,LResource) ->
 case get_and_del_spool_msg_t(LServer, LUser,LResource) of
 	{atomic, {selected, Rs}} ->
-	      ?LOG_INFO("Popped ~p offline messages for user ~ts@~ts/~ts", [length(Rs), LUser, LServer, LResource]),
+	    ?LOG_INFO("Popped ~p offline messages for user ~ts@~ts/~ts", [length(Rs), LUser, LServer, LResource]),
 	    {ok, lists:flatmap(
 		   fun({_, XML}) ->
 			   case xml_to_offline_msg(XML) of
@@ -434,89 +434,15 @@ el_to_offline_msg(El) ->
 	    {error, bad_jid_from}
     end.
 
-
-%     get_and_del_spool_msg_t(LServer, LUser,LResource) ->
-% 	Resource = re:replace(binary_to_list(LResource),"Mobile-", ""),
-% 	UResource = iolist_to_binary(Resource),
-% 	DeviceID = <<"MF-01-mobile">>,
-%     F = fun () ->
-% 		ResultSet =
-% 		    ejabberd_sql:sql_query_t(
-%                       ?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H order by seq limit 100;")),
-% 		case catch ResultSet of
-% 			{selected, []} ->
-% 			Result =
-% 				ejabberd_sql:sql_query_t(
-% 				?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H order by seq limit 100;")),
-% 			DResult =
-% 				ejabberd_sql:sql_query_t(
-% 				?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H limit 100;"));
-% 			{selected, _ } ->
-% 			Result = ResultSet,
-% 			DResult =
-% 				ejabberd_sql:sql_query_t(
-% 				?SQL("delete from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H limit 100;"))
-% 		end,
-
-% 		case {Result, DResult} of
-% 		    {{selected, Rs}, {updated, DC}} when length(Rs) /= DC ->
-% 			ejabberd_sql:restart(concurent_insert);
-% 		    _ ->
-% 			Result
-% 		end
-% 	end,
-%     ejabberd_sql:sql_transaction(LServer, F).
-
-
-% mysql version incompatability code 
-% get_and_del_spool_msg_t(LServer, LUser, LResource) ->
-% 	Resource = re:replace(binary_to_list(LResource), "Mobile-", ""),
-% 	UResource = iolist_to_binary(Resource),
-% 	DeviceID = <<"MF-01-mobile">>,
-	
-% 	F = fun () ->
-% 		% Try resource-specific messages first (LOCKED)
-% 		ResultSet = ejabberd_sql:sql_query_t(?SQL("select @(username)s, @(xml)s, @(seq)s from spool where username=%(LUser)s "
-%                  "and device_id=%(UResource)s and %(LServer)H order by seq limit 100 for update skip locked;"
-%               )),
-
-%         case ResultSet of
-%             {selected, []} ->
-%                 % Fallback to default device (LOCKED)
-%                 Result = ejabberd_sql:sql_query_t(?SQL("select @(username)s, @(xml)s, @(seq)s from spool where username=%(LUser)s and device_id=%(DeviceID)s "
-% 				"and %(LServer)H order by seq limit 100 for update skip locked;")),
-
-%                 % Delete exactly the locked rows
-%                 DResult =
-%                     ejabberd_sql:sql_query_t(?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H and seq in ("
-% 		    		"  select seq from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H order by seq limit 100 for update skip locked );" )),
-%                 Result;
-
-%             {selected, _} ->
-%                 Result = ResultSet,
-
-%                 % Delete exactly the rows we locked
-%                 DResult =
-%                     ejabberd_sql:sql_query_t(?SQL("delete from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H and seq in ("
-% 		    			"  select seq from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H order by seq "
-% 					"  limit 100 for update skip locked );")),
-%                 Result
-%         end
-%     end,
-%     ejabberd_sql:sql_transaction(LServer, F).
-
 get_and_del_spool_msg_t(LServer, LUser, LResource) ->
     CleanResource = re:replace(binary_to_list(LResource), "Mobile-", "", [{return, list}]),
     UResource = iolist_to_binary(CleanResource),
     DeviceID = <<"MF-01-mobile">>,
 
-    ?LOG_INFO("Getting offline messages for user ~ts@~ts/~ts", [LUser, LServer, LResource]),
-    ?LOG_INFO("clean_resource ~p, UResource ~p", [CleanResource, UResource]),
     F = fun() ->
 	ExistQ = ?SQL("select @(count(username))s from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H ;"),
 	ExistResult = ejabberd_sql:sql_query_t(ExistQ),
  
-	?LOG_INFO("ExistResult, ~p", [ExistResult]),
         DeviceToUse =
 	case ExistResult of
 		{selected, [[CountBin]]} when is_binary(CountBin) ->
@@ -541,8 +467,6 @@ get_and_del_spool_msg_t(LServer, LUser, LResource) ->
 		DeviceID
 	end,
 
-        % Fetch 100 messages for that device
-        ?LOG_INFO("DeviceToUse, ~p", [DeviceToUse]),
         FetchQ = ?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H order by seq limit 100;"),
         DeleteQ = ?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H order by seq limit 100;"),
 
@@ -557,5 +481,4 @@ get_and_del_spool_msg_t(LServer, LUser, LResource) ->
         end
     end,
 
-    TransResult = ejabberd_sql:sql_transaction(LServer, F),
-    TransResult.
+    ejabberd_sql:sql_transaction(LServer, F).

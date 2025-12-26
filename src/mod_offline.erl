@@ -705,10 +705,8 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
     if Substring =:= 1 andalso IsValid =:= true ->
       Msgs = case Mod:pop_messages(LUser, LServer,LResource) of
 	       {ok, OffMsgs} ->
-		?LOG_INFO("OffMsgs count ~p for user ~ts@~ts/~ts", [length(OffMsgs), LUser, LServer, LResource]),
 		   case use_mam_for_user(LUser, LServer) of
 		       true ->
-			   ?LOG_INFO("use_mam_for_user true"),
 			   flush_cache(Mod, LUser, LServer),
 			   lists:map(
 			       fun({_, #message{from = From, to = To} = Msg}) ->
@@ -718,16 +716,13 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
 					end,
 			        read_mam_messages(LUser, LServer, OffMsgs));
 		       _ ->
-			   ?LOG_INFO("use_mam_for_user false"),
 			   flush_cache(Mod, LUser, LServer),
 			   OffMsgs
 		   end;
 	       _ ->
-		   ?LOG_INFO("No OffMsgs found for user ~ts@~ts/~ts", [LUser, LServer, LResource]),
 		   []
 	   end,
 
-    ?LOG_INFO("Routing ~p offline messages for user ~ts@~ts/~ts", [length(Msgs), LUser, LServer, LResource]),
     lists:foreach(
 	fun(OffMsg) ->
 	    route_offline_message(State, OffMsg)
@@ -803,27 +798,18 @@ route_offline_message(#{jid := #jid{luser = LUser, lserver = LServer, lresource 
 		      #offline_msg{expire = Expire} = OffMsg) ->
     case offline_msg_to_route(LServer, OffMsg) of
 	error ->
-	     Id = case OffMsg#offline_msg.packet of
-			#xmlel{} ->
-		        	fxml:get_tag_attr_s(<<"id">>, OffMsg#offline_msg.packet);
-			_ ->
-				<<"unknown">>
-		   end,
-        	?LOG_INFO("Failed to route offline message id ~p for ~ts@~ts/~ts", [Id, LUser, LServer, LResource]),
 	    ok;
 	{route, Msg} ->
 		Id = xmpp:get_id(Msg),
 	    case is_message_expired(Expire, Msg) of
 		true ->
-		    ?LOG_INFO("Offline message id ~p for ~ts@~ts/~ts has expired", [Id, LUser, LServer, LResource]),
 		    ok;
 		false ->
 		    case privacy_check_packet(State, Msg, in) of
 			allow ->
-                		?INFO_MSG("Routing offline message id ~p for ~ts@~ts/~ts", [Id, LUser, LServer, LResource]),
 				NewMsg = xmpp:set_to(Msg, #jid{luser = LUser, lserver = LServer, lresource = LResource}),
 				ejabberd_router:route(NewMsg);
-			deny -> ?LOG_INFO("privacy_check.. offline message routing deny"),
+			deny ->
 				ok
 		    end
 	    end
