@@ -440,7 +440,7 @@ push_vcard_updates(#iq{from = #jid{luser = LUser, lserver = LServer}} = IQ) ->
     children = [VCARD]
   },
 
-  lists:foreach(fun(R) ->
+  lists:foreach(fun(R) -> 
     ejabberd_router:route(jid:make(LUser, LServer, <<>>), jid:make(LUser, LServer, R), Packet0)
                 end,
     ejabberd_sm:get_user_resources(LUser, LServer)),
@@ -457,6 +457,16 @@ push_vcard_updates(#iq{from = #jid{luser = LUser, lserver = LServer}} = IQ) ->
 
   % push_to_email_contacts(jid:make(LUser, LServer, <<>>), Packet).
   push_to_rosters_and_recent(jid:make(LUser, LServer, <<>>), Packet1).
+
+remove_image_tags(VCARD, FServer, UserName) ->   
+  Hide =
+   case fly_mod_utils:get_hide_profile_privacy(FServer, UserName) of
+                {selected, [<<"hide_profile">>], [[<<"0">>]]} ->
+                  true;
+                _ ->
+                  false
+          end,
+  case Hide of true  -> strip_images(VCARD); false -> VCARD end.
 
 %% Hook lisenter to to update the user rosters on timeout
 %%
@@ -551,7 +561,7 @@ process_get_recent_profile(From, RequestType, SubEl, IQ) ->
                             {error, _} ->
                               []; 
                             VCARD -> 
-                              remove_image_tags(VCARD, FServer, UserName)
+                              remove_image_tags_aslist(VCARD, FServer, UserName)
                             end,
                             #xmlel{name = <<"vcarddetails">>, attrs = [{<<"username">>,  UserName }], children = VCardEls}
                         end, UserProfiles),
@@ -559,7 +569,7 @@ process_get_recent_profile(From, RequestType, SubEl, IQ) ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType ,sub_els = [#xmlel{name = <<"vcard">>, children = SubEls1}]})
   end.
 
-remove_image_tags(VCARD, FServer, UserName) ->   
+remove_image_tags_aslist(VCARD, FServer, UserName) ->   
   Hide =
    case fly_mod_utils:get_hide_profile_privacy(FServer, UserName) of
                 {selected, [<<"hide_profile">>], [[<<"0">>]]} ->
