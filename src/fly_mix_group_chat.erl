@@ -1456,10 +1456,10 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
       SubEls1 = lists:map(fun(G) ->
 
         [ItemId, UserId, Affiliation, CreatedAt, IsAdminBlocked, SVCARD] = G,
-        case fxml_stream:parse_element(SVCARD) of
-          {error, _Reason} -> UserVCard = [];
-          UserVCard -> {ok, [UserVCard]}
-        end,
+        UserVCard = case fxml_stream:parse_element(SVCARD) of
+                       {error, _Reason} -> [];
+                       VCARD -> [VCARD]
+                     end,
         JidElement = #xmlel{name = <<"jid">>, attrs = [], children = [{xmlcdata, <<UserId / binary, <<"@">> / binary, Server / binary>>}]},
         
         AffiliationElement = #xmlel{name = <<"affiliation">>, attrs = [], children = [{xmlcdata, Affiliation}]},
@@ -1471,7 +1471,7 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
         IsAdminBlockedElement = #xmlel{name = <<"is_admin_blocked">>, attrs = [], children = [{xmlcdata, IsAdminBlocked}]},
 
         ?LOG_INFO("(get_participants) FUser: ~p TUser: ~p", [FUser, UserId]),
-        VcardElement = #xmlel{name = <<"user_profile">>, attrs = [], children = [mod_vcard:remove_tag(UserVCard, FUser, UserId, Server)]},
+        VcardElement = #xmlel{name = <<"user_profile">>, attrs = [], children = mod_vcard:remove_tag(UserVCard, FUser, UserId, Server)},
 
         #xmlel{name = <<"participant">>, attrs = [], children = [JidElement, AffiliationElement, ItemIdElement, CreatedElement, IsAdminBlockedElement, VcardElement]}
 

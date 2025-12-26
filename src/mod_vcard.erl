@@ -254,7 +254,7 @@ remove_tag(Els, FUser, LUser, LServer) ->
                 {selected, [<<"hide_profile">>], [[_]]} -> false;
                 _ -> false
             end,
-            
+
     ?LOG_INFO("Hide status: ~p", [Hide]),
     ?LOG_INFO("FUser: ~p", [FUser]),
     ?LOG_INFO("LUser: ~p", [LUser]),
@@ -268,8 +268,10 @@ remove_tag(Els, FUser, LUser, LServer) ->
             Els
     end.
 
-remove_subtags(Els, Name) ->
-    [remove_subtag_from_el(El, Name) || El <- Els].
+remove_subtags(Els, Name) when is_list(Els) ->
+    [remove_subtag_from_el(El, Name) || El <- Els];
+remove_subtags(El, Name) ->
+    [remove_subtag_from_el(El, Name)].
 
 remove_subtag_from_el(#xmlel{name = <<"vCard">>, attrs = Attrs, children = Children}, Name) ->
     #xmlel{name = <<"vCard">>, attrs = Attrs,
