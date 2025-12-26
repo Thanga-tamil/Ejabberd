@@ -434,10 +434,12 @@ push_vcard_updates(#iq{from = #jid{luser = LUser, lserver = LServer}} = IQ) ->
       fly_mod_utils:create_user_ifuserexit(LServer, LUser, Nickname, Image, Mobile, Status, Email)
   end,
 
+  FinalVcard = remove_image_tags(VCARD, LServer, LUser),
+
   Packet = #xmlel{
     name = <<"iq">>,
     attrs = [{<<"type">>, <<"result">>},{<<"id">>,<<(get_string()) / binary>>}],
-    children = [VCARD]
+    children = [FinalVcard]
   },
 
   lists:foreach(fun(R) ->
@@ -541,28 +543,24 @@ process_get_recent_profile(From, RequestType, SubEl, IQ) ->
                             {error, _} ->
                               []; 
                             VCARD -> 
-                              Hide = case fly_mod_utils:get_hide_profile_privacy(FServer, UserName) of
-                                {selected, [<<"hide_profile">>], [[<<"0">>]]} ->
-                                  true;
-                                _ ->
-                                  false
-                                  end,
-                                  
-                              FinalVCard = case Hide of
-                                              true  ->
-                                                strip_images(VCARD);
-                                              false ->
-                                                VCARD
-                                            end,
-
-                              [FinalVCard]
+                              remove_image_tags(VCARD, FServer, UserName)
                             end,
-
                             #xmlel{name = <<"vcarddetails">>, attrs = [{<<"username">>,  UserName }], children = VCardEls}
                         end, UserProfiles),
 
       fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType ,sub_els = [#xmlel{name = <<"vcard">>, children = SubEls1}]})
   end.
+
+remove_image_tags(VCARD, FServer, UserName) ->   
+  Hide =
+   case fly_mod_utils:get_hide_profile_privacy(FServer, UserName) of
+                {selected, [<<"hide_profile">>], [[<<"0">>]]} ->
+                  true;
+                _ ->
+                  false
+          end,
+      FinalVCard = case Hide of true  -> strip_images(VCARD); false -> VCARD end, 
+    [FinalVCard].
 
 strip_images(#xmlel{name = Name, attrs = Attrs, children = Children}) ->
     #xmlel{
