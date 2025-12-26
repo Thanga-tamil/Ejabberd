@@ -467,37 +467,118 @@ el_to_offline_msg(El) ->
 %     ejabberd_sql:sql_transaction(LServer, F).
 
 
-get_and_del_spool_msg_t(LServer, LUser, LResource) ->
-	Resource = re:replace(binary_to_list(LResource), "Mobile-", ""),
-	UResource = iolist_to_binary(Resource),
-	DeviceID = <<"MF-01-mobile">>,
+% mysql version incompatability code 
+% get_and_del_spool_msg_t(LServer, LUser, LResource) ->
+% 	Resource = re:replace(binary_to_list(LResource), "Mobile-", ""),
+% 	UResource = iolist_to_binary(Resource),
+% 	DeviceID = <<"MF-01-mobile">>,
 	
-	F = fun () ->
-		% Try resource-specific messages first (LOCKED)
-		ResultSet = ejabberd_sql:sql_query_t(?SQL("select @(username)s, @(xml)s, @(seq)s from spool where username=%(LUser)s "
-                 "and device_id=%(UResource)s and %(LServer)H order by seq limit 100 for update skip locked;"
-              )),
+% 	F = fun () ->
+% 		% Try resource-specific messages first (LOCKED)
+% 		ResultSet = ejabberd_sql:sql_query_t(?SQL("select @(username)s, @(xml)s, @(seq)s from spool where username=%(LUser)s "
+%                  "and device_id=%(UResource)s and %(LServer)H order by seq limit 100 for update skip locked;"
+%               )),
+
+%         case ResultSet of
+%             {selected, []} ->
+%                 % Fallback to default device (LOCKED)
+%                 Result = ejabberd_sql:sql_query_t(?SQL("select @(username)s, @(xml)s, @(seq)s from spool where username=%(LUser)s and device_id=%(DeviceID)s "
+% 				"and %(LServer)H order by seq limit 100 for update skip locked;")),
+
+%                 % Delete exactly the locked rows
+%                 DResult =
+%                     ejabberd_sql:sql_query_t(?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H and seq in ("
+% 		    		"  select seq from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H order by seq limit 100 for update skip locked );" )),
+%                 Result;
+
+%             {selected, _} ->
+%                 Result = ResultSet,
+
+%                 % Delete exactly the rows we locked
+%                 DResult =
+%                     ejabberd_sql:sql_query_t(?SQL("delete from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H and seq in ("
+% 		    			"  select seq from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H order by seq "
+% 					"  limit 100 for update skip locked );")),
+%                 Result
+%         end
+%     end,
+
+%     ejabberd_sql:sql_transaction(LServer, F).
+
+get_and_del_spool_msg_t(LServer, LUser, LResource) ->
+    Resource = re:replace(binary_to_list(LResource), "Mobile-", ""),
+    UResource = iolist_to_binary(Resource),
+    DeviceID = <<"MF-01-mobile">>,
+
+    F = fun () ->
+        % Try resource-specific messages first (LOCKED)
+        ResultSet = ejabberd_sql:sql_query_t(?SQL(
+            "select @(username)s, @(xml)s, @(seq)s from spool "
+            "where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H "
+            "order by seq limit 100 for update skip locked;"
+        )),
 
         case ResultSet of
             {selected, []} ->
                 % Fallback to default device (LOCKED)
-                Result = ejabberd_sql:sql_query_t(?SQL("select @(username)s, @(xml)s, @(seq)s from spool where username=%(LUser)s and device_id=%(DeviceID)s "
-				"and %(LServer)H order by seq limit 100 for update skip locked;")),
+                Result = ejabberd_sql:sql_query_t(?SQL(
+                    "select @(username)s, @(xml)s, @(seq)s from spool "
+                    "where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H "
+                    "order by seq limit 100 for update skip locked;"
+                )),
 
-                % Delete exactly the locked rows
-                DResult =
-                    ejabberd_sql:sql_query_t(?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H and seq in ("
-		    		"  select seq from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H order by seq limit 100 for update skip locked );" )),
+                % Delete the same rows — adapter-specific SQL to avoid IN(... LIMIT ...)
+                _D = ejabberd_sql:sql_query(LServer, fun(Driver, _) ->
+                    case Driver of
+                        pgsql ->
+                            ejabberd_sql:sql_query_t(?SQL(
+                                "DELETE FROM spool s USING ("
+                                "  SELECT seq FROM spool WHERE username=%(LUser)s AND device_id=%(DeviceID)s AND %(LServer)H "
+                                "  ORDER BY seq LIMIT 100 FOR UPDATE SKIP LOCKED"
+                                ") t WHERE s.seq = t.seq;"
+                            ));
+                        mysql ->
+                            ejabberd_sql:sql_query_t(?SQL(
+                                "DELETE s FROM spool s "
+                                "JOIN (SELECT seq FROM spool WHERE username=%(LUser)s AND device_id=%(DeviceID)s AND %(LServer)H "
+                                "ORDER BY seq LIMIT 100) t ON s.seq = t.seq;"
+                            ));
+                        _ ->
+                            % Generic fallback (no subquery-with-limit)
+                            ejabberd_sql:sql_query_t(?SQL(
+                                "DELETE FROM spool WHERE username=%(LUser)s AND device_id=%(DeviceID)s AND %(LServer)H "
+                                "ORDER BY seq LIMIT 100;"
+                            ))
+                    end
+                end),
                 Result;
 
-            {selected, _} ->
+            {selected, _Rows} ->
                 Result = ResultSet,
 
-                % Delete exactly the rows we locked
-                DResult =
-                    ejabberd_sql:sql_query_t(?SQL("delete from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H and seq in ("
-		    			"  select seq from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H order by seq "
-					"  limit 100 for update skip locked );")),
+                % Delete exactly the rows we locked — adapter-specific
+                _D = ejabberd_sql:sql_query(LServer, fun(Driver, _) ->
+                    case Driver of
+                        pgsql ->
+                            ejabberd_sql:sql_query_t(?SQL(
+                                "DELETE FROM spool s USING ("
+                                "  SELECT seq FROM spool WHERE username=%(LUser)s AND device_id=%(UResource)s AND %(LServer)H "
+                                "  ORDER BY seq LIMIT 100 FOR UPDATE SKIP LOCKED"
+                                ") t WHERE s.seq = t.seq;"
+                            ));
+                        mysql ->
+                            ejabberd_sql:sql_query_t(?SQL(
+                                "DELETE s FROM spool s "
+                                "JOIN (SELECT seq FROM spool WHERE username=%(LUser)s AND device_id=%(UResource)s AND %(LServer)H "
+                                "ORDER BY seq LIMIT 100) t ON s.seq = t.seq;"
+                            ));
+                        _ ->
+                            ejabberd_sql:sql_query_t(?SQL(
+                                "DELETE FROM spool WHERE username=%(LUser)s AND device_id=%(UResource)s AND %(LServer)H "
+                                "ORDER BY seq LIMIT 100;"
+                            ))
+                    end
+                end),
                 Result
         end
     end,
