@@ -41,7 +41,7 @@
 	 disco_items/5, disco_features/5, disco_identity/5,
 	 vcard_iq_set/1, mod_opt_type/1, set_vcard/3, make_vcard_search/4]).
 -export([init/1, handle_call/3, handle_cast/2,
-	 handle_info/2, terminate/2, code_change/3]).
+	 handle_info/2, terminate/2, code_change/3, remove_tag/4]).
 -export([route/1]).
 
 -include("logger.hrl").
@@ -242,28 +242,30 @@ process_sm_iq(#iq{type = get, from = From, to = To, lang = Lang} = IQ) ->
         [] ->
             xmpp:make_iq_result(IQ, #vcard_temp{});
         Els ->
-            HideImg = fly_mod_utils:get_hide_profile_privacy(LServer, LUser),
-            ?LOG_INFO("hide profile status: ~p", [HideImg]),
+            IQ#iq{type = result, to = From, from = To, sub_els = remove_tag(Els, FUser, LUser, LServer)}
+    end.
 
-            Hide = case HideImg of
-                        {selected, [<<"hide_profile">>], [[<<"0">>]]} -> true;
-                        {selected, [<<"hide_profile">>], [[_]]} -> false;
-                        _ -> false
-                   end,
-            ?LOG_INFO("Hide status: ~p", [Hide]),
-            ?LOG_INFO("FUser: ~p", [FUser]),
-            ?LOG_INFO("LUser: ~p", [LUser]),
-            ?LOG_INFO("FUser =/= LUser: ~p", [FUser =/= LUser]),
+remove_tag(Els, FUser, LUser, LServer) -> 
+    HideImg = fly_mod_utils:get_hide_profile_privacy(LServer, LUser),
+    ?LOG_INFO("hide profile status: ~p", [HideImg]),
 
-            FinalVcard = case Hide andalso FUser =/= LUser of
-                             true ->
-                                 R1 = remove_subtags(Els, <<"thumbImage">>),
-                                 remove_subtags(R1, <<"image">>);
-                             false ->
-                                 Els
-                         end,
+    Hide = case HideImg of
+                {selected, [<<"hide_profile">>], [[<<"0">>]]} -> true;
+                {selected, [<<"hide_profile">>], [[_]]} -> false;
+                _ -> false
+            end,
+            
+    ?LOG_INFO("Hide status: ~p", [Hide]),
+    ?LOG_INFO("FUser: ~p", [FUser]),
+    ?LOG_INFO("LUser: ~p", [LUser]),
+    ?LOG_INFO("FUser =/= LUser: ~p", [FUser =/= LUser]),
 
-            IQ#iq{type = result, to = From, from = To, sub_els = FinalVcard}
+    case Hide andalso FUser =/= LUser of
+        true ->
+            R1 = remove_subtags(Els, <<"thumbImage">>),
+            remove_subtags(R1, <<"image">>);
+        false ->
+            Els
     end.
 
 remove_subtags(Els, Name) ->
