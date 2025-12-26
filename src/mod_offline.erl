@@ -705,8 +705,10 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
     if Substring =:= 1 andalso IsValid =:= true ->
       Msgs = case Mod:pop_messages(LUser, LServer,LResource) of
 	       {ok, OffMsgs} ->
+		?LOG_INFO("OffMsgs count ~p for user ~ts@~ts/~ts", [length(OffMsgs), LUser, LServer, LResource]),
 		   case use_mam_for_user(LUser, LServer) of
 		       true ->
+			   ?LOG_INFO("use_mam_for_user true"),
 			   flush_cache(Mod, LUser, LServer),
 			   lists:map(
 			       fun({_, #message{from = From, to = To} = Msg}) ->
@@ -716,6 +718,7 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
 					end,
 			        read_mam_messages(LUser, LServer, OffMsgs));
 		       _ ->
+			   ?LOG_INFO("use_mam_for_user false"),
 			   flush_cache(Mod, LUser, LServer),
 			   OffMsgs
 		   end;
@@ -723,6 +726,7 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
 		   []
 	   end,
 
+    ?LOG_INFO("Routing ~p offline messages for user ~ts@~ts/~ts", [length(Msgs), LUser, LServer, LResource]),
     lists:foreach(
 	fun(OffMsg) ->
 	    route_offline_message(State, OffMsg)
