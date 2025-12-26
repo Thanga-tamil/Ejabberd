@@ -54,12 +54,13 @@ sql_schemas() ->
                 columns =
                     [#sql_column{name = <<"username">>, type = text},
                      #sql_column{name = <<"server_host">>, type = text},
+		     #sql_column{name = <<"device_id">>, type = text},
                      #sql_column{name = <<"xml">>, type = {text, big}},
                      #sql_column{name = <<"seq">>, type = bigserial},
                      #sql_column{name = <<"created_at">>, type = timestamp,
                                  default = true}],
                 indices = [#sql_index{
-                              columns = [<<"server_host">>, <<"username">>]},
+                              columns = [<<"server_host">>, <<"username">>, <<"device_id">>]},
                            #sql_index{
                               columns = [<<"created_at">>]}]}]}].
 
@@ -210,6 +211,7 @@ end.
 pop_messages(LUser, LServer,LResource) ->
 case get_and_del_spool_msg_t(LServer, LUser,LResource) of
 	{atomic, {selected, Rs}} ->
+	    ?LOG_INFO("Popped ~p offline messages for user ~ts@~ts/~ts", [length(Rs), LUser, LServer, LResource]),
 	    {ok, lists:flatmap(
 		   fun({_, XML}) ->
 			   case xml_to_offline_msg(XML) of
@@ -432,35 +434,51 @@ el_to_offline_msg(El) ->
 	    {error, bad_jid_from}
     end.
 
+get_and_del_spool_msg_t(LServer, LUser, LResource) ->
+    CleanResource = re:replace(binary_to_list(LResource), "Mobile-", "", [{return, list}]),
+    UResource = iolist_to_binary(CleanResource),
+    DeviceID = <<"MF-01-mobile">>,
 
-    get_and_del_spool_msg_t(LServer, LUser,LResource) ->
-	Resource = re:replace(binary_to_list(LResource),"Mobile-", ""),
-	UResource = iolist_to_binary(Resource),
-	DeviceID = <<"MF-01-mobile">>,
-    F = fun () ->
-		ResultSet =
-		    ejabberd_sql:sql_query_t(
-                      ?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H order by seq limit 100;")),
-		case catch ResultSet of
-			{selected, []} ->
-			Result =
-				ejabberd_sql:sql_query_t(
-				?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H order by seq limit 100;")),
-			DResult =
-				ejabberd_sql:sql_query_t(
-				?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H limit 100;"));
-			{selected, _ } ->
-			Result = ResultSet,
-			DResult =
-				ejabberd_sql:sql_query_t(
-				?SQL("delete from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H limit 100;"))
-		end,
+    F = fun() ->
+	ExistQ = ?SQL("select @(count(username))s from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H ;"),
+	ExistResult = ejabberd_sql:sql_query_t(ExistQ),
+ 
+        DeviceToUse =
+	case ExistResult of
+		{selected, [[CountBin]]} when is_binary(CountBin) ->
+		case binary_to_integer(CountBin) > 0 of
+			true -> UResource;
+			false -> DeviceID
+		end;
 
-		case {Result, DResult} of
-		    {{selected, Rs}, {updated, DC}} when length(Rs) /= DC ->
-			ejabberd_sql:restart(concurent_insert);
-		    _ ->
-			Result
-		end
+		{selected, [[CountInt]]} when is_integer(CountInt) ->
+		case CountInt > 0 of
+			true -> UResource;
+			false -> DeviceID
+		end;
+
+		{selected, [{CountInt}]} when is_integer(CountInt) ->
+		case CountInt > 0 of
+			true -> UResource;
+			false -> DeviceID
+		end;
+
+		_ ->
+		DeviceID
 	end,
+
+        FetchQ = ?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H order by seq limit 100;"),
+        DeleteQ = ?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H order by seq limit 100;"),
+
+        Result = ejabberd_sql:sql_query_t(FetchQ),
+        DResult = ejabberd_sql:sql_query_t(DeleteQ),
+
+        case {Result, DResult} of
+            {{selected, Rs}, {updated, DC}} when length(Rs) =/= DC ->
+                ejabberd_sql:restart(concurent_insert);
+            _ ->
+                Result
+        end
+    end,
+
     ejabberd_sql:sql_transaction(LServer, F).
