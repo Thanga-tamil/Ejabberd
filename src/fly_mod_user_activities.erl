@@ -434,21 +434,29 @@ push_vcard_updates(#iq{from = #jid{luser = LUser, lserver = LServer}} = IQ) ->
       fly_mod_utils:create_user_ifuserexit(LServer, LUser, Nickname, Image, Mobile, Status, Email)
   end,
 
-  FinalVcard = remove_image_tags(VCARD, LServer, LUser),
+  Packet0 = #xmlel{
+    name = <<"iq">>,
+    attrs = [{<<"type">>, <<"result">>},{<<"id">>,<<(get_string()) / binary>>}],
+    children = [VCARD]
+  },
 
-  Packet = #xmlel{
+  lists:foreach(fun(R) ->
+    ejabberd_router:route(jid:make(LUser, LServer, <<>>), jid:make(LUser, LServer, R), Packet0)
+                end,
+    ejabberd_sm:get_user_resources(LUser, LServer)),
+
+  ?LOG_INFO("server ~p user ~p", [LServer, LUser]),
+  FinalVcard = remove_image_tags(VCARD, LServer, LUser),
+  ?LOG_INFO("FinalVcard ~p", [FinalVcard]),
+
+  Packet1 = #xmlel{
     name = <<"iq">>,
     attrs = [{<<"type">>, <<"result">>},{<<"id">>,<<(get_string()) / binary>>}],
     children = [FinalVcard]
   },
 
-  lists:foreach(fun(R) ->
-    ejabberd_router:route(jid:make(LUser, LServer, <<>>), jid:make(LUser, LServer, R), Packet)
-                end,
-    ejabberd_sm:get_user_resources(LUser, LServer)),
-
   % push_to_email_contacts(jid:make(LUser, LServer, <<>>), Packet).
-  push_to_rosters_and_recent(jid:make(LUser, LServer, <<>>), Packet).
+  push_to_rosters_and_recent(jid:make(LUser, LServer, <<>>), Packet1).
 
 %% Hook lisenter to to update the user rosters on timeout
 %%
