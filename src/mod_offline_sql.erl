@@ -511,7 +511,7 @@ get_and_del_spool_msg_t(LServer, LUser, LResource) ->
     DeviceID = <<"MF-01-mobile">>,
 
     ?LOG_INFO("Getting offline messages for user ~ts@~ts/~ts", [LUser, LServer, LResource]),
-    ?LOG_INFO("CleanResource ~p, UResource ~p", [CleanResource, UResource]),
+    ?LOG_INFO("clean_resource ~p, UResource ~p", [CleanResource, UResource]),
     F = fun() ->
 	ExistQ = ?SQL("select @(count(username))s from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H ;"),
 	ExistResult = ejabberd_sql:sql_query_t(ExistQ),
@@ -544,7 +544,7 @@ get_and_del_spool_msg_t(LServer, LUser, LResource) ->
         % Fetch 100 messages for that device
         ?LOG_INFO("DeviceToUse, ~p", [DeviceToUse]),
         FetchQ = ?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H order by seq limit 100;"),
-        DeleteQ = ?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H limit 100;"),
+        DeleteQ = ?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H order by seq limit 100;"),
 
         Result = ejabberd_sql:sql_query_t(FetchQ),
         DResult = ejabberd_sql:sql_query_t(DeleteQ),
