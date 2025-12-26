@@ -506,81 +506,46 @@ el_to_offline_msg(El) ->
 %     ejabberd_sql:sql_transaction(LServer, F).
 
 get_and_del_spool_msg_t(LServer, LUser, LResource) ->
-    Resource = re:replace(binary_to_list(LResource), "Mobile-", ""),
-    UResource = iolist_to_binary(Resource),
-    DeviceID = <<"MF-01-mobile">>,
+    CleanResource = re:replace(binary_to_list(LResource), "Mobile-", "", [{return, list}]),
+    UResource = iolist_to_binary(CleanResource),
+     DeviceID = <<"MF-01-mobile">>,
 
-    F = fun () ->
-        % Try resource-specific messages first (LOCKED)
-        ResultSet = ejabberd_sql:sql_query_t(?SQL(
-            "select @(username)s, @(xml)s, @(seq)s from spool "
-            "where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H "
-            "order by seq limit 100 for update skip locked;"
-        )),
+    F = fun() ->
+        % Check if any message exists for UResource
+        ExistQ = io_lib:format(
+          "select count(username) from spool where username='~s' and device_id='~s' and server_host='~s' limit 1;",
+          [LUser, UResource, LServer]
+        ),
+        ExistResult = ejabberd_sql:sql_query_t(lists:flatten(ExistQ)),
+ 
+        DeviceToUse =
+          case ExistResult of
+              {selected, _, [[CountBin]]} when is_binary(CountBin) -> 
+                  Count = binary_to_integer(CountBin),
+                  if Count > 0 ->
+                       UResource;
+                  true ->
+                      DeviceID
+                  end;
+              _ -> 
+                  DeviceID
+          end,
 
-        case ResultSet of
-            {selected, []} ->
-                % Fallback to default device (LOCKED)
-                Result = ejabberd_sql:sql_query_t(?SQL(
-                    "select @(username)s, @(xml)s, @(seq)s from spool "
-                    "where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H "
-                    "order by seq limit 100 for update skip locked;"
-                )),
+        % Fetch 100 messages for that device
 
-                % Delete the same rows — adapter-specific SQL to avoid IN(... LIMIT ...)
-                _D = ejabberd_sql:sql_query(LServer, fun(Driver, _) ->
-                    case Driver of
-                        pgsql ->
-                            ejabberd_sql:sql_query_t(?SQL(
-                                "DELETE FROM spool s USING ("
-                                "  SELECT seq FROM spool WHERE username=%(LUser)s AND device_id=%(DeviceID)s AND %(LServer)H "
-                                "  ORDER BY seq LIMIT 100 FOR UPDATE SKIP LOCKED"
-                                ") t WHERE s.seq = t.seq;"
-                            ));
-                        mysql ->
-                            ejabberd_sql:sql_query_t(?SQL(
-                                "DELETE s FROM spool s "
-                                "JOIN (SELECT seq FROM spool WHERE username=%(LUser)s AND device_id=%(DeviceID)s AND %(LServer)H "
-                                "ORDER BY seq LIMIT 100) t ON s.seq = t.seq;"
-                            ));
-                        _ ->
-                            % Generic fallback (no subquery-with-limit)
-                            ejabberd_sql:sql_query_t(?SQL(
-                                "DELETE FROM spool WHERE username=%(LUser)s AND device_id=%(DeviceID)s AND %(LServer)H "
-                                "ORDER BY seq LIMIT 100;"
-                            ))
-                    end
-                end),
-                Result;
+        FetchQ = ?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H order by seq limit 100;"),
+        DeleteQ = ?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H limit 100;"),
 
-            {selected, _Rows} ->
-                Result = ResultSet,
+        Result = ejabberd_sql:sql_query_t(FetchQ),
+        DResult = ejabberd_sql:sql_query_t(DeleteQ),
 
-                % Delete exactly the rows we locked — adapter-specific
-                _D = ejabberd_sql:sql_query(LServer, fun(Driver, _) ->
-                    case Driver of
-                        pgsql ->
-                            ejabberd_sql:sql_query_t(?SQL(
-                                "DELETE FROM spool s USING ("
-                                "  SELECT seq FROM spool WHERE username=%(LUser)s AND device_id=%(UResource)s AND %(LServer)H "
-                                "  ORDER BY seq LIMIT 100 FOR UPDATE SKIP LOCKED"
-                                ") t WHERE s.seq = t.seq;"
-                            ));
-                        mysql ->
-                            ejabberd_sql:sql_query_t(?SQL(
-                                "DELETE s FROM spool s "
-                                "JOIN (SELECT seq FROM spool WHERE username=%(LUser)s AND device_id=%(UResource)s AND %(LServer)H "
-                                "ORDER BY seq LIMIT 100) t ON s.seq = t.seq;"
-                            ));
-                        _ ->
-                            ejabberd_sql:sql_query_t(?SQL(
-                                "DELETE FROM spool WHERE username=%(LUser)s AND device_id=%(UResource)s AND %(LServer)H "
-                                "ORDER BY seq LIMIT 100;"
-                            ))
-                    end
-                end),
+        case {Result, DResult} of
+            {{selected, Rs}, {updated, DC}} when length(Rs) =/= DC ->
+                ejabberd_sql:restart(concurent_insert);
+            _ ->
                 Result
         end
     end,
 
-    ejabberd_sql:sql_transaction(LServer, F).
+    TransResult = ejabberd_sql:sql_transaction(LServer, F),
+    TransResult.
