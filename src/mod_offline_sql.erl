@@ -434,34 +434,72 @@ el_to_offline_msg(El) ->
     end.
 
 
-    get_and_del_spool_msg_t(LServer, LUser,LResource) ->
-	Resource = re:replace(binary_to_list(LResource),"Mobile-", ""),
+%     get_and_del_spool_msg_t(LServer, LUser,LResource) ->
+% 	Resource = re:replace(binary_to_list(LResource),"Mobile-", ""),
+% 	UResource = iolist_to_binary(Resource),
+% 	DeviceID = <<"MF-01-mobile">>,
+%     F = fun () ->
+% 		ResultSet =
+% 		    ejabberd_sql:sql_query_t(
+%                       ?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H order by seq limit 100;")),
+% 		case catch ResultSet of
+% 			{selected, []} ->
+% 			Result =
+% 				ejabberd_sql:sql_query_t(
+% 				?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H order by seq limit 100;")),
+% 			DResult =
+% 				ejabberd_sql:sql_query_t(
+% 				?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H limit 100;"));
+% 			{selected, _ } ->
+% 			Result = ResultSet,
+% 			DResult =
+% 				ejabberd_sql:sql_query_t(
+% 				?SQL("delete from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H limit 100;"))
+% 		end,
+
+% 		case {Result, DResult} of
+% 		    {{selected, Rs}, {updated, DC}} when length(Rs) /= DC ->
+% 			ejabberd_sql:restart(concurent_insert);
+% 		    _ ->
+% 			Result
+% 		end
+% 	end,
+%     ejabberd_sql:sql_transaction(LServer, F).
+
+
+get_and_del_spool_msg_t(LServer, LUser, LResource) ->
+	Resource = re:replace(binary_to_list(LResource), "Mobile-", ""),
 	UResource = iolist_to_binary(Resource),
 	DeviceID = <<"MF-01-mobile">>,
-    F = fun () ->
-		ResultSet =
-		    ejabberd_sql:sql_query_t(
-                      ?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H order by seq limit 100;")),
-		case catch ResultSet of
-			{selected, []} ->
-			Result =
-				ejabberd_sql:sql_query_t(
-				?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H order by seq limit 100;")),
-			DResult =
-				ejabberd_sql:sql_query_t(
-				?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H limit 100;"));
-			{selected, _ } ->
-			Result = ResultSet,
-			DResult =
-				ejabberd_sql:sql_query_t(
-				?SQL("delete from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H limit 100;"))
-		end,
+	
+	F = fun () ->
+		% Try resource-specific messages first (LOCKED)
+		ResultSet = ejabberd_sql:sql_query_t(?SQL("select @(username)s, @(xml)s, @(seq)s from spool where username=%(LUser)s "
+                 "and device_id=%(UResource)s and %(LServer)H order by seq limit 100 for update skip locked;"
+              )),
 
-		case {Result, DResult} of
-		    {{selected, Rs}, {updated, DC}} when length(Rs) /= DC ->
-			ejabberd_sql:restart(concurent_insert);
-		    _ ->
-			Result
-		end
-	end,
+        case ResultSet of
+            {selected, []} ->
+                % Fallback to default device (LOCKED)
+                Result = ejabberd_sql:sql_query_t(?SQL("select @(username)s, @(xml)s, @(seq)s from spool where username=%(LUser)s and device_id=%(DeviceID)s "
+				"and %(LServer)H order by seq limit 100 for update skip locked;")),
+
+                % Delete exactly the locked rows
+                DResult =
+                    ejabberd_sql:sql_query_t(?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H and seq in ("
+		    		"  select seq from spool where username=%(LUser)s and device_id=%(DeviceID)s and %(LServer)H order by seq limit 100 for update skip locked );" )),
+                Result;
+
+            {selected, _} ->
+                Result = ResultSet,
+
+                % Delete exactly the rows we locked
+                DResult =
+                    ejabberd_sql:sql_query_t(?SQL("delete from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H and seq in ("
+		    			"  select seq from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H order by seq "
+					"  limit 100 for update skip locked );")),
+                Result
+        end
+    end,
+
     ejabberd_sql:sql_transaction(LServer, F).
