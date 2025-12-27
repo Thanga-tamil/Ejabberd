@@ -740,21 +740,21 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
   XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
   ejabberd_router:route(FromJid, ToJid, XmlBody1),
   fly_mod_stanza_ack:send_ack_response(FromJid, ToJid, OldMessageId, <<"delivered">>),
-  
   ?LOG_INFO("(delivery) msg_sender: ~p",[TUser]),
-
-  TUDeviceCnt   = fly_mod_utils:get_user_count(FServer, TUser), ?LOG_INFO("(delivery) UserDeviceCount: ~p", [TUDeviceCnt]),
-  TResource     = ejabberd_sm:get_user_resources(TUser, TServer), ?LOG_INFO("(length(TResource) =/= 0) : ~p (TUDeviceCnt) > 0): ~p",[length(TResource) =/= 0, TUDeviceCnt > 0]),
-  Res           = fly_mod_media:get_device_type(TResource), ?LOG_INFO("(device type) Res: ~p",[Res]),
-
-  if Res =:= <<"web">> andalso TUDeviceCnt > 0 ->
-    ?LOG_INFO("store delivery"),
-    ReceivedTimeStampedPacket = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
-    mod_offline:store_packet({FromJid, xmpp:decode(ReceivedTimeStampedPacket)});
-  true ->
-    ok
+  TResource = ejabberd_sm:get_user_resources(TUser, TServer), 
+  case {TResource, fly_mod_utils:get_user_count(FServer, TUser)} of
+    {[_ | _], Cnt} when Cnt > 0 ->
+        Device = [ fly_mod_media:get_device_type(R) || R <- TResource ],
+        case lists:member(<<"web">>, Device) of
+            true ->
+                ?LOG_INFO("store delivery"),
+                mod_offline:store_packet({FromJid, xmpp:decode(fxml:append_subtags(XmlBody, [ReceivedXMLTag]))});
+            false ->
+                ok
+        end;
+    _ ->
+        ok
   end,
-
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>}).
 
 send_seen_message(_From, RequestType, SubEl,IQ) ->
