@@ -189,7 +189,7 @@
 	   module = 'user_activities',
            result = {user_activities, '$remove_user', '$device_id', '$vote_id', '$edit_message_id', '$type', '$id', '$send_seen', '$license_data', '$result_type','$status','$password',
            '$socket_id','$message_from','$message_to','$to_user', '$from_user', '$mode', '$send_to', '$poll_option_id', '$voter_user_id', '$poll_id', '$send_from', '$message_type','$message_id','$message_ids','$message','$chat_type','$reply_id','$delete_type','$favourite','$_els','$position','$limit','$row_id','$updated_at',
-           '$call_status','$call_type','$caller_device','$call_id','$call_attend_status', '$last_msg_id', '$remove_message_user', '$calllog_ids', '$mute_status','$archive_status','$group_id','$archive','$block_status','$permission_status','$meta_data', '$topic_id', '$topic_time', '$user_list', '$action', '$mute_setting', '$busy_message', '$busy_status', '$busy'},
+           '$call_status','$call_type','$caller_device','$call_id','$call_attend_status', '$last_msg_id', '$remove_message_user', '$calllog_ids', '$mute_status','$archive_status','$group_id','$archive','$block_status','$permission_status','$meta_data', '$topic_id', '$topic_time', '$user_list', '$action', '$mute_setting', '$busy_message', '$busy_status', '$busy', '$sim_bind_logout'},
                      attrs = [#attr{name = <<"remove_user">>,default = <<"">>},
                               #attr{name = <<"type">>,default = <<"">>},
                               #attr{name = <<"id">>,default = <<"">>},
@@ -245,7 +245,8 @@
                               #attr{name = <<"mute_setting">>,default = <<"">>},
                               #attr{name = <<"busy_message">>,default = <<"">>},
                               #attr{name = <<"busy_status">>,default = <<"">>},
-                              #attr{name = <<"busy">>,default = <<"">>}],
+                              #attr{name = <<"busy">>,default = <<"">>},
+                              #attr{name = <<"sim_bind_logout">>,default = <<"">>}],
                        cdata = #cdata{default = <<"">>, label = '$result_type'}}).
 
 -xml(del_message_activities,
@@ -348,11 +349,12 @@
      #elem{name = <<"seen">>,
            xmlns = <<"urn:xmpp:receipts">>,
 	   module = 'seen',
-           result = {seen, '$id', '$time','$message_status', '$group_id'},
+           result = {seen, '$id', '$time','$message_status', '$group_id', '$seen_receipt'},
            attrs = [#attr{name = <<"id">>,default = <<"">>},
                     #attr{name = <<"message_status">>,default = <<"">>},
                     #attr{name = <<"group_id">>,default = <<"">>},
-                    #attr{name = <<"time">>,default = <<"">>}]}).
+                    #attr{name = <<"time">>,default = <<"">>},
+                    #attr{name = <<"seen_receipt">>,default = <<"">>}]}).
 -xml(poll,
      #elem{name = <<"poll">>,
            xmlns = <<"urn:xmpp:receipts">>,

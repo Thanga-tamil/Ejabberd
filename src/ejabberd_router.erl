@@ -390,20 +390,60 @@ do_route(OrigPacket) ->
 		true ->
 		    ok;
 		false ->
-		    To = xmpp:get_to(Packet),
-		    LDstDomain = To#jid.lserver,
-		    case find_routes(LDstDomain) of
-			[] ->
-			    ejabberd_s2s:route(Packet);
-			[Route] ->
-			    do_route(Packet, Route);
-			Routes ->
-			    From = xmpp:get_from(Packet),
-			    balancing_route(From, To, Packet, Routes)
-		    end,
-		    ok
+			Type = get_packet_type(Packet),
+			case Type of
+				message_seen ->
+					ElementAcknowledge = xmpp:get_subtag(Packet, #seen{}),
+					{seen, _Id, _Time, _MessageStatus, _GroupId, ReceiptStatus} = ElementAcknowledge,
+					if ReceiptStatus =:= <<"0">> ->
+						?LOG_INFO("read receipt status is in off.. restrict routing"),
+						ok;
+					true ->
+						To = xmpp:get_to(Packet),
+						LDstDomain = To#jid.lserver,
+						case find_routes(LDstDomain) of
+							[] ->
+								ejabberd_s2s:route(Packet);
+							[Route] ->
+								do_route(Packet, Route);
+							Routes ->
+								From = xmpp:get_from(Packet),
+								balancing_route(From, To, Packet, Routes)
+						end
+					end;
+				_ ->
+						To = xmpp:get_to(Packet),
+						LDstDomain = To#jid.lserver,
+						case find_routes(LDstDomain) of
+							[] ->
+								ejabberd_s2s:route(Packet);
+							[Route] ->
+								do_route(Packet, Route);
+							Routes ->
+								From = xmpp:get_from(Packet),
+								balancing_route(From, To, Packet, Routes)
+						end
+			end
 	    end
     end.
+
+get_packet_type(Packet) ->
+  Received = xmpp:get_subtag(Packet, #delivered{}),
+  if Received =/= false ->
+    message_delivered;
+    true ->
+      Seen = xmpp:get_subtag(Packet, #seen{}),
+      if Seen =/= false ->
+        message_seen;
+        true ->
+          Recall = xmpp:get_subtag(Packet, #recall{}),
+          if Recall =/= false ->
+            message_recall;
+            true ->
+              ok
+          end
+      end
+  end.
 
 -spec do_route(stanza(), #route{}) -> any().
 do_route(Pkt, #route{local_hint = LocalHint,
