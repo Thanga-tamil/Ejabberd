@@ -285,12 +285,12 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
         false ->
           ok
       end,
-      TResources = ejabberd_sm:get_user_resources(TUser, TServer),
-      if length(TResources) =:= 0 ->
-        ok;
-      true ->
-        fly_mod_offline_push:send_offline_message({_C2SState,RecallTimeStampedPacket})
-      end,
+      %TResources = ejabberd_sm:get_user_resources(TUser, TServer),
+      %if length(TResources) =:= 0 ->
+      %  ok;
+      %true ->
+      %  fly_mod_offline_push:send_offline_message({_C2SState,RecallTimeStampedPacket})
+      %end,
     fly_mod_utils:update_recall(From, Id);
     T when (T == ok) ->
       ok;
