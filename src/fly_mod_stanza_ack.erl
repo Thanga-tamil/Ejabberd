@@ -286,6 +286,8 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           ok
       end,
       DeviceDetails = fly_mod_utils:get_user_device(TServer, TUser, <<"">>, CType),
+      ?INFO_MSG("DeviceDetails for recall push ~p", [DeviceDetails]),
+      ?LOG_INFO("DeviceDetails for recall push ~p", [DeviceDetails]),
       case catch DeviceDetails of
         {selected, _, []} ->
           ok;
@@ -300,6 +302,8 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
                 if length(TResources) =:= 0 ->
                   ok;
                 true ->
+                  ?INFO_MSG("device_type: ~p send recall push", [DeviceType]),
+                  ?LOG_INFO("device_type: ~p send recall push", [DeviceType]),
                   fly_mod_offline_push:send_offline_message({_C2SState,RecallTimeStampedPacket})
                 end
             end
@@ -309,7 +313,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           ok
     end,
     fly_mod_utils:update_recall(From, Id);
-  
+
     T when (T == ok) ->
       ok;
     _ ->
