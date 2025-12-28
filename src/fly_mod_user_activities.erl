@@ -699,6 +699,7 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
   BusyMsg = fly_mod_utils:get_userbusy_message(FServer, TUser, FUser),
 
   if BusyMsg =/= <<"">> andalso GroupId =:= <<"">> ->
+  ?INFO_MSG("delivey 4 ~P",[TUser]),
     BodyString = fly_mod_security:aes_encrpyt_license(MsgId, <<"ddc0f15cc2c90fca">>, BusyMsg),
     MsgBody3 = XML = #xmlel{name = <<"message">>, attrs = [{<<"xmlns">>, <<"jabber:client">>},{<<"from">>, MessageFrom}, {<<"to">>, MessageTo},
       {<<"type">>, <<"chat">>},{<<"id">>, MsgId}],
@@ -739,25 +740,16 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
   ReceivedXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(ReceivedFlatTimeStamp)}], children = []},
   XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
   ejabberd_router:route(FromJid, ToJid, XmlBody1),
+  ?INFO_MSG("delivey 6 ~P",[TUser]),
   fly_mod_stanza_ack:send_ack_response(FromJid, ToJid, OldMessageId, <<"delivered">>),
-  
-  ?INFO_MSG("(delivery) msg_sender: ~p",[TUser]),
-  
-  TUDeviceCnt = fly_mod_utils:get_user_count(FServer, TUser), 
-
-  ?INFO_MSG("(delivery) UserDeviceCount: ~p", [TUDeviceCnt]),
-
   TResource = ejabberd_sm:get_user_resources(TUser, TServer),
-
-  ?INFO_MSG("(length(TResource) =/= 0) : ~p (length(TUDeviceCnt) > 0): ~p",[length(TResource) =/= 0, length(TUDeviceCnt) > 0]),
-
-  if length(TResource) =/= 0 andalso length(TUDeviceCnt) > 0 ->
-    ReceivedTimeStampedPacket = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
-    mod_offline:store_packet({FromJid, xmpp:decode(ReceivedTimeStampedPacket)});
-  true ->
-    ok
-  end,
-
+      if length(TResource) =/= 0 ->
+        ReceivedTimeStampedPacket = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
+        mod_offline:store_packet({FromJid, xmpp:decode(ReceivedTimeStampedPacket)});
+      true ->
+        ok
+      end,
+      ?INFO_MSG("delivey 7 ~P",[TUser]),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>}).
 
 send_seen_message(_From, RequestType, SubEl,IQ) ->
