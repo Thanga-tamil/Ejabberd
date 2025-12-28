@@ -285,33 +285,13 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
         false ->
           ok
       end,
-      DeviceDetails = fly_mod_utils:get_user_device(TServer, TUser, <<"">>, CType),
-      ?INFO_MSG("DeviceDetails for recall push ~p", [DeviceDetails]),
-      ?LOG_INFO("DeviceDetails for recall push ~p", [DeviceDetails]),
-      case catch DeviceDetails of
-        {selected, _, []} ->
-          ok;
-        {selected, _, Tokens} ->
-          lists:map(fun(G) -> 
-            [DeviceType, _DeviceToken, _VoipDeviceToken, _Mode, _IOSVersion, _DeviceId, _UserType, _PushType ] = G,
-            case DeviceType of 
-              <<"ios">> ->
-                ok;
-              _ -> 
-                TResources = ejabberd_sm:get_user_resources(TUser, TServer),
-                if length(TResources) =:= 0 ->
-                  ok;
-                true ->
-                  ?INFO_MSG("device_type: ~p send recall push", [DeviceType]),
-                  ?LOG_INFO("device_type: ~p send recall push", [DeviceType]),
-                  fly_mod_offline_push:send_offline_message({_C2SState,RecallTimeStampedPacket})
-                end
-            end
-          end, Tokens);
-        _Error ->
-          ?INFO_MSG("push_message get_user_device_details error is ~p", [_Error]),
-          ok
-    end,
+      
+      TResources = ejabberd_sm:get_user_resources(TUser, TServer),
+      if length(TResources) =:= 0 ->
+        ok;
+      true ->
+        fly_mod_offline_push:send_offline_message({_C2SState,RecallTimeStampedPacket})
+      end,
     fly_mod_utils:update_recall(From, Id);
 
     T when (T == ok) ->
