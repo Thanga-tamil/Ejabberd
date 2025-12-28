@@ -516,17 +516,13 @@ call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, User
                     Recipient, SubEl, TimestampValue, Packet,
                     State#state.rabbitmq_connection, State#state.rabbitmq_exchange);
               <<"ios">> ->
-                if 
-                  ChatType == <<"mediacall">> andalso VoipDeviceToken == <<>> ->
+                case ChatType of 
+                  <<"mediacall">> when VoipDeviceToken == <<>> ->
                     ?INFO_MSG("voip token is empty ~p", [Recipient#jid.luser]);
-                  true ->
-                    if 
-                      ChatType == <<"recall">> ->
-                        ?INFO_MSG("(ios) recall restriction ~p", [Recipient#jid.luser]),
-                        ok;
-                      true ->
-                        apns_single_push(DeviceToken, UserType, VoipDeviceToken, IOSVersion, ChatType, Sender, Recipient, SubEl, TimestampValue,Packet, State, Mode,PushType)
-                      end
+                  <<"recall">> ->
+                    ?INFO_MSG("(ios) recall restricted ~p", [Recipient#jid.luser]);
+                  _ ->
+                    apns_single_push(DeviceToken, UserType, VoipDeviceToken, IOSVersion, ChatType, Sender, Recipient, SubEl, TimestampValue,Packet, State, Mode,PushType)
                 end;
             _ -> ?INFO_MSG("push_message user device not found error is ~p", [Recipient#jid.luser]),
               database_error
