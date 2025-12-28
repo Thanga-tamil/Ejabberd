@@ -741,14 +741,17 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
   ejabberd_router:route(FromJid, ToJid, XmlBody1),
   fly_mod_stanza_ack:send_ack_response(FromJid, ToJid, OldMessageId, <<"delivered">>),
   
-  ?LOG_INFO("(delivery) msg_sender: ~p",[TUser]),
+  ?INFO_MSG("(delivery) msg_sender: ~p",[TUser]),
+  
+  TUDeviceCnt = fly_mod_utils:get_user_count(FServer, TUser), 
 
-  TUDeviceCnt   = fly_mod_utils:get_user_count(FServer, TUser), ?LOG_INFO("(delivery) UserDeviceCount: ~p", [TUDeviceCnt]),
-  TResource     = ejabberd_sm:get_user_resources(TUser, TServer), ?LOG_INFO("(length(TResource) =/= 0) : ~p (TUDeviceCnt) > 0): ~p",[length(TResource) =/= 0, TUDeviceCnt > 0]),
-  Res           = fly_mod_media:get_device_type(TResource), ?LOG_INFO("(device type) Res: ~p",[Res]),
+  ?INFO_MSG("(delivery) UserDeviceCount: ~p", [TUDeviceCnt]),
 
-  if Res =:= <<"web">> andalso TUDeviceCnt > 0 ->
-    ?LOG_INFO("store delivery"),
+  TResource = ejabberd_sm:get_user_resources(TUser, TServer),
+
+  ?INFO_MSG("(length(TResource) =/= 0) : ~p (length(TUDeviceCnt) > 0): ~p",[length(TResource) =/= 0, length(TUDeviceCnt) > 0]),
+
+  if length(TResource) =/= 0 andalso length(TUDeviceCnt) > 0 ->
     ReceivedTimeStampedPacket = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
     mod_offline:store_packet({FromJid, xmpp:decode(ReceivedTimeStampedPacket)});
   true ->

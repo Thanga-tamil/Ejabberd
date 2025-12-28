@@ -2284,7 +2284,7 @@ get_rosters_to_update_privacy(User, Server) ->
   end.
 
 get_user_count(Server, User) ->
-  case ejabberd_sql:sql_query(Server, [<<"select count(username) from chat_users_details where username = '">>,User,<<"' and device_type != 'web';">>]) of
+  case ejabberd_sql:sql_query(Server, [<<"select count(username) from chat_users_details where username = '">>,User,<<"' device_type != 'web' ">>]) of
     {selected, _, [[C]]} ->
       binary_to_integer(C);
     _ -> 0
