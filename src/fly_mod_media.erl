@@ -10,7 +10,7 @@
 -behaviour(gen_mod).
 
 %% API
--export([start/2, stop/1, depends/2, process_local_iq/1, filter_packet/1, mod_options/1, mod_opt_type/1]).
+-export([start/2, stop/1, depends/2, process_local_iq/1, filter_packet/1, mod_options/1, mod_opt_type/1, sql_in/1]).
 
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
