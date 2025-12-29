@@ -180,6 +180,7 @@ create_group(From, To, SubEl, IQ) ->
   Profile = fxml:get_subtag(SubEl, <<"profile">>),
   VCard = fxml:get_subtag(Profile, <<"vCard">>),
   NickName = fxml:get_subtag(VCard, <<"nickName">>),
+  Desc = fxml:get_path_s(VCard, [{elem, <<"description">>}, cdata]),
   GroupName = fxml:get_tag_cdata(NickName),
   CustAtr = fxml:get_subtag_with_xmlns(xmpp:encode(SubEl), <<"custom_attributes">>, <<"ocp:json">>),
   if  CustAtr =:= false ->
@@ -187,6 +188,17 @@ create_group(From, To, SubEl, IQ) ->
   true ->
     CustomAttributes = fxml:get_tag_cdata(CustAtr)
   end,
+
+  ?INFO_MSG("Description : ~p", [Desc]),
+  DescNotifier = case Desc of D -> <<"added the group description \"", D/binary, "\"." >>; _ -> <<"">> end,
+
+  EncDesNotifier = 
+  if DescNotifier =:= <<"">> ->
+    <<"">>;
+  true -> 
+    fly_mod_security:aes_encrpyt_group_desc_notifier(MessageId, <<"ddc0f15cc2c90fca">>, DescNotifier)
+  end,
+
   % Creates Group
   AccessUri = generate_group_access_uri(GroupName),
   CreateIQ = #iq{
@@ -204,11 +216,11 @@ create_group(From, To, SubEl, IQ) ->
   % Adds Owner
   mod_mix_pam:process_iq(#iq{from = From, to = From, type = set,id = MessageId1,
         sub_els = [#mix_client_join{channel = GroupJID, xmlns = <<"urn:xmpp:mix:pam:0">>,affiliation = <<"o">>,
-        join = #mix_join{nick = GroupName, message_id = MessageId1, group_create = <<"y">>, custom_attributes = #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, xmlns = <<"urn:xmpp:mix:core:0">>, subscribe = [<<"urn:xmpp:mix:nodes:messages">>,<<"urn:xmpp:mix:nodes:presence">>,
+        join = #mix_join{nick = GroupName, message_id = MessageId1, description_notifier = EncDesNotifier, group_create = <<"y">>, custom_attributes = #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, xmlns = <<"urn:xmpp:mix:core:0">>, subscribe = [<<"urn:xmpp:mix:nodes:messages">>,<<"urn:xmpp:mix:nodes:presence">>,
           <<"urn:xmpp:mix:nodes:participants">>,<<"urn:xmpp:mix:nodes:subject">>,<<"urn:xmpp:mix:nodes:config">>]}}]}),
   process_set_group_info(From, GroupJID, SubEl, IQ, <<"new">>),
 
-  fly_mod_offline_push:groupcreationfunction(From, groupcreation, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes),
+  fly_mod_offline_push:groupcreationfunction(From, groupcreation, Participants, Channel, GroupJID, SubEl, IQ, MessageId1, CustomAttributes, EncDesNotifier),
  
   fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, group_id = Channel, result_type = <<"Group Created successfully">>}).
 
