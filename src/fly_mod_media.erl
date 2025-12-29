@@ -468,15 +468,8 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
               #xmlel{name = <<"mediacall">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:call">>}, {<<"room_id">>, RoomId},  {<<"call_link">>, CallLink},{<<"meta_data">>, MetaData}, {<<"caller_name">>, CallerName}, {<<"call_mode">>, CallMode},{<<"call_status">>, CallStatus}, {<<"call_type">>, CallType},  {<<"call_time">>, CallTime},  {<<"group_id">>, GroupId}], children = [Users]},
               fly_mod_utils:get_custom_attributes(SubEl)
             ]},
-            ejabberd_router:route(From, BareToJid, NewPacket),
-            case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
-              true ->
-                ?LOG_INFO("SEND OFFLINE PUSH MESSAGE TO ~p", [ToUser]),
-                fly_mod_offline_push:send_offline_message({From,xmpp:decode(NewPacket,?NS_CLIENT, Opts)});
-              false ->
-                ?LOG_INFO("NO OFFLINE PUSH"),
-                ok
-            end,
+            ?LOG_INFO("sending"),
+            fly_mod_offline_push:send_offline_message({From,xmpp:decode(NewPacket,?NS_CLIENT, Opts)}),
             fly_mod_utils:insert_media_call_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,MetaData),
             fly_mod_utils:insert_call_log_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,list_to_binary(UsersList),LResource,MetaData)
           end, Users#xmlel.children);
