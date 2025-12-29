@@ -444,7 +444,7 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
 
   DeviceDetails = 
   if CallMode =:= <<"onetoone">> ->
-    fly_mod_utils:get_user_device_exclude_restricted_countries(Recipient#jid.server, Recipient#jid.luser, Rs, ChatType, Ccodes);
+    fly_mod_utils:get_user_device_exclude_restricted_countries(Recipient#jid.server, Recipient#jid.luser, Rs, Ccodes);
     true ->
       fly_mod_utils:get_user_device(Recipient#jid.server, Recipient#jid.luser, Rs, ChatType)
   end,
@@ -516,10 +516,13 @@ call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, User
                     Recipient, SubEl, TimestampValue, Packet,
                     State#state.rabbitmq_connection, State#state.rabbitmq_exchange);
               <<"ios">> ->
-                if ChatType == <<"mediacall">> andalso VoipDeviceToken == <<>> ->
-                  ?INFO_MSG("voip token is empty ~p", [Recipient#jid.luser]);
-                  true ->
-                apns_single_push(DeviceToken, UserType, VoipDeviceToken, IOSVersion, ChatType, Sender, Recipient, SubEl, TimestampValue,Packet, State, Mode,PushType)
+                case ChatType of 
+                  <<"mediacall">> when VoipDeviceToken == <<>> ->
+                    ?INFO_MSG("voip token is empty ~p", [Recipient#jid.luser]);
+                  <<"recall">> ->
+                    ?INFO_MSG("(ios) recall restricted ~p", [Recipient#jid.luser]);
+                  _ ->
+                    apns_single_push(DeviceToken, UserType, VoipDeviceToken, IOSVersion, ChatType, Sender, Recipient, SubEl, TimestampValue,Packet, State, Mode,PushType)
                 end;
             _ -> ?INFO_MSG("push_message user device not found error is ~p", [Recipient#jid.luser]),
               database_error

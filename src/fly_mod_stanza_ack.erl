@@ -266,7 +266,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
 
     T when (T == message_recall) ->
       ElementAcknowledge = xmpp:get_subtag(Packet, #recall{}),
-      {_,Id,_Time,_ChatType,_GroupId} = ElementAcknowledge,
+      {_,Id,_Time, CType, _GroupId} = ElementAcknowledge,
       send_ack_response(From, To, Id,  <<"recall">>),
       NewRecallPacket = xmpp:set_from_to(Packet,From, To),
       GetRecallTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
@@ -285,6 +285,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
         false ->
           ok
       end,
+      
       TResources = ejabberd_sm:get_user_resources(TUser, TServer),
       if length(TResources) =:= 0 ->
         ok;
@@ -292,6 +293,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
         fly_mod_offline_push:send_offline_message({_C2SState,RecallTimeStampedPacket})
       end,
     fly_mod_utils:update_recall(From, Id);
+
     T when (T == ok) ->
       ok;
     _ ->

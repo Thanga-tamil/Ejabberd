@@ -26,7 +26,7 @@
   get_vcard_from_search/2,
   get_user_device/2,
   get_user_device/4,
-  get_user_device_exclude_restricted_countries/5,
+  get_user_device_exclude_restricted_countries/4,
   get_user_for_ios_group_device/3,
   get_group_participants/2,
   get_roster_and_recent_jid/1,
@@ -316,7 +316,7 @@ get_user_device(LServer, LUser, LResource, ChatType) ->
       % end
   end.
 
-get_user_device_exclude_restricted_countries(LServer, LUser, LResource, ChatType, Codes) ->
+get_user_device_exclude_restricted_countries(LServer, LUser, LResource, Codes) ->
     if LResource =:= "" ->
       ejabberd_sql:sql_query(LServer,
       [<<"SELECT  device_type, device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE username = '">>, LUser, <<"' and ( device_token != '' and device_token != 'null'  and device_type !='') and device_id != '' and country_code not in ('">>,Codes,<<"') ;">>]);
@@ -1402,18 +1402,13 @@ clear_particular_call_log(#jid{luser = User,lserver = Server},RoomId) ->
 update_recall(#jid{luser = _User,lserver = Server}, MessageId) ->
   Range = binary:split(MessageId, <<",">>, [global]),
   lists:foreach(fun(N) ->
-  ejabberd_sql:sql_query(
-      Server,
-      [<<"delete FROM spool  where message_id='">>,N,<<"';">>]),
-    ejabberd_sql:sql_query(
-      Server,
-      [<<"update message_status set recall_status =  1 where message_id='">>,N,<<"';">>]),
-    ejabberd_sql:sql_query(
-      Server,
-    [<<"DELETE FROM message_favourite WHERE message_id = '">>,N,<<"';">>]),
-    ejabberd_sql:sql_query(
-      Server,
-      [<<"update chat_recent set recall_status  =  1 where message_id='">>,N,<<"';">>])
+  %ejabberd_sql:sql_query(Server, [<<"delete FROM spool  where message_id='">>,N,<<"';">>]), % commented to retain recalled message in offline storage
+    
+  ejabberd_sql:sql_query(Server, [<<"update message_status set recall_status =  1 where message_id='">>,N,<<"';">>]),
+
+  ejabberd_sql:sql_query(Server, [<<"DELETE FROM message_favourite WHERE message_id = '">>,N,<<"';">>]),
+
+  ejabberd_sql:sql_query(Server, [<<"update chat_recent set recall_status  =  1 where message_id='">>,N,<<"';">>])
   end, Range).
 
 %% insert message status
