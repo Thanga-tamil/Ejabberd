@@ -457,7 +457,6 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
         case Bool of
           true  ->
           ?LOG_INFO("bool true.. [push]"),
-          ?LOG_INFO("Users#xmlel.children ~p", [Users#xmlel.children]),
           lists:foreach(fun(U) ->
             User = fxml:get_tag_cdata(U),
             [ToUser, _] = binary:split(User, <<"@">>),
@@ -470,7 +469,6 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
             ]},
             case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
               true ->
-                ?LOG_INFO("SEND OFFLINE PUSH MESSAGE TO ~p", [ToUser]),
                 fly_mod_offline_push:send_offline_message({From,xmpp:decode(NewPacket,?NS_CLIENT, Opts)});
               false ->
                 ok
