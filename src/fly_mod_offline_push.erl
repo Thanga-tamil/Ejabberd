@@ -440,10 +440,7 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
         false ->
             <<"">>
     end,
-   ?LOG_INFO("send_push_notifications CallMode: ~p", [CallMode]),
-
-   Ccodes = gen_mod:get_module_opt(Recipient#jid.server, fly_mod_offline_push, restricted_country_code), 
-   ?LOG_INFO("Restricted Country Codes: ~p", [Ccodes]),
+  Ccodes = gen_mod:get_module_opt(Recipient#jid.server, fly_mod_offline_push, restricted_country_code), 
 
   DeviceDetails = 
   if CallMode =:= <<"onetoone">> ->
@@ -452,7 +449,6 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
       fly_mod_utils:get_user_device(Recipient#jid.server, Recipient#jid.luser, Rs, ChatType)
   end,
 
-  ?LOG_INFO("DeviceDetails: ~p", [DeviceDetails]),
   case catch DeviceDetails of
     {selected, _, []} -> 
       ?INFO_MSG("~p device detail not found", [Recipient#jid.luser]),
@@ -508,7 +504,6 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
   end.
 
 call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType, SubEl, Packet,TimestampValue,State)->
-  ?LOG_INFO("call_push_method.. DeviceType: ~p", [DeviceType]),
   case DeviceType of
             <<"">> -> ?INFO_MSG("push_message user device is empty error is ~p", [Recipient#jid.luser]),
               device_type_is_empty;
