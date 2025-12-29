@@ -444,7 +444,7 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
 
   DeviceDetails = 
   if CallMode =:= <<"onetoone">> ->
-    fly_mod_utils:get_user_device_exclude_restricted_countries(Recipient#jid.server, Recipient#jid.luser, Rs, fly_mod_media:sql_in(Ccodes));
+    fly_mod_utils:get_user_device_exclude_restricted_countries(Recipient#jid.server, Recipient#jid.luser, Rs, Ccodes);
     true ->
       fly_mod_utils:get_user_device(Recipient#jid.server, Recipient#jid.luser, Rs, ChatType)
   end,
