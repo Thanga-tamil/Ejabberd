@@ -125,7 +125,8 @@ process_iq_set(From, To, SubEl, IQ) ->
     <<"remove_admin">> ->
       process_remove_admin(From, To, SubEl, IQ);
     <<"admin_remove_participant">> ->
-      process_admin_remove_participant(From, To, SubEl, IQ);
+      process_user_exit_group(From, To, SubEl, IQ, RequestType);
+      % process_admin_remove_participant(From, To, SubEl, IQ);
     <<"admin_exit_group">> ->
       process_admin_exit_group(From, To, SubEl, IQ);
     <<"admin_remove_admin">> ->
