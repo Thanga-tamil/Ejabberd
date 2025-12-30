@@ -808,11 +808,9 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   Type = fxml:get_path_s(SubEl, [{attr, <<"type">>}]),
   Action = fxml:get_path_s(SubEl, [{attr, <<"action">>}]),
 
-  BareJidFrom = jid:make({FUser, FServer, <<>>}),
-
   XmlBody = #xmlel{
     name = <<"message">>,
-    attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, jid:to_string(BareJidFrom)}, {<<"type">>, <<"result">>}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}],
+    attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, jid:to_string(From)}, {<<"type">>, <<"result">>}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}],
     children = [
       #xmlel{name = <<"privacy">>,
       attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>}, {<<"status">>, RequestType},{<<"type">>, Type},{<<"action">>, Action}],
@@ -849,7 +847,7 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
               attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>}, {<<"status">>, RequestType},{<<"type">>, Type},{<<"action">>, Action}],
               children = []}]
             },
-        ejabberd_router:route(BareJidFrom, ToJid, Packet)
+        ejabberd_router:route(jid:make({FUser, FServer, <<>>}), ToJid, Packet)
       end, fly_mod_utils:get_rosters_to_update_privacy(FUser, FServer) );
     _ -> 
       ok
