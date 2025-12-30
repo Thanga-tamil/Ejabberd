@@ -814,7 +814,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                                 [image | NewChanges2];
                             {OldImage, NewImage} when OldImage =:= NewImage ->
                                 NewChanges2;
-                            {OldImage, NewImage} when OldImage =/= <<>> andalso NewImage =/= OldDesc ->
+                            {OldImage, NewImage} when OldImage =/= <<>> andalso NewImage =/= OldImage ->
                                 ?INFO_MSG("Image updated for group ~p", [LUser]),
                                 [image | NewChanges2];
                             _ ->
@@ -842,8 +842,10 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                                     image ->
                                         case OldImage of
                                             <<>> -> % First time adding image
+                                                ?INFO_MSG("Image updated update_group_info_to_members 12 ~p", [OldImage]),
                                                 update_group_info_to_members(From, To, Status, VCard, JIDs, <<"12">>, SubEl, <<"">>);
                                             _ -> % Updating existing image
+                                                ?INFO_MSG("Image updated update_group_info_to_members 13 ~p", [OldImage]),
                                                 update_group_info_to_members(From, To, Status, VCard, JIDs, <<"13">>, SubEl, <<"">>)
                                         end
                                 end;
@@ -1792,6 +1794,7 @@ process_get_removed_user(From, _To, SubEl, IQ, _RequestType) ->
 
 update_group_info_to_members(ActionUser, GroupFrom, Status, Data, Members, Notification, SubEl, GroupDescription) ->
   #jid{user = AUser, lserver = _AServer} = ActionUser,
+  ?INFO_MSG("update_group_info_to_members ActionUser ~p", [ActionUser]),
   ActionDoneBy = list_to_binary(binary_to_list(AUser) ++ "@" ++ binary_to_list(_AServer)),
   #jid{user = FUser, lserver = _FServer} = GroupFrom,
   CustAtr = fxml:get_subtag_with_xmlns(xmpp:encode(SubEl), <<"custom_attributes">>, <<"ocp:json">>),
@@ -1802,6 +1805,7 @@ update_group_info_to_members(ActionUser, GroupFrom, Status, Data, Members, Notif
   end,
   Timestamp = now_to_microseconds(erlang:now()),
   FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
+  ?INFO_MSG("update_group_info_to_members Status ~p", [Status]),
   if Status == <<"new_admin_added">> ->
       ParticipantJid = <<Data / binary, $@,_AServer / binary>>,
       fly_mod_utils:update_group_count(_AServer, FUser),
@@ -1844,6 +1848,7 @@ Status == <<"remove_admin">> ->
     end
     end, Members);
     Status == <<"group_profile_updated">> ->
+      ?INFO_MSG("update_group_info_to_members FUser ~p", [FUser]),
       fly_mod_utils:update_group_count(_AServer, FUser),
       MessageId = <<(get_string()) / binary>>,
       case catch fly_mod_utils:get_group_profile_type(_AServer,FUser) of
@@ -1877,6 +1882,7 @@ Status == <<"remove_admin">> ->
                                     end,
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
+        ?INFO_MSG("update_group_info_to_members RouteToJid ~p", [RouteToJid]),
         #jid{user = TUser, lserver = TServer} = RouteToJid,
         EncryptedDescriptionNotifier = fly_mod_security:aes_encrpyt_group_desc_notifier(MessageId, <<"ddc0f15cc2c90fca">>, GroupDescription),
         fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp), EncryptedDescriptionNotifier),
