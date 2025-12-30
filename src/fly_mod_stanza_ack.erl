@@ -405,6 +405,7 @@ should_acknowledge_on_send(Packet) ->
   if Packet#message.body =:= []  ->
     false ;
     true ->
+      ?INFO_MSG ("Single Chat Message Sent", []),
       message_acknowledge
   end.
 
