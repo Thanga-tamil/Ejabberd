@@ -981,6 +981,7 @@ process_admin_remove_participant(From, To, SubEl, IQ) ->
 
   _RequestType = <<"admin_remove_participant">>,
   Participant = fxml:get_subtag(SubEl, <<"participant">>),
+  ?INFO_MSG("process_admin_remove_participant Participant ~p",[Participant]),
   #jid{luser = _User, lserver = FServer} = From,
   ParticipantData = fxml:get_tag_cdata(Participant),
   MacroNameSpace = ?NS_MIX_GROUP_CHAT,
@@ -988,10 +989,16 @@ process_admin_remove_participant(From, To, SubEl, IQ) ->
   MacroNameSpace = ?NS_MIX_GROUP_CHAT,
   FromJID = jid:make(fly_mod_utils:get_user_from_string_jid(ParticipantData),FServer,<<"">>),
   MessageId = <<(get_string()) / binary>>,
+  ?INFO_MSG("process_admin_remove_participant FromJID ~p",[FromJID]),
+  ?INFO_MSG("process_admin_remove_participant TUser ~p",[TUser]),
+  ?INFO_MSG("process_admin_remove_participant ParticipantData ~p",[ParticipantData]),
+  ?INFO_MSG("process_admin_remove_participant get_user_from_string_jid ~p",[fly_mod_utils:get_user_from_string_jid(ParticipantData)]),
   case catch fly_mod_utils:get_participants(FServer, TUser, fly_mod_utils:get_user_from_string_jid(ParticipantData)) of
       {selected, _, []} ->
+      ?INFO_MSG("process_admin_remove_participant participant not found ~p",[TUser]),
       fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Participant not removed in group">>});
     {selected, _, _GroupMembers} ->
+      ?INFO_MSG("process_admin_remove_participant FromJID ~p",[FromJID]),
       mod_mix:process_mix_core(#iq{from = FromJID , to = To, type = set ,id = MessageId,
       sub_els = [#mix_leave{from_jid = From, xmlns = <<"urn:xmpp:mix:core:0">>}]}),
       #jid{user = PUser} = FromJID,
@@ -999,6 +1006,7 @@ process_admin_remove_participant(From, To, SubEl, IQ) ->
       update_group_status(From, To, SubEl, IQ, <<"3">>, Participant, MessageId),
       fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Participant removed successfully">>});
       {_, _} ->
+        ?INFO_MSG("process_admin_remove_participant final block ~p",[TUser]),
       fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Participant not removed in group">>})
       end.
 %%%============================================================================================
