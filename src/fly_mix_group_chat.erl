@@ -1136,13 +1136,21 @@ process_admin_remove_admin(From, To, SubEl, IQ) ->
 
 process_user_exit_group(From, To, SubEl, IQ, RequestFrom) ->
   _RequestType = <<"user_exit_group">>,
+  ?INFO_MSG("process_user_exit_group RequestFrom ~p",[RequestFrom]),
   Participant = fxml:get_subtag(SubEl, <<"participant">>),
+  ?INFO_MSG("process_user_exit_group Participant ~p",[Participant]),
   ParticipantData = fxml:get_tag_cdata(Participant),
+  ?INFO_MSG("process_user_exit_group ParticipantData ~p",[ParticipantData]),
   #jid{luser = SUser, lserver = Server, lresource = Resource} = From,
   ParticipantJid = jid:make(fly_mod_utils:get_user_from_string_jid(ParticipantData),Server,<<>>),
+  ?INFO_MSG("process_user_exit_group ParticipantJid ~p",[ParticipantJid]),
   #jid{user = PUser} = ParticipantJid,
+  ?INFO_MSG("process_user_exit_group PUser ~p",[PUser]),
   MobileResource = string:str(binary_to_list(Resource), binary_to_list(<<"Mobile-">>)),
+  ?INFO_MSG("process_user_exit_group MobileResource ~p",[MobileResource]),
   WebResource = string:str(binary_to_list(Resource), binary_to_list(<<"Web-">>)),
+  ?INFO_MSG("process_user_exit_group WebResource ~p",[WebResource]),
+
   if MobileResource =:= 0 andalso WebResource =:= 0 ->
     FromUser = ParticipantJid;
   true ->
@@ -1152,12 +1160,20 @@ process_user_exit_group(From, To, SubEl, IQ, RequestFrom) ->
       FromUser = From
     end
   end,
+  ?INFO_MSG("process_user_exit_group FromUser ~p",[FromUser]),
+  ?INFO_MSG("process_user_exit_group SUser ~p",[SUser]),
+  ?INFO_MSG("process_user_exit_group PUser ~p",[PUser]),
+  ?INFO_MSG("process_user_exit_group From ~p",[From]),
+
   #jid{user = TUser} = To,
+  ?INFO_MSG("process_user_exit_group To ~p",[To]),
   if RequestFrom =:= <<"user_exit_group_api">> ->
     FUser = PUser;
   true ->
     FUser = SUser
     end,
+  ?INFO_MSG("process_user_exit_group RequestFrom ~p",[RequestFrom]),
+  ?INFO_MSG("process_user_exit_group FUser ~p",[FUser]),
   MessageId = <<(get_string()) / binary>>,
   case catch fly_mod_utils:get_participants(Server, TUser, fly_mod_utils:get_user_from_string_jid(ParticipantData)) of
       {selected, _, []} ->
@@ -1165,6 +1181,7 @@ process_user_exit_group(From, To, SubEl, IQ, RequestFrom) ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = Status, removeduser = ParticipantData,  group_id = TUser, result_type = <<"Participant  not removed in group">>});
     {selected, _, _GroupMembers} ->
       Jid = fly_mod_utils:make_admin_ifadminexit(Server,PUser, TUser),
+      ?INFO_MSG("process_user_exit_group Jid ~p",[Jid]),
       if Jid =:= ok ->
             if FUser =:= PUser ->
               Status = <<"user_exit_group">>;
@@ -1186,6 +1203,11 @@ process_user_exit_group(From, To, SubEl, IQ, RequestFrom) ->
                 true ->
                   Status = <<"admin_exit_group">>
                 end,
+                ?INFO_MSG("process_user_exit_group Status ~p",[Status]),
+                ?INFO_MSG("process_user_exit_group AdminStatus ~p",[AdminStatus]),
+                ?INFO_MSG("process_user_exit_group JIDs ~p",[JIDs]),
+                ?INFO_MSG("process_user_exit_group Jid ~p",[Jid]),
+                ?INFO_MSG("process_user_exit_group SubEl ~p",[SubEl]),
                 update_group_info_to_members(FromUser, To, AdminStatus, Jid, JIDs, <<"5">>, SubEl, <<"">>)
             end
       end,
