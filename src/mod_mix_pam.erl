@@ -263,15 +263,18 @@ remove_user(LUser, LServer) ->
 %%% Internal functions
 %%%===================================================================
 -spec process_join(iq()) -> ignore.
-process_join(#iq{from = From, lang = Lang, sub_els = [#mix_client_join{channel = Channel, join = Join}]} = IQ) ->
-    
+process_join(#iq{from = From, lang = Lang,
+		 sub_els = [#mix_client_join{channel = Channel,
+		                             join = Join}]} = IQ) ->
     ejabberd_router:route_iq(
-        #iq{from = jid:remove_resource(From), to = Channel, type = set, sub_els = [Join]}, 
-        
-        fun(#iq{sub_els = [El]} = ResIQ) ->
-
+      #iq{from = jid:remove_resource(From),
+	  to = Channel, type = set, sub_els = [Join]},
+      fun(#iq{sub_els = [El]} = ResIQ) ->
         try xmpp:decode(El) of
-            MixJoin -> process_join_result(ResIQ#iq {sub_els = [MixJoin]}, IQ)
+            MixJoin ->
+                process_join_result(ResIQ#iq {
+                    sub_els = [MixJoin]
+                }, IQ)
         catch
             _:{xmpp_codec, Reason} ->
                 Txt = xmpp:io_format_error(Reason),
@@ -298,52 +301,6 @@ process_leave(#iq{from = From,
 
 %%Contus added affiliation attribute to the channel%%
 -spec process_join_result(iq(), iq()) -> ok.
-process_join_result(#iq{from = #jid{} = Channel,
-			type = result, sub_els = [#mix_join{id = ID, xmlns = XmlNs, description_notifier = DescNotifier} = Join]},
-		    #iq{to = To,sub_els = [#mix_client_join{affiliation = Affiliation,channel = _ToJid}]}  = IQ) ->
-    case add_channel(To, Channel, ID, Affiliation) of
-	ok ->
-	    % Do roster push
-	    mod_roster:push_item(To, #roster_item{jid = #jid{}}, #roster_item{
-		jid = Channel,
-		name = <<>>,
-		subscription = none,
-		ask = undefined,
-		groups = [],
-		mix_channel = #mix_roster_channel{participant_id = ID}
-	    }),
-	    % send IQ result - preserve encrypted description_notifier
-	    ChanID = make_channel_id(Channel, ID),
-	    Join1 = Join#mix_join{id = <<"">>, jid = ChanID, description_notifier = DescNotifier},
-	    ResIQ = xmpp:make_iq_result(IQ, #mix_client_join{join = Join1, xmlns = XmlNs}),
-	    ejabberd_router:route(ResIQ),
-	    
-	    % Store encrypted description_notifier in offline if user is offline
-	    {LUser, LServer, _} = jid:tolower(To),
-	    case ejabberd_sm:get_user_resources(LUser, LServer) of
-		[] when DescNotifier =/= undefined andalso DescNotifier =/= <<>> ->
-		    % User is offline, store notifier in offline spool
-		    OfflineMsg = #message{
-			from = Channel,
-			to = To,
-			type = normal,
-			id = ID,
-			body = [],
-			sub_els = [#xmlel{
-			    name = <<"description_notifier">>,
-			    attrs = [{<<"xmlns">>, <<"urn:xmpp:mix:core:0">>}],
-			    children = [{xmlcdata, DescNotifier}]
-			}]
-		    },
-		    mod_offline:store_packet({To, OfflineMsg});
-		_ ->
-		    % User is online or no notifier to store
-		    ok
-	    end;
-	{error, db_failure} ->
-	    ejabberd_router:route_error(IQ, db_error(IQ))
-    end;
-%%Handle case where description_notifier is undefined
 process_join_result(#iq{from = #jid{} = Channel,
 			type = result, sub_els = [#mix_join{id = ID, xmlns = XmlNs} = Join]},
 		    #iq{to = To,sub_els = [#mix_client_join{affiliation = Affiliation,channel = _ToJid}]}  = IQ) ->
