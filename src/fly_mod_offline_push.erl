@@ -14,7 +14,7 @@
 -define(EJABBERD_DEBUG, true).
 
 %% gen_mod callbacks
--export([send_offline_message/1, queryexecfunction/5, queryfunction/6, groupcreationfunction/10, has_more_resources/2, send_bulk_group_push/7, send_own_offline_message/3, start/2, start_link/2, depends/2,
+-export([send_offline_message/1, groupcreationfunction/9, queryexecfunction/5, queryfunction/6, groupcreationfunction/10, has_more_resources/2, send_bulk_group_push/7, send_own_offline_message/3, start/2, start_link/2, depends/2,
   stop/1]).
 
 -export([code_change/3, handle_call/3, handle_cast/2, handle_info/2, init/1, mod_opt_type/1, terminate/2, mod_options/1]).
@@ -158,8 +158,8 @@ handle_cast({queryexecution, <<"call_log">>,
   clear_call_log(From, Chat_Type, Delete_Type, XMLBody, State),
   {noreply, State};
 handle_cast({groupcreationexecutions, <<"group_creation">>,
-  {From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes, DescNotifier}},State) ->
-  group_create_query(From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes, State, DescNotifier),
+  {From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes}},State) ->
+  group_create_query(From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes, State),
 
   {noreply, State};
 handle_cast({own_pushnotification, <<"chat">>,
@@ -239,9 +239,10 @@ queryfunction(Proc, Type, From, Chat_Type, Delete_Type, XMLBody) ->
     {queryexecution, Type,
       { From, Chat_Type, Delete_Type,XMLBody}}).
 
-groupcreationfunction(Proc, Type, From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes, DescNotifier) ->
+groupcreationfunction(Proc, Type, From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes) ->
   gen_server:cast(Proc,
-    {groupcreationexecutions, Type, {From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes, DescNotifier}}).
+    {groupcreationexecutions, Type,
+      {From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes}}).
 
 %% Hook lisenter to for offline message hook
 %%
@@ -397,7 +398,7 @@ get_string() ->
   R = crypto:rand_uniform(0, 16#10000000000000000),
   integer_to_binary(R).
 
-  group_create_query(From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1, CustomAttributes, State, DescNotifier)->
+  group_create_query(From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes, State)->
 
   #jid{user = FUser, lserver = FServer} = From,
   Profile = fxml:get_subtag(SubEl, <<"profile">>),
@@ -416,7 +417,7 @@ get_string() ->
     timer:sleep(50),
     mod_mix_pam:process_iq(#iq{from = FromJID, to = FromJID,type = set,id = MessageID,
       sub_els = [#mix_client_join{channel = GroupJID,  xmlns = <<"urn:xmpp:mix:pam:0">>,affiliation = <<"n">>,
-      join = #mix_join{owner = jid:to_string(From),message_id = MessageID, nick = GroupName, description_notifier = DescNotifier, group_create = <<"y">>, custom_attributes = #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, xmlns = <<"urn:xmpp:mix:core:0">>, subscribe = [<<"urn:xmpp:mix:nodes:messages">>,<<"urn:xmpp:mix:nodes:presence">>,
+      join = #mix_join{owner = jid:to_string(From),message_id = MessageID, nick = GroupName, group_create = <<"y">>, custom_attributes = #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, xmlns = <<"urn:xmpp:mix:core:0">>, subscribe = [<<"urn:xmpp:mix:nodes:messages">>,<<"urn:xmpp:mix:nodes:presence">>,
       <<"urn:xmpp:mix:nodes:participants">>,<<"urn:xmpp:mix:nodes:info">>,<<"urn:xmpp:mix:nodes:config">>]}}]}),
     fly_mix_group_chat:update_group_status(From, GroupJID, SubEl, IQ, <<"2">>, Participant, MessageID)
   end, Participants#xmlel.children).
@@ -1835,10 +1836,10 @@ queryexecfunction(From, calllog, Chat_Type, Delete_Type, XMLBody)->
 
   queryfunction(Server,<<"call_log">>, From, Chat_Type, Delete_Type, XMLBody).
 
-groupcreationfunction(From, groupcreation, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes, DescNotifier)->
+groupcreationfunction(From, groupcreation, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes)->
   Server = gen_mod:get_module_proc(From#jid.lserver,
     ?PROCNAME),
-groupcreationfunction(Server,<<"group_creation">>, From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes, DescNotifier).
+groupcreationfunction(Server,<<"group_creation">>, From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes).
 
 send_own_offline_message(Sender, Recipient, Packet) ->
   ChatType = fxml:get_attr_s(<<"type">>, Packet#xmlel.attrs),
