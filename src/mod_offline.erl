@@ -800,6 +800,7 @@ route_offline_message(#{jid := #jid{luser = LUser, lserver = LServer, lresource 
 	error ->
 	    ok;
 	{route, Msg} ->
+		Id = xmpp:get_id(Msg),
 	    case is_message_expired(Expire, Msg) of
 		true ->
 		    ok;
@@ -808,7 +809,8 @@ route_offline_message(#{jid := #jid{luser = LUser, lserver = LServer, lresource 
 			allow ->
 				NewMsg = xmpp:set_to(Msg, #jid{luser = LUser, lserver = LServer, lresource = LResource}),
 				ejabberd_router:route(NewMsg);
-			deny -> ok
+			deny ->
+				ok
 		    end
 	    end
     end.

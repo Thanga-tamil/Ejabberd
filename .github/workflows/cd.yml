@@ -95,3 +95,4 @@ jobs:
             --set client.key="${{ secrets.TM_CLIENT_KEY }}" \
             --set image.repository=${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT}/${ARTIFACT_REGISTRY_NAME}/${{ github.event.repository.name }} \
             --set image.tag=${IMAGE_TAG}
+            
