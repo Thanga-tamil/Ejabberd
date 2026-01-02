@@ -54,7 +54,7 @@ jobs:
           provenance: false
           tags: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_NAME }}/${{ github.event.repository.name }}:${{ env.IMAGE_TAG }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=min
 
       - name: Get GKE credentials
         run: |
@@ -86,7 +86,7 @@ jobs:
       - name: Helm upgrade/install
         run: |
           RELEASE_NAME=${{ steps.chart_name.outputs.chart_name }}
-          helm upgrade --install "$RELEASE_NAME" ./charts \
+          helm upgrade --install --force "$RELEASE_NAME" ./charts \
             --namespace production \
             --create-namespace \
             --set ejabberd.staticIp=${{ steps.static_ip.outputs.STATIC_IP }} \
