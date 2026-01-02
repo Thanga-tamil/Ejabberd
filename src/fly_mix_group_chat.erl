@@ -814,7 +814,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                                 [image | NewChanges2];
                             {OldImage, NewImage} when OldImage =:= NewImage ->
                                 NewChanges2;
-                            {OldImage, NewImage} when OldImage =/= <<>> andalso NewImage =/= OldDesc ->
+                            {OldImage, NewImage} when OldImage =/= <<>> andalso NewImage =/= OldImage ->
                                 ?INFO_MSG("Image updated for group ~p", [LUser]),
                                 [image | NewChanges2];
                             _ ->
@@ -842,8 +842,10 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                                     image ->
                                         case OldImage of
                                             <<>> -> % First time adding image
+                                                ?INFO_MSG("Image updated update_group_info_to_members 12 ~p", [OldImage]),
                                                 update_group_info_to_members(From, To, Status, VCard, JIDs, <<"12">>, SubEl, <<"">>);
                                             _ -> % Updating existing image
+                                                ?INFO_MSG("Image updated update_group_info_to_members 13 ~p", [OldImage]),
                                                 update_group_info_to_members(From, To, Status, VCard, JIDs, <<"13">>, SubEl, <<"">>)
                                         end
                                 end;
@@ -979,6 +981,7 @@ process_admin_remove_participant(From, To, SubEl, IQ) ->
 
   _RequestType = <<"admin_remove_participant">>,
   Participant = fxml:get_subtag(SubEl, <<"participant">>),
+  ?INFO_MSG("process_admin_remove_participant Participant ~p",[Participant]),
   #jid{luser = _User, lserver = FServer} = From,
   ParticipantData = fxml:get_tag_cdata(Participant),
   MacroNameSpace = ?NS_MIX_GROUP_CHAT,
@@ -986,10 +989,16 @@ process_admin_remove_participant(From, To, SubEl, IQ) ->
   MacroNameSpace = ?NS_MIX_GROUP_CHAT,
   FromJID = jid:make(fly_mod_utils:get_user_from_string_jid(ParticipantData),FServer,<<"">>),
   MessageId = <<(get_string()) / binary>>,
+  ?INFO_MSG("process_admin_remove_participant FromJID ~p",[FromJID]),
+  ?INFO_MSG("process_admin_remove_participant TUser ~p",[TUser]),
+  ?INFO_MSG("process_admin_remove_participant ParticipantData ~p",[ParticipantData]),
+  ?INFO_MSG("process_admin_remove_participant get_user_from_string_jid ~p",[fly_mod_utils:get_user_from_string_jid(ParticipantData)]),
   case catch fly_mod_utils:get_participants(FServer, TUser, fly_mod_utils:get_user_from_string_jid(ParticipantData)) of
       {selected, _, []} ->
+      ?INFO_MSG("process_admin_remove_participant participant not found ~p",[TUser]),
       fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Participant not removed in group">>});
     {selected, _, _GroupMembers} ->
+      ?INFO_MSG("process_admin_remove_participant FromJID ~p",[FromJID]),
       mod_mix:process_mix_core(#iq{from = FromJID , to = To, type = set ,id = MessageId,
       sub_els = [#mix_leave{from_jid = From, xmlns = <<"urn:xmpp:mix:core:0">>}]}),
       #jid{user = PUser} = FromJID,
@@ -997,6 +1006,7 @@ process_admin_remove_participant(From, To, SubEl, IQ) ->
       update_group_status(From, To, SubEl, IQ, <<"3">>, Participant, MessageId),
       fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Participant removed successfully">>});
       {_, _} ->
+        ?INFO_MSG("process_admin_remove_participant final block ~p",[TUser]),
       fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Participant not removed in group">>})
       end.
 %%%============================================================================================
@@ -1125,13 +1135,21 @@ process_admin_remove_admin(From, To, SubEl, IQ) ->
 
 process_user_exit_group(From, To, SubEl, IQ, RequestFrom) ->
   _RequestType = <<"user_exit_group">>,
+  ?INFO_MSG("process_user_exit_group RequestFrom ~p",[RequestFrom]),
   Participant = fxml:get_subtag(SubEl, <<"participant">>),
+  ?INFO_MSG("process_user_exit_group Participant ~p",[Participant]),
   ParticipantData = fxml:get_tag_cdata(Participant),
+  ?INFO_MSG("process_user_exit_group ParticipantData ~p",[ParticipantData]),
   #jid{luser = SUser, lserver = Server, lresource = Resource} = From,
   ParticipantJid = jid:make(fly_mod_utils:get_user_from_string_jid(ParticipantData),Server,<<>>),
+  ?INFO_MSG("process_user_exit_group ParticipantJid ~p",[ParticipantJid]),
   #jid{user = PUser} = ParticipantJid,
+  ?INFO_MSG("process_user_exit_group PUser ~p",[PUser]),
   MobileResource = string:str(binary_to_list(Resource), binary_to_list(<<"Mobile-">>)),
+  ?INFO_MSG("process_user_exit_group MobileResource ~p",[MobileResource]),
   WebResource = string:str(binary_to_list(Resource), binary_to_list(<<"Web-">>)),
+  ?INFO_MSG("process_user_exit_group WebResource ~p",[WebResource]),
+
   if MobileResource =:= 0 andalso WebResource =:= 0 ->
     FromUser = ParticipantJid;
   true ->
@@ -1141,12 +1159,20 @@ process_user_exit_group(From, To, SubEl, IQ, RequestFrom) ->
       FromUser = From
     end
   end,
+  ?INFO_MSG("process_user_exit_group FromUser ~p",[FromUser]),
+  ?INFO_MSG("process_user_exit_group SUser ~p",[SUser]),
+  ?INFO_MSG("process_user_exit_group PUser ~p",[PUser]),
+  ?INFO_MSG("process_user_exit_group From ~p",[From]),
+
   #jid{user = TUser} = To,
+  ?INFO_MSG("process_user_exit_group To ~p",[To]),
   if RequestFrom =:= <<"user_exit_group_api">> ->
     FUser = PUser;
   true ->
     FUser = SUser
     end,
+  ?INFO_MSG("process_user_exit_group RequestFrom ~p",[RequestFrom]),
+  ?INFO_MSG("process_user_exit_group FUser ~p",[FUser]),
   MessageId = <<(get_string()) / binary>>,
   case catch fly_mod_utils:get_participants(Server, TUser, fly_mod_utils:get_user_from_string_jid(ParticipantData)) of
       {selected, _, []} ->
@@ -1154,6 +1180,7 @@ process_user_exit_group(From, To, SubEl, IQ, RequestFrom) ->
       fly_mod_utils:generate_subel(IQ, #group_query{type = Status, removeduser = ParticipantData,  group_id = TUser, result_type = <<"Participant  not removed in group">>});
     {selected, _, _GroupMembers} ->
       Jid = fly_mod_utils:make_admin_ifadminexit(Server,PUser, TUser),
+      ?INFO_MSG("process_user_exit_group Jid ~p",[Jid]),
       if Jid =:= ok ->
             if FUser =:= PUser ->
               Status = <<"user_exit_group">>;
@@ -1175,6 +1202,11 @@ process_user_exit_group(From, To, SubEl, IQ, RequestFrom) ->
                 true ->
                   Status = <<"admin_exit_group">>
                 end,
+                ?INFO_MSG("process_user_exit_group Status ~p",[Status]),
+                ?INFO_MSG("process_user_exit_group AdminStatus ~p",[AdminStatus]),
+                ?INFO_MSG("process_user_exit_group JIDs ~p",[JIDs]),
+                ?INFO_MSG("process_user_exit_group Jid ~p",[Jid]),
+                ?INFO_MSG("process_user_exit_group SubEl ~p",[SubEl]),
                 update_group_info_to_members(FromUser, To, AdminStatus, Jid, JIDs, <<"5">>, SubEl, <<"">>)
             end
       end,
@@ -1792,6 +1824,7 @@ process_get_removed_user(From, _To, SubEl, IQ, _RequestType) ->
 
 update_group_info_to_members(ActionUser, GroupFrom, Status, Data, Members, Notification, SubEl, GroupDescription) ->
   #jid{user = AUser, lserver = _AServer} = ActionUser,
+  ?INFO_MSG("update_group_info_to_members ActionUser ~p", [ActionUser]),
   ActionDoneBy = list_to_binary(binary_to_list(AUser) ++ "@" ++ binary_to_list(_AServer)),
   #jid{user = FUser, lserver = _FServer} = GroupFrom,
   CustAtr = fxml:get_subtag_with_xmlns(xmpp:encode(SubEl), <<"custom_attributes">>, <<"ocp:json">>),
@@ -1802,6 +1835,7 @@ update_group_info_to_members(ActionUser, GroupFrom, Status, Data, Members, Notif
   end,
   Timestamp = now_to_microseconds(erlang:now()),
   FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
+  ?INFO_MSG("update_group_info_to_members Status ~p", [Status]),
   if Status == <<"new_admin_added">> ->
       ParticipantJid = <<Data / binary, $@,_AServer / binary>>,
       fly_mod_utils:update_group_count(_AServer, FUser),
@@ -1844,6 +1878,7 @@ Status == <<"remove_admin">> ->
     end
     end, Members);
     Status == <<"group_profile_updated">> ->
+      ?INFO_MSG("update_group_info_to_members FUser ~p", [FUser]),
       fly_mod_utils:update_group_count(_AServer, FUser),
       MessageId = <<(get_string()) / binary>>,
       case catch fly_mod_utils:get_group_profile_type(_AServer,FUser) of
@@ -1877,6 +1912,7 @@ Status == <<"remove_admin">> ->
                                     end,
       lists:foreach(fun(To) ->
         RouteToJid = jid:make(To, _AServer, <<>>),
+        ?INFO_MSG("update_group_info_to_members RouteToJid ~p", [RouteToJid]),
         #jid{user = TUser, lserver = TServer} = RouteToJid,
         EncryptedDescriptionNotifier = fly_mod_security:aes_encrpyt_group_desc_notifier(MessageId, <<"ddc0f15cc2c90fca">>, GroupDescription),
         fly_mod_utils:group_notify_message(ActionUser, RouteToJid, <<"">>, FUser, Notification, Status, MessageId,list_to_binary(FlatTimeStamp), EncryptedDescriptionNotifier),
