@@ -468,13 +468,13 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
               fly_mod_utils:get_custom_attributes(SubEl)
             ]},
 
-            ejabberd_router:route(From, BareToJid, NewPacket),
-            case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
-              true ->
-                fly_mod_offline_push:send_offline_message({From,xmpp:decode(NewPacket,?NS_CLIENT, Opts)});
-              false ->
-                ok
-            end,
+            % ejabberd_router:route(From, BareToJid, NewPacket),
+            % case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
+              % true ->
+                fly_mod_offline_push:send_offline_message({From,xmpp:decode(NewPacket,?NS_CLIENT, Opts)}),
+              % false ->
+                % ok
+            % end,
             fly_mod_utils:insert_media_call_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,MetaData),
             fly_mod_utils:insert_call_log_status(FServer,FUser,ToUser,RoomId,CallType,CallStatus,CallTime,CallMode,GroupId,CallLink,list_to_binary(UsersList),LResource,MetaData)
           end, Users#xmlel.children);
