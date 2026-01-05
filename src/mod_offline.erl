@@ -827,6 +827,7 @@ route_offline_message(#{jid := #jid{luser = LUser, lserver = LServer, lresource 
 		    case privacy_check_packet(State, Msg, in) of
 			allow ->
 				NewMsg = xmpp:set_to(Msg, #jid{luser = LUser, lserver = LServer, lresource = LResource}),
+				?LOG_INFO("Routing offline message id ~p to ~p", [Id, LResource]),
 				ejabberd_router:route(NewMsg);
 			deny ->
 				ok

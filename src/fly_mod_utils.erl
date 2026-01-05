@@ -1322,6 +1322,7 @@ update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
           _ ->
             <<"chat">>
     end,
+    
     FinUser = if ChatType == <<"normal">> -> User; true -> TUser end,
 
     ejabberd_sql:sql_query(
