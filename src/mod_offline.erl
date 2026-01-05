@@ -788,15 +788,26 @@ route_in_batches(_State, [], _BatchSize) ->
     ok;
 
 route_in_batches(State, Msgs, BatchSize) ->
-    {Batch, Rest} = lists:split(BatchSize, Msgs),
-    lists:foreach(
-        fun(OffMsg) ->
-            route_offline_message(State, OffMsg)
-        end,
-        Batch
-    ),
-    timer:sleep(1000),
-    route_in_batches(State, Rest, BatchSize).
+    case length(Msgs) =< BatchSize of
+        true ->
+            %% Last batch (or only batch)
+            lists:foreach(
+                fun(OffMsg) ->
+                    route_offline_message(State, OffMsg)
+                end,
+                Msgs
+            );
+        false ->
+            {Batch, Rest} = lists:split(BatchSize, Msgs),
+            lists:foreach(
+                fun(OffMsg) ->
+                    route_offline_message(State, OffMsg)
+                end,
+                Batch
+            ),
+            timer:sleep(1000),
+            route_in_batches(State, Rest, BatchSize)
+    end.
 
 now_to_microseconds({Mega, Sec, Micro}) ->
   %%Epoch time in milliseconds from 1 Jan 1970
