@@ -435,50 +435,43 @@ el_to_offline_msg(El) ->
     end.
 
 get_and_del_spool_msg_t(LServer, LUser, LResource) ->
-    CleanResource = re:replace(binary_to_list(LResource), "Mobile-", "", [{return, list}]),
-    UResource = iolist_to_binary(CleanResource),
-    DeviceID = <<"MF-01-mobile">>,
 
     F = fun() ->
-	ExistQ = ?SQL("select @(count(username))s from spool where username=%(LUser)s and device_id=%(UResource)s and %(LServer)H ;"),
-	ExistResult = ejabberd_sql:sql_query_t(ExistQ),
- 
-        DeviceToUse =
-	case ExistResult of
-		{selected, [[CountBin]]} when is_binary(CountBin) ->
-		case binary_to_integer(CountBin) > 0 of
-			true -> UResource;
-			false -> DeviceID
-		end;
-
-		{selected, [[CountInt]]} when is_integer(CountInt) ->
-		case CountInt > 0 of
-			true -> UResource;
-			false -> DeviceID
-		end;
-
-		{selected, [{CountInt}]} when is_integer(CountInt) ->
-		case CountInt > 0 of
-			true -> UResource;
-			false -> DeviceID
-		end;
-
-		_ ->
-		DeviceID
-	end,
-
+        DeviceToUse = get_device_to_use(LServer, LUser, LResource),
         FetchQ = ?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H order by seq limit 100;"),
-        DeleteQ = ?SQL("delete from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H order by seq limit 100;"),
-
-        Result = ejabberd_sql:sql_query_t(FetchQ),
-        DResult = ejabberd_sql:sql_query_t(DeleteQ),
-
-        case {Result, DResult} of
-            {{selected, Rs}, {updated, DC}} when length(Rs) =/= DC ->
-                ejabberd_sql:restart(concurent_insert);
-            _ ->
-                Result
-        end
+        ejabberd_sql:sql_query_t(FetchQ)
     end,
 
     ejabberd_sql:sql_transaction(LServer, F).
+
+get_device_to_use(LServer, LUser, LResource) -> 
+
+    CleanResource 	= re:replace(binary_to_list(LResource), "Mobile-", "", [{return, list}]),
+    UResource 	= iolist_to_binary(CleanResource),
+    DeviceID 	= <<"MF-01-mobile">>,
+
+    CntQ = ejabberd_sql:sql_query(LServer, [<<"select count(username) from spool where username='">>,LUser,<<"' and device_id='">>,UResource,<<"';">>]),
+    ?LOG_INFO("CntQ: ~p", [CntQ]),
+
+    case CntQ of
+        {selected, _, [[CountBin]]} when is_binary(CountBin) ->
+            case binary_to_integer(CountBin) > 0 of
+                true -> UResource;
+                false -> DeviceID
+            end;
+
+        {selected, _, [[CountInt]]} when is_integer(CountInt) ->
+            case CountInt > 0 of
+                true -> UResource;
+                false -> DeviceID
+            end;
+
+        {selected, _, [{CountInt}]} when is_integer(CountInt) ->
+            case CountInt > 0 of
+                true -> UResource;
+                false -> DeviceID
+            end;
+
+        _ ->
+            DeviceID
+    end.
