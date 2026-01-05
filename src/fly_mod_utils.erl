@@ -1315,27 +1315,25 @@ update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
         ok
     end,
 
-  % ejabberd_sql:sql_query(
-  %   Server,
-  %   [<<"update chat_recent set unread =  0 where message_id='">>,MessageId,<<"' and to_user ='">>,User,<<"';">>]),
+    ?LOG_INFO("Fuser, Tuser, MessageId ~p ~p ~p", [User, TUser, MessageId]),
 
-  % if GroupId =/= <<"">> ->
-  %   ToJid = jid:make(TUser, Server, <<>>),
-  %   case catch get_groupmessage_status(ToJid, MessageId) of
-  %       {selected, _, []} ->
-  %         Status = <<"2">>;
-  %       {selected, _, [[GroupStatus]]} ->
-  %         Status = GroupStatus;
-  %       _ ->
-  %         Status = <<"2">>
-  %     end;
-  % true ->
-  %   Status = <<"2">>
-  % end,
+    ChatType = 
+    case ejabberd_sql:sql_query(Server, [<<"select chat_type from chat_message_edit_history where message_id = '">>,MessageId,<<"' group by message_id;">>]) of
+          {selected, _, [[C]]} ->
+            ?LOG_INFO("chat_type found to update seen status: ~p", [C]),
+            C;
+          _ ->
+            <<"chat">>
+    end,
 
-  ejabberd_sql:sql_query(
+    ?LOG_INFO("ChatType ~p", [ChatType]),
+    
+    FinUser = if ChatType == <<"normal">> -> User; true -> TUser end,
+    ?LOG_INFO("FinUser ~p", [FinUser]),
+
+    ejabberd_sql:sql_query(
     Server,
-    [<<"update chat_recent set status = 2 where  to_user ='">>,TUser,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>]).
+    [<<"update chat_recent set status = 2 where  to_user ='">>,FinUser,<<"' and message_id='">>,MessageId,<<"' and status < 2 ;">>]).
 
 %% Update message delivery status
 %%
@@ -1436,7 +1434,7 @@ end,
       '',0,'0000-00-00 00:00:00','0000-00-00 00:00:00') ON DUPLICATE KEY UPDATE to_user = '">>, ToUser, <<"',message_id = '">>, MessageId, <<"' ;">>])
       end;
     true ->
-  ejabberd_sql:sql_query(ToServer, [<<"delete from spool where username = '">>,ToUser, <<"' and message_id ='">>,MessageId, <<"';">>]),
+  %ejabberd_sql:sql_query(ToServer, [<<"delete from spool where username = '">>,ToUser, <<"' and message_id ='">>,MessageId, <<"';">>]), % commented to retain recalled message on edit in offline storage 
   ejabberd_sql:sql_query( ToServer, [<<"update  message_status set edit_status = 1, status = 0,  edit_message_id = '">>, EditMsgId , <<"' where message_id = '">>, MessageId, <<"' ;">>])
   end,
   ejabberd_sql:sql_query( ToServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg, meta_data) values ('">>, User, <<"', '">>, ToUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'chat', '">>, Msg, <<"', '">>, MetaData, <<"');">>]).
