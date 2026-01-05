@@ -79,7 +79,7 @@ process_iq_set(From, To, RequestType, IQ) ->
 %%</iq>
 
 update_call_status(From, RequestType, SubEl, IQ) ->
-  #jid{user = FUser, lserver = FServer} = From,
+  #jid{user = FUser, lserver = FServer, lresource = FRes} = From,
   RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),
   CallStatus = fxml:get_path_s(SubEl, [{attr, <<"call_status">>}]),
   case CallStatus of
@@ -220,55 +220,70 @@ update_call_status(From, RequestType, SubEl, IQ) ->
               send_call_to_users(FServer,RoomId,<<"exit">>,IQ,RequestType,FromJid,CallType,EndTime,CallMode,CallStatus,CallTime, SubEl)
           end
         end;
-    <<"CALLING">> ->
+      <<"CALLING">> ->
 
-      Users  = fxml:get_subtag(SubEl, <<"users">>),
-      Ccodes = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code),
+          Ccodes = gen_mod:get_module_opt(FServer, fly_mod_media, restricted_country_code),
+          FDevList = fly_mod_utils:get_users_devices_detail(FServer, sql_in([FUser]), sql_in(Ccodes)),
 
-      case fxml:get_path_s(SubEl, [{attr, <<"call_mode">>}]) of 
-        <<"onetomany">> -> 
-          UserList = lists:map(fun(U) -> JidBin = fxml:get_tag_cdata(U), [UserId, _] = binary:split(JidBin, <<"@">>), UserId end, Users#xmlel.children),
-          ?LOG_INFO("user_list ~p", [UserList]),
-          GroupId = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
-          if GroupId =/= <<"">> -> 
-            DevList = fly_mod_utils:get_users_devices_detail(FServer, sql_in(UserList), sql_in(Ccodes)),
-            ?LOG_INFO("device_list ~p", [DevList]),
-            case DevList of 
+          case FDevList of 
               [] -> 
-                fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"Calling isn't supported in the UAE">>});
-              _ -> 
-                send_payload(CallStatus, SubEl, [], false),
-                fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>})
-              end;
-          false -> 
-            ok
+                  ?LOG_INFO("call not allowed for From_User"),
+                  fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling isn't supported in the UAE">>});
+              [_ | _] ->
+                  FDeviceType = [ DType || [_C, DType] <- FDevList ],
+                  case not lists:member(get_device_type(FRes), FDeviceType) of 
+                      true ->
+                          ?LOG_INFO("call not allowed for From_User"),
+                          fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling isn't supported in the UAE">>});
+                      false -> 
+                          Users  = fxml:get_subtag(SubEl, <<"users">>),
+                          UserList = lists:map(fun(U) -> JidBin = fxml:get_tag_cdata(U), [UserId, _] = binary:split(JidBin, <<"@">>), UserId end, Users#xmlel.children),
+
+                          case fxml:get_path_s(SubEl, [{attr, <<"call_mode">>}]) of 
+                              <<"onetomany">> -> 
+                                  UserList = lists:map(fun(U) -> JidBin = fxml:get_tag_cdata(U), [UserId, _] = binary:split(JidBin, <<"@">>), UserId end, Users#xmlel.children),
+                                  ?LOG_INFO("user_list ~p", [UserList]),
+                                  GroupId = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
+                                  if GroupId =/= <<"">> -> 
+                                         DevList = fly_mod_utils:get_users_devices_detail(FServer, sql_in(UserList), sql_in(Ccodes)),
+                                         ?LOG_INFO("device_list ~p", [DevList]),
+                                         case DevList of 
+                                             [] -> 
+                                                 fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"Calling isn't supported in the UAE">>});
+                                             _ -> 
+                                                 send_payload(CallStatus, SubEl, [], false),
+                                                 fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>})
+                                         end;
+                                     false -> 
+                                         ok
+                                  end;
+
+                              <<"onetoone">> -> 
+                                  TUserJidEl  = fxml:get_subtag(Users, <<"user">>), ?LOG_INFO("TUserJidEl ~p", [TUserJidEl]),
+                                  JidBin      = fxml:get_tag_cdata(TUserJidEl), ?LOG_INFO("JidBin ~p", [JidBin]),
+                                  [TU,TS]     = binary:split(JidBin, <<"@">>), ?LOG_INFO("TU ~p, TS ~p", [TU,TS]),
+                                  DevList     = fly_mod_utils:get_users_devices_detail(FServer, sql_in([TU]), sql_in(Ccodes)), ?LOG_INFO("DevList ~p", [DevList]),
+                                  URes        = ejabberd_sm:get_user_resources(TU, FServer), ?LOG_INFO("URes ~p", [URes]),
+                                  IsAllowed   = case {DevList, URes} of {[], _} -> false; {_DevList, []} -> true; {_DevList, _URes} -> true end,
+
+                                  case IsAllowed of
+                                      true ->
+                                          ?LOG_INFO("call allowed"),
+                                          AllowedDevices = [ DeviceType || [_Country, DeviceType] <- DevList ],
+                                          ?LOG_INFO("pick AllowedDevices from devList to make full jid.. found: ~p", [AllowedDevices]),
+                                          TargetJids = [ jid:make(TU, TS, Res) || Res <- URes, lists:member(get_device_type(Res), AllowedDevices) ],
+                                          ?LOG_INFO("TargetJids ~p", [TargetJids]),
+                                          send_payload(CallStatus, SubEl, TargetJids, true),
+                                          fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>});
+                                      false ->
+                                          ?LOG_INFO("call not allowed"),
+                                          fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling isn't supported in the UAE">>})
+                                  end;
+                              _ -> 
+                                  ok
+                          end
+                  end
           end;
-
-        <<"onetoone">> -> 
-          TUserJidEl  = fxml:get_subtag(Users, <<"user">>), ?LOG_INFO("TUserJidEl ~p", [TUserJidEl]),
-          JidBin      = fxml:get_tag_cdata(TUserJidEl), ?LOG_INFO("JidBin ~p", [JidBin]),
-          [TU,TS]     = binary:split(JidBin, <<"@">>), ?LOG_INFO("TU ~p, TS ~p", [TU,TS]),
-          DevList     = fly_mod_utils:get_users_devices_detail(FServer, sql_in([TU]), sql_in(Ccodes)), ?LOG_INFO("DevList ~p", [DevList]),
-          URes        = ejabberd_sm:get_user_resources(TU, FServer), ?LOG_INFO("URes ~p", [URes]),
-          IsAllowed   = case {DevList, URes} of {[], _} -> false; {_DevList, []} -> true; {_DevList, _URes} -> true end,
-
-          case IsAllowed of
-            true ->
-              ?LOG_INFO("call allowed"),
-              AllowedDevices = [ DeviceType || [_Country, DeviceType] <- DevList ],
-              ?LOG_INFO("pick AllowedDevices from devList to make full jid.. found: ~p", [AllowedDevices]),
-              TargetJids = [ jid:make(TU, TS, Res) || Res <- URes, lists:member(get_device_type(Res), AllowedDevices) ],
-              ?LOG_INFO("TargetJids ~p", [TargetJids]),
-              send_payload(CallStatus, SubEl, TargetJids, true),
-              fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>});
-            false ->
-              ?LOG_INFO("call not allowed"),
-              fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling isn't supported in the UAE">>})
-          end;
-        _ -> 
-          ok
-        end;
-
     <<"JOINED">> ->
       RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),
       CallType = fxml:get_path_s(SubEl, [{attr, <<"call_type">>}]),
