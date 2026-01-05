@@ -723,14 +723,8 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
 		   []
 	   end,
 
-    lists:foreach(
-	fun(OffMsg) ->
-	    route_offline_message(State, OffMsg)
-	end, Msgs),
-	if Msgs =/= [] ->
-	route_offline_messages(State);
-	true -> ok
-	end;
+ 	route_in_batches(State, Msgs, 100);
+
     Substring =:= 0 ->
   case catch fly_mod_utils:get_not_delivered_message(LServer,LUser) of
       {selected, _, []} ->
@@ -789,6 +783,20 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
  true ->
 	 ok
 end.
+
+route_in_batches(_State, [], _BatchSize) ->
+    ok;
+
+route_in_batches(State, Msgs, BatchSize) ->
+    {Batch, Rest} = lists:split(BatchSize, Msgs),
+    lists:foreach(
+        fun(OffMsg) ->
+            route_offline_message(State, OffMsg)
+        end,
+        Batch
+    ),
+    timer:sleep(1000),
+    route_in_batches(State, Rest, BatchSize).
 
 now_to_microseconds({Mega, Sec, Micro}) ->
   %%Epoch time in milliseconds from 1 Jan 1970

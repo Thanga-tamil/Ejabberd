@@ -438,7 +438,7 @@ get_and_del_spool_msg_t(LServer, LUser, LResource) ->
 
     F = fun() ->
         DeviceToUse = get_device_to_use(LServer, LUser, LResource),
-        FetchQ = ?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H order by seq limit 100;"),
+        FetchQ = ?SQL("select @(username)s, @(xml)s from spool where username=%(LUser)s and device_id=%(DeviceToUse)s and %(LServer)H order by seq;"), %limit 100
         ejabberd_sql:sql_query_t(FetchQ)
     end,
 
