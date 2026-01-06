@@ -766,7 +766,10 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
         ?INFO_MSG("Existing Group Info - Nickname: ~p, Description: ~p, Image: ~p", [Nickname, Description, Image]),
         
         JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
-        case mod_vcard:set_vcard(LUser, FServer, VCard) of
+        SetVcard = mod_vcard:set_vcard(LUser, FServer, VCard),
+        MixParticipant = fly_mod_utils:update_mix_participant(FServer, LUser, IncomingNickName),
+        ?LOG_INFO("MixParticipant update result: ~p", [MixParticipant]),
+        case SetVcard of
           ok ->
             case catch fly_mod_utils:check_group_exists(FServer, LUser) of
               {selected, _, []} ->
