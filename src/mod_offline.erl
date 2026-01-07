@@ -723,7 +723,7 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
 		   []
 	   end,
 
-    route_total_count(State, Msgs, jid:make(LUser, LServer, LResource));
+    route_total_count(State, Msgs);
 
     Substring =:= 0 ->
   case catch fly_mod_utils:get_not_delivered_message(LServer,LUser) of
@@ -784,23 +784,23 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
 	 ok
 end.
 
-route_total_count(#{jid := #jid{luser = LUser, lserver = LServer, lresource = LResource}} = State, Msgs, User) -> 
-    
-	TotalCount = length(Msgs),
-	?LOG_INFO("Routing ~p offline records to user ~p@~p", [TotalCount, LUser, LServer]),
-	Packet = 
-	#xmlel{
-		name = <<"message">>,
-		attrs = [{<<"from">>, jid:to_string(User)}, {<<"to">>, jid:to_string(User)}, {<<"type">>, <<"offline_storage">>}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}],
-		children = [
-			#xmlel{name = <<"spool">>,
-			attrs = [{<<"xmlns">>, <<"urn:xmpp:delay">>}, {<<"count">>, integer_to_binary(TotalCount)}],
-			children = []}
-			]
-		},
-	
-	ejabberd_router:route(User, User, Packet),
-	route_in_batches(State, Msgs, 100).
+route_total_count(#{jid := U} = State, Msgs) ->
+
+        C = length(Msgs),
+        ?LOG_INFO("routing [~p] offline records for jid: ~p", [C, U]),
+        Packet =
+        #xmlel{
+                name = <<"message">>,
+                attrs = [{<<"from">>, jid:to_string(U)}, {<<"to">>, jid:to_string(U)}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}],
+                children = [
+                        #xmlel{name = <<"spool">>,
+                        attrs = [{<<"xmlns">>, <<"urn:xmpp:delay">>}, {<<"type">>, <<"offline_storage">>}, {<<"count">>, integer_to_binary(C)}],
+                        children = []}
+                        ]
+                },
+
+        ejabberd_router:route(U, U, Packet),
+        route_in_batches(State, Msgs, 100).
 
 route_in_batches(_State, [], _BatchSize) ->
     ok;
