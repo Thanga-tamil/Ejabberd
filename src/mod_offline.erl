@@ -723,7 +723,7 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
 		   []
 	   end,
 
-    route_total_count(jid:make(LUser, LServer), Msgs);
+    route_total_count(State, Msgs, jid:make(LUser, LServer, LResource));
 
     Substring =:= 0 ->
   case catch fly_mod_utils:get_not_delivered_message(LServer,LUser) of
@@ -784,14 +784,14 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
 	 ok
 end.
 
-route_total_count(#{jid := #jid{luser = LUser, lserver = LServer, lresource = LResource}} = State, Msgs) -> 
+route_total_count(#{jid := #jid{luser = LUser, lserver = LServer, lresource = LResource}} = State, Msgs, User) -> 
     
 	TotalCount = length(Msgs),
 	?LOG_INFO("Routing ~p offline records count to user ~p@~p", [TotalCount, LUser, LServer]),
 	Packet = 
 	#xmlel{
 		name = <<"message">>,
-		attrs = [{<<"from">>, jid:to_string(LUser)}, {<<"to">>, jid:to_string(LUser)}, {<<"type">>, <<"offline_storage">>}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}],
+		attrs = [{<<"from">>, jid:to_string(User)}, {<<"to">>, jid:to_string(User)}, {<<"type">>, <<"offline_storage">>}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}],
 		children = [
 			#xmlel{name = <<"spool">>,
 			attrs = [{<<"xmlns">>, <<"jabber:iq:mod_offline">>}, {<<"count">>, TotalCount}],
