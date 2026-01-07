@@ -859,7 +859,6 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
     
   #jid{user = FUser, lserver = FServer,lresource = LResource} = From,
   MsgId = fxml:get_path_s(SubEl, [{attr, <<"id">>}]),
-  ?LOG_INFO("acknowledgement for msg id: ~p", [MsgId]),
   Substring = string:str(binary_to_list(LResource),binary_to_list(<<"Mobile-">>)),
   if Substring =:= 1 ->
     MResource = fly_mod_utils:get_device_from_resource(LResource);
