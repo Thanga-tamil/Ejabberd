@@ -517,7 +517,7 @@ get_roster_and_recent_jid(#jid{luser = User,lserver = Server})->
   ejabberd_sql:sql_query(Server,[<<" select from_user as jid from chat_recent where to_user = '">>,User,<<"' and chat_type = 'chat';" >>]).
 
 get_roster_from_recent_jid(#jid{luser = User,lserver = Server})->
-  ejabberd_sql:sql_query(Server,[<<"select to_user as jid from chat_recent where from_user = '">>,User,<<"' and chat_type = 'chat' union select username from rosterusers  where jid_username = '">>,User,<<"';" >>]).
+  ejabberd_sql:sql_query(Server,[<<"select to_user as jid from chat_recent where from_user = '">>,User,<<"' and chat_type = 'chat' union select username from rosterusers  where jid_username = '">>,User,<<"' and username != '">>,User,<<"';" >>]).
 
 get_email_contacts(#jid{luser = User, lserver = Server})->
   ejabberd_sql:sql_query(Server,[<<"select username as jid from contus_chat_users contus_chat_users where username not in (select jid from rosterusers  where username = '">>,User,<<"' union select CONCAT(from_user,'@','">>,Server,<<"') as jid from chat_recent where to_user = '">>,User,<<"' and chat_type = 'chat') GROUP BY jid;" >>]).
