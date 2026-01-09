@@ -244,7 +244,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
                                   UserList = lists:map(fun(U) -> JidBin = fxml:get_tag_cdata(U), [UserId, _] = binary:split(JidBin, <<"@">>), UserId end, Users#xmlel.children),
                                   ?LOG_INFO("user_list ~p", [UserList]),
                                   GroupId = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
-                                  if GroupId =/= <<"">> -> 
+                                  if GroupId =/= <<"">> orelse GroupId =/= <<>> -> 
                                          DevList = fly_mod_utils:get_users_devices_detail(FServer, sql_in(UserList), sql_in(Ccodes)),
                                          ?LOG_INFO("device_list ~p", [DevList]),
                                          case DevList of 
@@ -254,7 +254,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
                                                  send_payload(CallStatus, SubEl, [], false),
                                                  fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>})
                                          end;
-                                     false -> 
+                                     true -> 
                                          ok
                                   end;
 
