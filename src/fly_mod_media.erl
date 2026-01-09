@@ -253,10 +253,10 @@ update_call_status(From, RequestType, SubEl, IQ) ->
                                              _ -> 
                                                  send_payload(CallStatus, SubEl, [], false),
                                                  fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>})
-                                         end
+                                         end;
                                     %  true -> 
                                         % ok
-                                  end;
+                                  % end;
 
                               <<"onetoone">> -> 
                                   TUserJidEl  = fxml:get_subtag(Users, <<"user">>), ?LOG_INFO("TUserJidEl ~p", [TUserJidEl]),
