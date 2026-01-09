@@ -1315,21 +1315,14 @@ update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
         ok
     end,
 
-    ?LOG_INFO("Fuser, Tuser, MessageId ~p ~p ~p", [User, TUser, MessageId]),
-
     ChatType = 
     case ejabberd_sql:sql_query(Server, [<<"select chat_type from chat_message_edit_history where message_id = '">>,MessageId,<<"' group by message_id;">>]) of
           {selected, _, [[C]]} ->
-            ?LOG_INFO("chat_type found to update seen status: ~p", [C]),
             C;
           _ ->
             <<"chat">>
     end,
-
-    ?LOG_INFO("ChatType ~p", [ChatType]),
-    
     FinUser = if ChatType == <<"normal">> -> User; true -> TUser end,
-    ?LOG_INFO("FinUser ~p", [FinUser]),
 
     ejabberd_sql:sql_query(
     Server,

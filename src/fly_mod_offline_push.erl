@@ -441,6 +441,7 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
             <<"">>
     end,
   Ccodes = gen_mod:get_module_opt(Recipient#jid.server, fly_mod_offline_push, restricted_country_code), 
+  ?LOG_INFO("Ccodes: ~p", [Ccodes]),
 
   DeviceDetails = 
   if CallMode =:= <<"onetoone">> ->
@@ -448,6 +449,8 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
     true ->
       fly_mod_utils:get_user_device(Recipient#jid.server, Recipient#jid.luser, Rs, ChatType)
   end,
+
+  ?LOG_INFO("DeviceDetails: ~p", [DeviceDetails]),
 
   case catch DeviceDetails of
     {selected, _, []} -> 

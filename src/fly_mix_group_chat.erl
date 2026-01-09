@@ -1502,7 +1502,6 @@ process_get_participants(From, To, _SubEl, IQ, RequestType) ->
 
         IsAdminBlockedElement = #xmlel{name = <<"is_admin_blocked">>, attrs = [], children = [{xmlcdata, IsAdminBlocked}]},
 
-        ?LOG_INFO("(get_participants) FUser: ~p TUser: ~p", [FUser, UserId]),
         VcardElement = #xmlel{name = <<"user_profile">>, attrs = [], children = mod_vcard:remove_tag(UserVCard, FUser, UserId, Server)},
 
         #xmlel{name = <<"participant">>, attrs = [], children = [JidElement, AffiliationElement, ItemIdElement, CreatedElement, IsAdminBlockedElement, VcardElement]}
@@ -1835,7 +1834,6 @@ update_group_info_to_members(ActionUser, GroupFrom, Status, Data, Members, Notif
   end,
   Timestamp = now_to_microseconds(erlang:now()),
   FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
-  ?INFO_MSG("update_group_info_to_members Status ~p", [Status]),
   if Status == <<"new_admin_added">> ->
       ParticipantJid = <<Data / binary, $@,_AServer / binary>>,
       fly_mod_utils:update_group_count(_AServer, FUser),
