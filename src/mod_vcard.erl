@@ -247,18 +247,11 @@ process_sm_iq(#iq{type = get, from = From, to = To, lang = Lang} = IQ) ->
 
 remove_tag(Els, FUser, LUser, LServer) -> 
     HideImg = fly_mod_utils:get_hide_profile_privacy(LServer, LUser),
-    ?LOG_INFO("hide profile status: ~p", [HideImg]),
-
     Hide = case HideImg of
                 {selected, [<<"hide_profile">>], [[<<"0">>]]} -> true;
                 {selected, [<<"hide_profile">>], [[_]]} -> false;
                 _ -> false
             end,
-
-    ?LOG_INFO("Hide status: ~p", [Hide]),
-    ?LOG_INFO("FUser: ~p", [FUser]),
-    ?LOG_INFO("LUser: ~p", [LUser]),
-    ?LOG_INFO("FUser =/= LUser: ~p", [FUser =/= LUser]),
 
     case Hide andalso FUser =/= LUser of
         true ->

@@ -243,19 +243,14 @@ update_call_status(From, RequestType, SubEl, IQ) ->
                               <<"onetomany">> -> 
                                   UserList = lists:map(fun(U) -> JidBin = fxml:get_tag_cdata(U), [UserId, _] = binary:split(JidBin, <<"@">>), UserId end, Users#xmlel.children),
                                   ?LOG_INFO("user_list ~p", [UserList]),
-                                  GroupId = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
-                                  if GroupId =/= <<"">> -> 
-                                         DevList = fly_mod_utils:get_users_devices_detail(FServer, sql_in(UserList), sql_in(Ccodes)),
-                                         ?LOG_INFO("device_list ~p", [DevList]),
-                                         case DevList of 
-                                             [] -> 
-                                                 fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"Calling isn't supported in the UAE">>});
-                                             _ -> 
-                                                 send_payload(CallStatus, SubEl, [], false),
-                                                 fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>})
-                                         end;
-                                     false -> 
-                                         ok
+                                  DevList = fly_mod_utils:get_users_devices_detail(FServer, sql_in(UserList), sql_in(Ccodes)),
+                                  ?LOG_INFO("device_list ~p", [DevList]),
+                                  case DevList of 
+                                    [] -> 
+                                      fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"Calling isn't supported in the UAE">>});
+                                    _ -> 
+                                      send_payload(CallStatus, SubEl, [], false),
+                                      fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>})
                                   end;
 
                               <<"onetoone">> -> 
@@ -458,9 +453,11 @@ send_call_message(From,SubEl,Users,CallStatus,RoomId,CallType,CallMode,CallTime,
             #xmlel{name = <<"mediacall">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:call">>}, {<<"room_id">>, RoomId},  {<<"call_link">>, CallLink},{<<"meta_data">>, MetaData}, {<<"caller_name">>, CallerName}, {<<"call_mode">>, CallMode},{<<"call_status">>, CallStatus}, {<<"call_type">>, CallType},  {<<"call_time">>, CallTime},  {<<"group_id">>, GroupId}], children = [Users]},
             fly_mod_utils:get_custom_attributes(SubEl)
           ]},
+            ?LOG_INFO("Routing call message to ~p", [Dest]),
             ejabberd_router:route(From, Dest, NewPacket),
           case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
             true ->
+              ?LOG_INFO("send push to user ~p", [ToUser]),
               fly_mod_offline_push:send_offline_message({From,xmpp:decode(NewPacket,?NS_CLIENT, Opts)});
             false ->
               ok
