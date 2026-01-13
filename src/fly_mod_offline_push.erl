@@ -1019,96 +1019,139 @@ gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
     true -> {ok, <<"chat type is different gcm">>}
   end.
 
+%%%===================================================================
+%%% RabbitMQ Connection Management with Safe Channel Lifecycle
+%%%===================================================================
+
 create_rabbit_mq_create_connection(Host) ->
-  RabbitMQHost = gen_mod:get_module_opt(Host, ?PROCNAME, rabbitmq_host),
-  RabbitMQExchange = gen_mod:get_module_opt(Host, ?PROCNAME, rabbitmq_exchange),
-  RabbitMQUsername = gen_mod:get_module_opt(Host, ?PROCNAME, rabbitmq_username),
-  RabbitMQPassWord = gen_mod:get_module_opt(Host, ?PROCNAME, rabbitmq_password),
-  case amqp_connection:start(#amqp_params_network{host = binary_to_list(RabbitMQHost), username = RabbitMQUsername, password = RabbitMQPassWord}) of
-    {ok, RMQConnection} ->
-      ?INFO_MSG("RMQConnection: ~p",[RMQConnection]),
-      Channel = create_rabbit_mq_channel_connection(RMQConnection),
-      case check_rabbit_mq_connection_table (rabbit_mq_connection) of
-        true ->
-          ets:delete_all_objects(rabbit_mq_connection);
+    maybe_cleanup_old_connection(),
+    RabbitMQHost = gen_mod:get_module_opt(Host, ?PROCNAME, rabbitmq_host),
+    RabbitMQExchange = gen_mod:get_module_opt(Host, ?PROCNAME, rabbitmq_exchange),
+    RabbitMQUsername = gen_mod:get_module_opt(Host, ?PROCNAME, rabbitmq_username),
+    RabbitMQPassWord = gen_mod:get_module_opt(Host, ?PROCNAME, rabbitmq_password),
+
+    case amqp_connection:start(
+        #amqp_params_network{
+            host = binary_to_list(RabbitMQHost),
+            username = RabbitMQUsername,
+            password = RabbitMQPassWord
+        }) of
+        {ok, RMQConnection} ->
+            ?INFO_MSG("RabbitMQ connection established: ~p", [RMQConnection]),
+            Channel = create_rabbit_mq_channel_connection(RMQConnection, Host),
+            case check_rabbit_mq_connection_table(rabbit_mq_connection) of
+                true -> ets:delete_all_objects(rabbit_mq_connection);
+                _ -> ok
+            end,
+            ets:insert(rabbit_mq_connection, {pid, RMQConnection}),
+            ets:insert(rabbit_mq_connection, {channel, Channel}),
+            [Channel, RabbitMQExchange];
+        Error ->
+            ?ERROR_MSG("RabbitMQ connection failed: ~p", [Error]),
+            Error
+    end.
+
+%%%-------------------------------------------------------------------
+%%% Safely close old RabbitMQ connections and channels
+%%%-------------------------------------------------------------------
+maybe_cleanup_old_connection() ->
+    maybe_close_old_channel(),
+    case ets:lookup(rabbit_mq_connection, pid) of
+        [{pid, OldConn}] when is_pid(OldConn) ->
+            catch amqp_connection:close(OldConn),
+            ets:delete_all_objects(rabbit_mq_connection),
+            ?INFO_MSG("Closed old RabbitMQ connection: ~p", [OldConn]);
         _ ->
-          ok
-      end,
-      ets:insert(rabbit_mq_connection, {pid, RMQConnection}),
-      [Channel,RabbitMQExchange];
-    _Error ->
-      ?ERROR_MSG("RabbitMQ Server Connection Failed: ~p",[_Error])
+            ok
+    end.
 
-  end.
+%%%-------------------------------------------------------------------
+%%% Safely create a new channel for an existing connection
+%%%-------------------------------------------------------------------
+create_rabbit_mq_channel_connection(RMQConnection, Host) ->
+    maybe_close_old_channel(),
+    case amqp_connection:open_channel(RMQConnection) of
+        {ok, Channel} ->
+            case check_rabbit_mq_connection_table(rabbit_mq_connection) of
+                true -> ets:delete_all_objects(rabbit_mq_connection);
+                _ -> ok
+            end,
+            ets:insert(rabbit_mq_connection, {pid, RMQConnection}),
+            ets:insert(rabbit_mq_connection, {channel, Channel}),
+            ?INFO_MSG("Created new RabbitMQ channel: ~p", [Channel]),
+            Channel;
+        {error, Reason} ->
+            io:format("Failed to open channel: ~p~n", [Reason]),
+            catch amqp_connection:close(RMQConnection),
+            [ChannelNewPid, _] = create_rabbit_mq_create_connection(Host),
+            ChannelNewPid
+    end.
 
-create_rabbit_mq_channel_connection(RMQConnection) ->
-  {ok, Channel} = amqp_connection:open_channel(RMQConnection),
-  case check_rabbit_mq_connection_table (rabbit_mq_connection) of
-    true ->
-      ets:delete_all_objects(rabbit_mq_connection);
-    _ ->
-      ok
-  end,
-  ets:insert(rabbit_mq_connection, {pid, RMQConnection}),
-  Channel.
+%%%-------------------------------------------------------------------
+%%% Close old channel if it exists
+%%%-------------------------------------------------------------------
+maybe_close_old_channel() ->
+    case ets:lookup(rabbit_mq_connection, channel) of
+        [{channel, OldChannel}] when is_pid(OldChannel) ->
+            catch amqp_channel:close(OldChannel),
+            ets:delete(rabbit_mq_connection, channel),
+            ?INFO_MSG("Closed old RabbitMQ channel: ~p", [OldChannel]);
+        _ -> ok
+    end.
 
-check_rabbit_mq_connection_table(Table)->
-  case  ets:lookup(Table, pid) of
-    [{pid,_}] -> true;
-    _ ->
-      false
-  end.
+%%%-------------------------------------------------------------------
+%%% Check ETS table for active RabbitMQ connection
+%%%-------------------------------------------------------------------
+check_rabbit_mq_connection_table(Table) ->
+    case ets:lookup(Table, pid) of
+        [{pid, _}] -> true;
+        _ -> false
+    end.
 
-check_rabbit_mq_connection_is_alive(ChannelPid,Host) ->
-  ChannelConnection = case is_pid(ChannelPid) of
-                        true ->
-                          case  is_process_alive(ChannelPid)of
-                            true ->
-                              ChannelPid;
-                            false ->
-                              [[RabbitMQConnectionPid]] = ets:match(rabbit_mq_connection, {pid, '$1'}),
-                              ?INFO_MSG("RabbitMQConnectionPid-from-ets: ~p",[RabbitMQConnectionPid]),
-                              case is_pid(RabbitMQConnectionPid)  of
-                                true  ->
-                                  ?INFO_MSG("Connection-Pid-Alive: ~p",[ChannelPid]),
-                                  case is_process_alive(RabbitMQConnectionPid) of
-                                    true ->
-                                      ChannelNewPid = create_rabbit_mq_channel_connection(RabbitMQConnectionPid),
-                                      ?INFO_MSG("Connection-Process-Alive-with new channel pid: ~p",[ChannelNewPid]),
-                                      ChannelNewPid;
-                                    false ->
-                                      [ChannelNewPid,_] = create_rabbit_mq_create_connection(Host),
-                                      ?INFO_MSG("Connection-Process-not-Alive-with new channel pid: ~p",[ChannelNewPid]),
-                                      ChannelNewPid
-                                  end;
-                                _ ->
-                                  [ChannelNewPid,_] = create_rabbit_mq_create_connection(Host),
-                                  ?INFO_MSG("Connection-Pid-not-Alive-with new channel pid: ~p",[ChannelNewPid]),
-                                  ChannelNewPid
-                              end
-                          end;
-                        _ ->
-                          ?INFO_MSG("Channel-Pid-Not-Alive: ~p",[ChannelPid]),
-                          [[RabbitMQConnectionPid]] = ets:match(rabbit_mq_connection, {pid, '$1'}),
-                          case is_pid(RabbitMQConnectionPid)  of
-                            true  ->
-                              ?INFO_MSG("Channel-Pid-Not-Alive-RabbitMQ-Connection-Alive: ~p",[ChannelPid]),
-                              case is_process_alive(RabbitMQConnectionPid) of
-                                true ->
-                                  ChannelNewPid = create_rabbit_mq_channel_connection(RabbitMQConnectionPid),
-                                  ?INFO_MSG("Connection-Process-Alive-with new channel pid: ~p",[ChannelNewPid]),
-                                  ChannelNewPid;
-                                false ->
-                                  [ChannelNewPid,_] = create_rabbit_mq_create_connection(Host),
-                                  ?INFO_MSG("Connection-Process-Alive-with new channel pid: ~p",[ChannelNewPid]),
-                                  ChannelNewPid
-                              end;
-                            _ ->
-                              [ChannelNewPid,_] = create_rabbit_mq_create_connection(Host),
-                              ?INFO_MSG("Channel-Pid-Not-Alive-RabbitMQ-Connection-Alive-with-New ChannelPID: ~p",[ChannelNewPid]),
-                              ChannelNewPid
-                          end
-                      end, ChannelConnection.
+%%%-------------------------------------------------------------------
+%%% Ensure channel and connection are alive, recreate if not
+%%%-------------------------------------------------------------------
+check_rabbit_mq_connection_is_alive(ChannelPid, Host) ->
+    ChannelConnection =
+        case is_pid(ChannelPid) of
+            true ->
+                case is_process_alive(ChannelPid) of
+                    true ->
+                        ChannelPid;
+                    false ->
+                        catch amqp_channel:close(ChannelPid),
+                        handle_connection_recovery(Host)
+                end;
+            false ->
+                handle_connection_recovery(Host)
+        end,
+    ChannelConnection.
+
+%%%-------------------------------------------------------------------
+%%% Helper: Recover connection and channel
+%%%-------------------------------------------------------------------
+handle_connection_recovery(Host) ->
+    case ets:match(rabbit_mq_connection, {pid, '$1'}) of
+        [[RabbitMQConnectionPid]] ->
+            case is_pid(RabbitMQConnectionPid) of
+                true ->
+               case is_process_alive(RabbitMQConnectionPid) of
+                  true ->
+                      ChannelNewPid = create_rabbit_mq_channel_connection(RabbitMQConnectionPid, Host),
+                      ?INFO_MSG("Recovered alive RabbitMQ connection, new channel pid: ~p", [ChannelNewPid]),
+                      ChannelNewPid;
+                  false ->
+                      [ChannelNewPid, _] = create_rabbit_mq_create_connection(Host),
+                      ?INFO_MSG("Recreated dead RabbitMQ connection, new channel pid: ~p", [ChannelNewPid]),
+                      ChannelNewPid
+              end
+            end;
+        _ ->
+            [ChannelNewPid, _] = create_rabbit_mq_create_connection(Host),
+            ?INFO_MSG("No RabbitMQ connection found, new channel pid: ~p", [ChannelNewPid]),
+            ChannelNewPid
+    end.
+
 %% Send Android push payloads to the rabbit mq server
 send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host) ->
 
