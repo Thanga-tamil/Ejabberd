@@ -276,7 +276,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
                                             true ->
                                               fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling isn't supported in the UAE">>});
                                             false ->
-                                              fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"user_logged_out">>, result_type = <<"No session found for the destination user">>})
+                                              fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>})
                                             end
                                   end;
                               _ -> 
