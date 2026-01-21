@@ -421,7 +421,7 @@ process_mix_join(#iq{to = To, from = From,
     case Mod:get_channel(ServerHost, Chan, Host) of
 	{ok, {_, _, Key}} ->
 	    ID = make_id(From, Key),
-	    Nick = JoinReq#mix_join.nick,
+	    InputNick = JoinReq#mix_join.nick,
 	    BFrom = jid:remove_resource(From),
 	    Nodes = filter_nodes(JoinReq#mix_join.subscribe),
 	    if Pub == <<>> ->
@@ -432,13 +432,15 @@ process_mix_join(#iq{to = To, from = From,
 	   PublisherJID = jid:make(fly_mod_utils:get_user_from_string_jid(Publisher),From#jid.lserver,<<"">>),
 	   PubID = make_id(PublisherJID, Key),
 	    try
-		ok = Mod:set_participant(ServerHost, Chan, Host, BFrom, MsgId, Nick),
+		NickOnDB = fly_mod_utils:get_nickname(ServerHost, Chan),
+		?LOG_INFO("InputNick: ~p | NickOnDB: ~p", [InputNick, NickOnDB]),
+		ok = Mod:set_participant(ServerHost, Chan, Host, BFrom, MsgId, NickOnDB),
 		ok = Mod:subscribe(ServerHost, Chan, Host, BFrom, Nodes),
-		notify_participant_joined(Mod, ServerHost, To, From, MsgId, [Nick, GroupCreate,  Publisher, PubID, CustomAttr], MsgId),
+		notify_participant_joined(Mod, ServerHost, To, From, MsgId, [NickOnDB, GroupCreate,  Publisher, PubID, CustomAttr], MsgId),
 		xmpp:make_iq_result(IQ, #mix_join{id = MsgId,
 						  subscribe = Nodes,
 						  jid = make_channel_id(To, MsgId),
-						  nick = Nick,
+						  nick = NickOnDB,
 						  xmlns = XmlNs})
 	    catch _:{badmatch, {error, db_failure}} ->
 		    xmpp:make_error(IQ, db_error(IQ))
