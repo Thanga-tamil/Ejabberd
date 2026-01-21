@@ -894,7 +894,7 @@ get_resource_sessions(User, Server, Resource) ->
 
 %% Contus added the below code
 -spec check_max_sessions(binary(), binary(), binary()) -> ok | replaced.
-    check_max_sessions(LUser, LServer, LResource) ->
+check_max_sessions(LUser, LServer, LResource) ->
     %% If the new connection is NOT a Web resource, do not run Web-only replacement.
     case is_web_resource(LResource) of
         true ->
@@ -903,51 +903,35 @@ get_resource_sessions(User, Server, Resource) ->
 
             % Filter only existing Web sessions excluding the current resource
             SsWeb = [S || S <- SsAll,
-                         begin
-                             Res = extract_resource(S),
-                             is_web_resource(Res) andalso Res =/= LResource
-                         end],
+                          begin
+                              Res = extract_resource(S),
+                              ?LOG_INFO("session replacer resource [~p] for user [~p]", [Res, LUser]),
+                              is_web_resource(Res) andalso Res =/= LResource
+                          end],
 
             case SsWeb of
                 [] ->
                     ok;
                 _ ->
-                    % pick oldest session (lists:min uses #session.sid ordering)
-        	OldSession = lists:min(SsWeb),
-                %     #session{sid = {_, Pid}} = OldSession,
+                    OldSession = lists:min(SsWeb),
+                    #session{sid = {_, C2SPid}, usr = { OldUser, OldServer, OldResource }} = OldSession,
+                    From = jid:make(<<"123456789">>, LServer, <<"">>),
+                    To   = jid:make(OldUser, OldServer, OldResource),
 
-                %     % avoid recursive replacements
-                %     case get(replace_in_progress) of
-                %         true ->
-                %             ?INFO_MSG("Replacement already in progress for ~p, skipping", [LUser]),
-                %             ok;
-                %         undefined ->
-                %             put(replace_in_progress, true),
-                %             ?INFO_MSG("Replacing old Web session with PID ~p for user ~p", [Pid, LUser]),
-                %             spawn(fun() ->
-                %                 timer:sleep(1500),
-                %                 catch ejabberd_c2s:route(Pid, replaced),
-                %                 erase(replace_in_progress)
-                %             end),
-                %             replaced
-                %     end
-		#session{sid = {_, C2SPid}, usr = { OldUser, OldServer, OldResource }} = OldSession,
-		From = jid:make(<<"123456789">>, LServer, <<"">>),
-		To   = jid:make(OldUser, OldServer, OldResource),
+                    LogoutMsg =
+                    #message{
+                       from = From,
+                       to   = To,
+                       type = normal,
+                       sub_els = [#xmlel{
+                                     name = <<"logout">>,
+                                     attrs = [],
+                                     children = [{xmlcdata, <<"Replaced by new session">>}]
+                                    }]
+                      },
+                    ?LOG_INFO("route logout for user ~p", [To]),
 
-		LogoutMsg =
-		#message{
-		from = From,
-		to   = To,
-		type = normal,
-		sub_els = [#xmlel{
-				name = <<"logout">>,
-				attrs = [],
-				children = [{xmlcdata, <<"Replaced by new session">>}]
-				}]
-		},
-
-		ejabberd_router:route(LogoutMsg)
+                    ejabberd_router:route(LogoutMsg)
 
             end;
         false ->
