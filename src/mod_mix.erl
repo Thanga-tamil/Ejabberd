@@ -433,14 +433,13 @@ process_mix_join(#iq{to = To, from = From,
 	   PubID = make_id(PublisherJID, Key),
 	    try
 		?LOG_INFO("server: ~p | channel: ~p", [ServerHost, Chan]),
-		{selected, [{NickName}]} = fly_mod_utils:get_nickname(ServerHost, Chan),
 		Nick = 
-		case NickName of 
-			<<>> -> InputNick;
-			_ -> NickName
+		case fly_mod_utils:get_nickname(ServerHost, Chan) of 
+			{selected, [{}]} -> ?LOG_INFO("proceed with input nick"), InputNick;
+			{selected, [{NickName}]} -> ?LOG_INFO("proceed DB nick"), NickName
 		end,
 
-		?LOG_INFO("input_nick: ~p | nick_from_db: ~p", [InputNick, NickName]),
+		?LOG_INFO("input_nick: ~p | final nick: ~p", [InputNick, Nick]),
 		ok = Mod:set_participant(ServerHost, Chan, Host, BFrom, MsgId, Nick),
 		ok = Mod:subscribe(ServerHost, Chan, Host, BFrom, Nodes),
 		notify_participant_joined(Mod, ServerHost, To, From, MsgId, [Nick, GroupCreate,  Publisher, PubID, CustomAttr], MsgId),
