@@ -59,6 +59,7 @@ start_link(Name, Prog) ->
     ?GEN_SERVER:start_link({local, Name}, ?MODULE, [Prog], []).
 
 check_password(User, Server, Password) ->
+    ClientApiKey = gen_mod:get_module_opt(Server, fly_mod_user_activities, client_api_url),
    LoginUrl = extauth_login_url(Server),
    case catch fly_mod_utils:get_admin_user(Server, User, Password) of
     {selected, _, []} ->
@@ -66,7 +67,7 @@ check_password(User, Server, Password) ->
     {selected, _, _Result} ->
       Secure = <<"allow">>
   end,
-call_port(Server, [<<"auth">>, User, Server, Secure,LoginUrl]).
+call_port(Server, [<<"auth">>, User, Server, Secure,LoginUrl,ClientApiKey]).
 
 check_certificate(User, Server, Certificate) ->
     call_port(Server, [<<"certauth">>, User, Server, Certificate]).
