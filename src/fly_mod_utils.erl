@@ -189,7 +189,7 @@
   update_block_status_user/3,update_block_status_group/3,get_contact_permission/1,update_vcard_date/2,get_user_resources/2,
   get_user_resources/3,get_mobile_user_message/2,get_mobile_user_resource/2,get_push_type/1,get_meta_chat_web/4,poll_vote_update/8,
   remove_poll_offline/3,get_existing_group_info/2,get_users_devices_detail/3,set_seen_receipt/3,set_hide_profile/3,update_msg_seen_receipt/3,
-  get_hide_profile_privacy/2, update_mix_participant/3, batch_remove_spool/4, is_session_exists/2]).
+  get_hide_profile_privacy/2, update_mix_participant/3, batch_remove_spool/4, is_session_exists/2, get_spool_seq/4]).
 
 -include("logger.hrl").
 
@@ -2221,6 +2221,24 @@ end.
 
 remove_poll_offline(FServer, FResource, PollMsgId)->
   ejabberd_sql:sql_query(FServer,[<<"DELETE FROM spool WHERE message_id='">>,PollMsgId,<<"' AND device_id='">>,FResource,<<"';">>]).
+
+get_spool_seq(Server, User, MessageId, DeviceId) -> 
+  Result = ejabberd_sql:sql_query(Server, [<<"select seq from spool where username ='">>,User,<<"' and message_id = '">>,MessageId,<<"' and device_id='">>,DeviceId,<<"' limit 1;">>]),
+  case Result of
+    {selected, _, [[Seq]]} -> 
+      Seq;
+    _ -> 
+      0
+  end.
+
+batch_remove_spool(Server, User, Seq, DeviceId) -> 
+    DeleteQ = ejabberd_sql:sql_query(Server, [<<"DELETE FROM spool WHERE username ='">>,User,<<"' and device_id='">>,DeviceId,<<"' and seq <= ">>,Seq,<<"' ;">>]),
+    case DeleteQ of
+      {updated, D} -> 
+        D;
+      _ -> 
+        0
+    end.
 
 get_mobile_user_message(TUser, TServer) ->
   Resources = ejabberd_sm:get_user_resources(TUser,
