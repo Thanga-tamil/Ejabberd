@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
     # branches: [ "staging", "production" ]
-    branches: ["feature/helminstall"]
+    branches: [ "production" ]
 
 env:
   GCP_REGION: "asia-south1"
@@ -13,40 +13,40 @@ env:
 permissions:
   id-token: write
   contents: read
-  
+
 jobs:
   build:
     name: Build
-    runs-on: 
+    runs-on:
       group: tm-runner-group
       labels: arc-runner-set
 
     steps:
 
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Setup gcloud CLI
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          version: 'latest'
+    - name: Setup gcloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        version: 'latest'
 
-      - name: Authenticate to Google Cloud
-        id: gcp-auth
-        uses: google-github-actions/auth@v2
-        with:
-          project_id: ${{ env.GCP_PROJECT }}
-          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY_JSON }}
-          export_environment_variables: true
+    - name: Authenticate to Google Cloud
+      id: gcp-auth
+      uses: google-github-actions/auth@v2
+      with:
+        project_id: ${{ env.GCP_PROJECT }}
+        credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY_JSON }}
+        export_environment_variables: true
 
-      - name: Configure Docker for Artifact Registry
-        run: |
-          gcloud auth configure-docker "${{ env.GCP_REGION }}-docker.pkg.dev" --quiet
+    - name: Configure Docker for Artifact Registry
+      run: |
+        gcloud auth configure-docker "${{ env.GCP_REGION }}-docker.pkg.dev" --quiet
 
-      - name: Build
-        uses: docker/build-push-action@v5
-        with:
-          push: false
-          provenance: false
-          platforms: linux/amd64
-          tags: ${{ github.sha }}
+    - name: Build
+      uses: docker/build-push-action@v5
+      with:
+        push: false
+        provenance: false
+        platforms: linux/amd64
+        tags: ${{ github.sha }}
