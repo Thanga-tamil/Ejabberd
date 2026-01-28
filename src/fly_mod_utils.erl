@@ -2232,7 +2232,7 @@ get_spool_seq(Server, User, MessageId, DeviceId) ->
   end.
 
 batch_remove_spool(Server, User, Seq, DeviceId) -> 
-    DeleteQ = ejabberd_sql:sql_query(Server, [<<"DELETE FROM spool WHERE username ='">>,User,<<"' and device_id='">>,DeviceId,<<"' and seq <= ">>,Seq,<<"' ;">>]),
+    DeleteQ = ejabberd_sql:sql_query(Server, [<<"DELETE FROM spool WHERE username ='">>,User,<<"' and device_id='">>,DeviceId,<<"' and seq <= '">>,Seq,<<"' ;">>]),
     case DeleteQ of
       {updated, D} -> 
         D;
