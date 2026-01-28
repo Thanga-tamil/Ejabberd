@@ -421,7 +421,7 @@ process_mix_join(#iq{to = To, from = From,
     case Mod:get_channel(ServerHost, Chan, Host) of
 	{ok, {_, _, Key}} ->
 	    ID = make_id(From, Key),
-	    Nick = JoinReq#mix_join.nick,
+	    InputNick = JoinReq#mix_join.nick,
 	    BFrom = jid:remove_resource(From),
 	    Nodes = filter_nodes(JoinReq#mix_join.subscribe),
 	    if Pub == <<>> ->
@@ -432,6 +432,16 @@ process_mix_join(#iq{to = To, from = From,
 	   PublisherJID = jid:make(fly_mod_utils:get_user_from_string_jid(Publisher),From#jid.lserver,<<"">>),
 	   PubID = make_id(PublisherJID, Key),
 	    try
+		?LOG_INFO("server: ~p | channel: ~p", [ServerHost, Chan]),
+		Q = fly_mod_utils:get_nickname(ServerHost, Chan),
+		?LOG_INFO("Q: ~p", [Q]),
+		Nick = 
+		case Q of 
+			{selected, []} -> ?LOG_INFO("proceed with input nick"), InputNick;
+			{selected, [{NickName}]} -> ?LOG_INFO("proceed DB nick"), NickName
+		end,
+
+		?LOG_INFO("input_nick: ~p | final nick: ~p", [InputNick, Nick]),
 		ok = Mod:set_participant(ServerHost, Chan, Host, BFrom, MsgId, Nick),
 		ok = Mod:subscribe(ServerHost, Chan, Host, BFrom, Nodes),
 		notify_participant_joined(Mod, ServerHost, To, From, MsgId, [Nick, GroupCreate,  Publisher, PubID, CustomAttr], MsgId),

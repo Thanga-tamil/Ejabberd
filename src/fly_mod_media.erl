@@ -228,13 +228,13 @@ update_call_status(From, RequestType, SubEl, IQ) ->
           case FDevList of 
               [] -> 
                   ?LOG_INFO("call not allowed for From_User"),
-                  fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling isn't supported in the UAE">>});
+                  fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling is unavailable due to regional restrictions.">>});
               [_ | _] ->
                   FDeviceType = [ DType || [_C, DType] <- FDevList ],
                   case not lists:member(get_device_type(FRes), FDeviceType) of 
                       true ->
                           ?LOG_INFO("call not allowed for From_User"),
-                          fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling isn't supported in the UAE">>});
+                          fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling is unavailable due to regional restrictions.">>});
                       false -> 
                           Users  = fxml:get_subtag(SubEl, <<"users">>),
                           UserList = lists:map(fun(U) -> JidBin = fxml:get_tag_cdata(U), [UserId, _] = binary:split(JidBin, <<"@">>), UserId end, Users#xmlel.children),
@@ -247,7 +247,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
                                   ?LOG_INFO("device_list ~p", [DevList]),
                                   case DevList of 
                                     [] -> 
-                                      fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"Calling isn't supported in the UAE">>});
+                                      fly_mod_utils:generate_subel(IQ,#media_call_activities{type = <<"restricted_country">>,result_type = <<"Calling is unavailable due to regional restrictions.">>});
                                     _ -> 
                                       send_payload(CallStatus, SubEl, [], false),
                                       fly_mod_utils:generate_subel(IQ,#media_call_activities{type = RequestType,result_type = <<"Media call CALLING status updated successfully">>})
@@ -272,7 +272,12 @@ update_call_status(From, RequestType, SubEl, IQ) ->
                                           fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>});
                                       false ->
                                           ?LOG_INFO("call not allowed"),
-                                          fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling isn't supported in the UAE">>})
+                                          case fly_mod_utils:is_session_exists(FServer, TU) of
+                                            true ->
+                                              fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling is unavailable due to regional restrictions.">>});
+                                            false ->
+                                              fly_mod_utils:generate_subel(IQ, #media_call_activities{type = RequestType, result_type = <<"Media call CALLING status updated successfully">>})
+                                            end
                                   end;
                               _ -> 
                                   ok
