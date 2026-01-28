@@ -856,6 +856,7 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Privacy settings updated successfully">>}).
   
   acknowledge(From,RequestType,SubEl,IQ) ->
+    
   #jid{user = FUser, lserver = FServer,lresource = LResource} = From,
   MsgId = fxml:get_path_s(SubEl, [{attr, <<"id">>}]),
   Substring = string:str(binary_to_list(LResource),binary_to_list(<<"Mobile-">>)),

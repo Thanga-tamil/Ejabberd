@@ -723,14 +723,8 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
 		   []
 	   end,
 
-    lists:foreach(
-	fun(OffMsg) ->
-	    route_offline_message(State, OffMsg)
-	end, Msgs),
-	if Msgs =/= [] ->
-	route_offline_messages(State);
-	true -> ok
-	end;
+    route_total_count(State, Msgs);
+
     Substring =:= 0 ->
   case catch fly_mod_utils:get_not_delivered_message(LServer,LUser) of
       {selected, _, []} ->
@@ -790,6 +784,49 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
 	 ok
 end.
 
+route_total_count(#{jid := U} = State, Msgs) ->
+
+        C = length(Msgs),
+        ?LOG_INFO("routing [~p] offline records for jid: ~p", [C, U]),
+        Packet =
+        #xmlel{
+                name = <<"message">>,
+                attrs = [{<<"from">>, jid:to_string(U)}, {<<"to">>, jid:to_string(U)}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}],
+                children = [
+                        #xmlel{name = <<"spool">>,
+                        attrs = [{<<"xmlns">>, <<"urn:xmpp:delay">>}, {<<"type">>, <<"offline_storage">>}, {<<"count">>, integer_to_binary(C)}],
+                        children = []}
+                        ]
+                },
+
+        ejabberd_router:route(U, U, Packet),
+        route_in_batches(State, Msgs, 100).
+
+route_in_batches(_State, [], _BatchSize) ->
+    ok;
+
+route_in_batches(State, Msgs, BatchSize) ->
+
+
+    case length(Msgs) =< BatchSize of
+        true ->
+            lists:foreach(
+                fun(OffMsg) ->
+                    route_offline_message(State, OffMsg)
+                end,
+                Msgs
+            );
+        false ->
+            {Batch, Rest} = lists:split(BatchSize, Msgs),
+            lists:foreach(
+                fun(OffMsg) ->
+                    route_offline_message(State, OffMsg)
+                end,
+                Batch
+            ),
+            route_in_batches(State, Rest, BatchSize)
+    end.
+
 now_to_microseconds({Mega, Sec, Micro}) ->
   %%Epoch time in milliseconds from 1 Jan 1970
   (Mega * 1000000 + Sec) * 1000000 + Micro.
@@ -808,6 +845,7 @@ route_offline_message(#{jid := #jid{luser = LUser, lserver = LServer, lresource 
 		    case privacy_check_packet(State, Msg, in) of
 			allow ->
 				NewMsg = xmpp:set_to(Msg, #jid{luser = LUser, lserver = LServer, lresource = LResource}),
+				?LOG_INFO("Routing offline message id ~p to ~p", [Id, LResource]),
 				ejabberd_router:route(NewMsg);
 			deny ->
 				ok

@@ -2380,7 +2380,6 @@ has_more_resources(User,LServer) ->
         "";
       true ->
         Resource = fly_mod_utils:get_device_from_resource(R),
-        ?LOG_INFO("get_device_from_resource: ~p", [Resource]), 
         binary_to_list(Resource) ++ "','"
       end
     end,Resources)

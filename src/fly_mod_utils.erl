@@ -1322,6 +1322,7 @@ update_seen(#jid{luser = User,lserver = Server},TUser, MessageId, GroupId) ->
           _ ->
             <<"chat">>
     end,
+
     FinUser = if ChatType == <<"normal">> -> User; true -> TUser end,
 
     ejabberd_sql:sql_query(
@@ -2220,7 +2221,13 @@ get_recent_profile(FServer, FUser, Updatedat) ->
 end.
 
 remove_poll_offline(FServer, FResource, PollMsgId)->
-  ejabberd_sql:sql_query(FServer,[<<"DELETE FROM spool WHERE message_id='">>,PollMsgId,<<"' AND device_id='">>,FResource,<<"';">>]).
+  DRes = ejabberd_sql:sql_query(FServer,[<<"DELETE FROM spool WHERE message_id='">>,PollMsgId,<<"' AND device_id='">>,FResource,<<"';">>]),
+  case DRes of
+    {updated, D} -> 
+      D;
+    _ -> 
+      0
+  end.
 
 get_spool_seq(Server, User, MessageId, DeviceId) -> 
   Result = ejabberd_sql:sql_query(Server, [<<"select seq from spool where username ='">>,User,<<"' and message_id = '">>,MessageId,<<"' and device_id='">>,DeviceId,<<"' limit 1;">>]),
