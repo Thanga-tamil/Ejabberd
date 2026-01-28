@@ -2040,7 +2040,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
           [Touser, IOSDevice, IOSDeviceUserType, IOSDevicePushType] = G,
           FUser = fly_mod_utils:get_user_from_string_jid(MesssageSend),
           if FUser =:= Touser ->
-            ?LOG_INFO("restrict own push for ios, userId: [~p]", [Touser]),
+            ?LOG_INFO(""),
             ok;
           true ->
             ios_send_bulk_push(Server, Touser, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"0">>, IOSDevice, Expiry, State,<<"13above">>,IOSDeviceUserType, IOSDevicePushType)
@@ -2064,7 +2064,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
       [Touser, IOSDevices, IOSDevicesUserType, IOSDevicesPushType] = G,
       FUser = fly_mod_utils:get_user_from_string_jid(MesssageSend),
       if FUser =:= Touser ->
-        ?LOG_INFO("restrict own push for ios, userId: [~p]", [Touser]),
+        ?LOG_INFO(""),
         ok;
       true ->
         ios_send_bulk_push(Server, Touser, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"1">>, IOSDevices, Expiry, State,<<"13above">>,IOSDevicesUserType, IOSDevicesPushType)
