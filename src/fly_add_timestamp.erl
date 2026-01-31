@@ -29,6 +29,7 @@ stop(Host) ->
   ok.
 
 filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
+  ?LOG_INFO("fly_add_timestamp: filter_packet called ~p",[XML]),
   #jid{user = TUser, lserver = LServer} = To,
   #jid{user = FUser, lserver = _FServer} = From,
     Type = XML#message.type,
@@ -117,7 +118,10 @@ Type = XML#message.type,
           To =:= <<>> ->
           Return = XML;
         true ->
-          Return = add_timestamp(XML)
+          ?LOG_INFO("fly_add_timestamp:XML ~p",[XML]),
+          Return = add_timestamp(XML),
+          ?LOG_INFO("fly_add_timestamp:Return ~p",[Return]),
+          Return
       end;
     _ ->
     %   Seen = fxml:get_subtag(xmpp:encode(XML),<<"seen">>),
