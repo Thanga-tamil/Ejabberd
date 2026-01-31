@@ -791,7 +791,7 @@ route_total_count(#{jid := U} = State, Msgs) ->
         Packet =
         #xmlel{
                 name = <<"message">>,
-                attrs = [{<<"from">>, jid:to_string(U)}, {<<"to">>, jid:to_string(U)}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}],
+                attrs = [{<<"from">>, jid:to_string(U)}, {<<"to">>, jid:to_string(U)}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}, {<<"type">>, <<"chat">>}],
                 children = [
                         #xmlel{name = <<"spool">>,
                         attrs = [{<<"xmlns">>, <<"urn:xmpp:delay">>}, {<<"type">>, <<"offline_storage">>}, {<<"count">>, integer_to_binary(C)}],
