@@ -847,6 +847,8 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
               attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>}, {<<"status">>, RequestType},{<<"type">>, Type},{<<"action">>, Action}],
               children = []}]
             },
+            ?LOG_INFO("hide_profile: pkt: ~p", [Packet]),
+            ?LOG_INFO("hide_profile: ToJid: ~p", [ToJid]),
         ejabberd_router:route(jid:make({FUser, FServer, <<>>}), ToJid, Packet)
       end, fly_mod_utils:get_rosters_to_update_privacy(FUser, FServer) );
     _ -> 
