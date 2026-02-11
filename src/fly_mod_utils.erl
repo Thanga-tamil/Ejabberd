@@ -22,6 +22,12 @@
   update_delete_roster/2,
   get_roster_delete/2,
   update_roster_avail/3,
+  remove_bulk_notification/2,
+  get_pending_bulk_messages_for_user/3,
+  delete_bulk_message_row/3,
+  delete_bulk_messages/3,
+  get_bulk_message_details/4, 
+  remove_bulk_notification/2,
   get_vcard/2,
   get_vcard_from_search/2,
   get_user_device/2,
@@ -2311,3 +2317,34 @@ is_session_exists(FServer, User) ->
     _ ->
       false
   end.
+
+
+get_bulk_message_details(#jid{lserver=Server}, TeamId, Offset, Limit) ->
+  Query = [
+    <<"SELECT user_id, message_id, message_content FROM bulk_notification ">>,
+    <<"WHERE team_id = '">>, TeamId, <<"' ">>,
+    <<"ORDER BY user_id ">>,
+    <<"LIMIT ">>, integer_to_binary(Limit), 
+    <<" OFFSET ">>, integer_to_binary(Offset)
+  ],
+  ejabberd_sql:sql_query(Server, Query).
+
+remove_bulk_notification(#jid{lserver=Server}, TeamId)->
+  ejabberd_sql:sql_query(Server,[<<"DELETE FROM bulk_notification WHERE team_id ='">>,TeamId,<<"'; ">>]).  
+
+
+get_pending_bulk_messages_for_user(LServer, LUser, Limit) ->
+  UserID = <<LUser/binary, "@", LServer/binary>>,
+  ejabberd_sql:sql_query(LServer, [<<"SELECT message_from, message_type, chat_type, message_id, message_content, group_id FROM bulk_notification WHERE is_broadcast = 0 and user_id = '">>, UserID, <<"' LIMIT ">>, integer_to_binary(Limit), <<";">>]).
+
+delete_bulk_message_row(LServer, MessageId, LUser) ->
+  UserID = <<LUser/binary, "@", LServer/binary>>,
+  ejabberd_sql:sql_query(LServer, [<<"DELETE FROM bulk_notification WHERE message_id = '">>, MessageId, <<"' AND user_id = '">>, UserID, <<"';">>]).
+
+delete_bulk_messages(_LServer, [], _LUser) ->
+  ok;
+delete_bulk_messages(LServer, MessageIds, LUser) ->
+  UserID = <<LUser/binary, "@", LServer/binary>>,
+  IdsStr = join(MessageIds, <<",">>),
+  ejabberd_sql:sql_query(LServer, [<<"DELETE FROM bulk_notification WHERE message_id IN (">>, IdsStr, <<") AND user_id = '">>, UserID, <<"';">>]),
+  ejabberd_sql:sql_query(LServer, [<<"DELETE FROM schedule_message WHERE message_id IN (">>, IdsStr, <<");">>]).

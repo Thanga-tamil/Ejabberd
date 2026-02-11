@@ -16,7 +16,8 @@
 
 %% API
 -export([start/2, stop/1, depends/2, mod_options/1, mod_opt_type/1, process_terminated/2, process_local_iq/1, push_vcard_updates/1,
-        set_presence/4, unset_presence/4, update_user_stream/1, send_block_list/3, push_to_rosters/2, media_permission_revoke/3]).
+        set_presence/4, unset_presence/4, update_user_stream/1, send_block_list/3, push_to_rosters/2, media_permission_revoke/3, 
+        check_and_send_user_bulk_messages/1]).
 
 -export([ handle_cast/2,  handle_info/2, handle_call/3]).
 
@@ -210,6 +211,7 @@ process_iq_set(From, _To, RequestType, IQ) ->
       update_user_busy(From, RequestType, SubEl, IQ);
     <<"register_update">> ->
       register_update_to_rosters(From, RequestType, SubEl, IQ);
+    <<"send_bulk_message">> -> send_bulk_message(From, RequestType, SubEl,IQ);
     <<"user_settings">> ->
       set_user_settings(From, RequestType, SubEl, IQ);
     <<"update_unread_count">> ->
@@ -487,6 +489,7 @@ set_presence(User, Server, Resource, _Status) ->
       fly_mod_utils:set_last_o(User, Server, <<"1">>),
       fly_mod_utils:remove_offline_by_user(Server, User),
       JID = jid:make({User, Server, <<>>}),
+      check_and_send_user_bulk_messages(JID),
       push_to_rosters(JID, #xmlel{name = <<"presence">>,
         attrs = [{<<"type">>, <<"available">>}],
         children = []
@@ -2558,6 +2561,179 @@ send_deleted_user_status(_From, RequestType, SubEl, IQ) ->
 %%
 %% @param record From
 %% @param attributes
+
+
+
+
+send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
+   
+    TypeBin = binary:copy(Type),
+    FromBin = binary:copy(From),
+    ToBin = binary:copy(To),
+    SubjectBin = binary:copy(Messagetype),
+    FromJID = jid:make(FromBin),
+    ToJID = jid:make(ToBin),
+
+    case {FromJID, ToJID} of
+        {#jid{}, #jid{}} ->
+            CodecOpts = ejabberd_config:codec_options(),
+            try
+
+                ChatContentChildren = case TypeBin of
+                            <<"chat">> -> [{xmlcdata, BodyString}];
+                            _ -> []
+                           end,
+
+                XML = #xmlel{
+                    name = <<"message">>,
+                    attrs = [
+                        {<<"to">>, jid:to_string(ToJID)},
+                        {<<"from">>, jid:to_string(FromJID)},
+                        {<<"type">>, TypeBin},
+                        {<<"id">>, MessageId }
+                    ],
+                    children = [
+                        #xmlel{
+                            name = <<"subject">>,
+                            attrs = [],
+                            children = [{xmlcdata, SubjectBin}]
+                        },
+                        #xmlel{
+                          name = <<"chatcontent">>,
+                          attrs = [
+                              {<<"xmlns">>, <<"urn:xmpp:content">>},
+                              {<<"message_type">>, Messagetype},
+                              {<<"broadcast_id">>, <<"">>},
+                              {<<"broadcast_msgid">>, <<"">>},
+                              {<<"block_user">>, <<"0">>}
+                          ],
+                          children = ChatContentChildren
+                        },
+                        #xmlel{
+                            name = <<"body">>,
+                            attrs = [],
+                            children = [{xmlcdata, BodyString}]
+                        },
+                        #xmlel{
+                            name = <<"timestamp">>,
+                            attrs = [
+                                {<<"xmlns">>, <<"urn:xmpp:messagetime">>},
+                                {<<"time">>, 
+                                list_to_binary(
+                                    lists:flatten(
+                                        io_lib:format("~p", [now_to_microseconds(erlang:now())])
+                                    )
+                                )
+                                }
+                            ],
+                            children = []
+                        }
+                    ]
+                },
+              
+                EncodedXML = xmpp:encode(XML),
+                case xmpp:decode(EncodedXML, ?NS_CLIENT, CodecOpts) of
+                    #message{from = JID} = Msg ->
+                        State = #{jid => JID},
+                        MsgWithMeta = Msg#message{meta = MetaMap},
+                         case TypeBin of
+                            <<"chat">> -> ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
+                            _ -> ok
+                           end,
+                        ejabberd_router:route(MsgWithMeta),
+                        {ok, <<"Message sent">>};
+                    Decoded ->
+                        {error, <<"Failed to decode XMPP message">>}
+                end
+            catch
+                _:{xmpp_codec, Why} ->
+                    {error, xmpp:format_error(Why)}
+            end;
+        _ ->
+            {error, <<"Invalid JID format">>}
+    end.
+
+send_bulk_message(From, RequestType, SubEl, IQ) ->
+    Attributes = [<<"message_from">>, <<"message_to">>, <<"message_type">>, <<"message_id">>, <<"message">>, <<"group_id">>, <<"chat_type">>,<<"to_user">>],
+    Results = lists:map(fun(Attr) -> fxml:get_path_s(SubEl, [{attr, Attr}]) end, Attributes),
+    [MessageFrom, MessageTo, MessageType, MessageId, MessageTag, GroupId, ChatType, TeamId] = Results,
+    FromServer = From#jid.lserver,
+    ?INFO_MSG("send_bulk_message: ~p ", [TeamId]),
+    case ChatType of
+        <<"chat">> -> 
+            ChunkSize = 100,
+            process_bulk_chunks(
+                From, TeamId, MessageFrom, MessageType, ChunkSize, 0, 
+                IQ, RequestType, ChatType
+            );
+        <<"normal">> -> 
+            send_message(ChatType, MessageFrom, GroupId, MessageType, MessageTag, MessageId, #{ from_broadcast => true }),
+            fly_mod_utils:remove_bulk_notification(From, TeamId),
+            ?INFO_MSG("send_message: ~p ", [TeamId]),
+            fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>});
+        _ -> 
+            undefined
+    end.
+
+process_bulk_chunks(From, TeamId, MessageFrom, MessageType, ChunkSize, Offset, IQ, RequestType, ChatType) ->
+    case catch fly_mod_utils:get_bulk_message_details(From, TeamId, Offset, ChunkSize) of
+        {selected, _, []} ->
+            if Offset == 0 ->
+                fly_mod_utils:generate_subel(IQ, #query{type = RequestType, result_type = <<"Members not found">>});
+            true ->
+                fly_mod_utils:remove_bulk_notification(From, TeamId),
+                fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>})
+            end;
+        {selected, _, Rosters} ->
+            lists:foreach(fun ([UserId, MessageIdFromDb, MessageContent]) ->
+                send_message(ChatType, MessageFrom, UserId, MessageType, MessageContent, MessageIdFromDb, #{ from_broadcast => true })
+            end, Rosters),
+             case length(Rosters) of
+                ChunkSize ->
+                    process_bulk_chunks(
+                        From, TeamId, MessageFrom, MessageType, ChunkSize,
+                        Offset + ChunkSize, IQ, RequestType, ChatType
+                    );
+                _ ->
+                    fly_mod_utils:remove_bulk_notification(From, TeamId),
+                    fly_mod_utils:generate_subel(IQ, #user_activities{
+                        type = RequestType, result_type = <<"Send successfully">>
+                    })
+            end;
+        _ ->
+            fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Message Not Sent">>})
+    end.
+
+
+check_and_send_user_bulk_messages(From) ->
+    process_user_bulk_messages_batch(From, 100).
+
+process_user_bulk_messages_batch(From, BatchSize) ->
+    #jid{luser = LUser, lserver = LServer} = From,
+    ?INFO_MSG("process_user_bulk_messages_batch LUser ~p ", [LUser]),
+    case catch fly_mod_utils:get_pending_bulk_messages_for_user(LServer, LUser, BatchSize) of
+        {selected, _, Rows} ->
+             lists:foreach(fun([MessageFrom, MessageType, ChatType, MessageId, MessageContent, GroupId]) ->
+                 ?INFO_MSG("process_user_bulk_messages_batch Inner ~p ~p ~p ~p ~p ~p ~p", [LUser, MessageFrom, MessageType, ChatType, MessageId, MessageContent, GroupId]),  
+                   ToUser = case ChatType of
+                      <<"chat">> -> <<LUser/binary, "@", LServer/binary>>;
+                      <<"normal">> -> GroupId;
+                      _ -> undefined
+                  end,
+                   ?INFO_MSG("process_user_bulk_messages_batch before sending message ~p", [ToUser]),
+                  send_message(ChatType, MessageFrom, ToUser, MessageType, MessageContent, MessageId, #{ from_broadcast => true }),
+                   ?INFO_MSG("process_user_bulk_messages_batch before sending after ~p", [ToUser])
+             end, Rows),
+             MessageIds = [MsgId || [_, _, _, MsgId, _, _] <- Rows],
+             fly_mod_utils:delete_bulk_messages(LServer, MessageIds, LUser),
+             if length(Rows) == BatchSize ->
+                 process_user_bulk_messages_batch(From, BatchSize);
+             true ->
+                 ok
+             end;
+        _ ->
+            ok
+    end.
 
 
 set_web_password(From, SubEl, IQ) ->
