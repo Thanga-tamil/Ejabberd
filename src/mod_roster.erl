@@ -436,6 +436,7 @@ encode_item(Item) ->
 	roster_thumbimage = [#roster_thumbimage{roster_thumbimage=Item#roster.thumbimage}],
 	roster_status = [#roster_status{roster_status=Item#roster.status}],
 	roster_is_admin_blocked = [#roster_is_admin_blocked{roster_is_admin_blocked=Item#roster.is_admin_blocked}],
+	roster_msg_disappear = [#roster_msg_disappear{msgDisappear=to_binary(Item#roster.msg_disappear)}],
 	roster_email= [#roster_email{roster_email=Item#roster.email}]}],
     #roster_item{jid = jid:make(Item#roster.jid),
 		 name = Item#roster.name,

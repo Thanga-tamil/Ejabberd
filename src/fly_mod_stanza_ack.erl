@@ -151,9 +151,10 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             Topicid = <<"">>,
             MetaData = <<"">>,
             MentionList = <<"">>,
+            DisappearAt = <<"">>,
             EditMsgid = MessageId;
             true ->
-              {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,MentionList, _} = ContentAcknowledge
+              {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,MentionList, DisappearAt , _} = ContentAcknowledge
           end,
           case catch fly_mod_utils:check_blockeduser(FServer, FUser, TUser) of
             {selected, _, []} ->
@@ -168,7 +169,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           SType = erlang:atom_to_binary(ChatType, utf8),
           BarePeer = TUser,
           MsgContent = xmpp:get_text(Packet#message.body),
-          send_ack_response(From, To, IdValue, <<"acknowledge">>),
+          send_ack_response(From, To, IdValue, <<"acknowledge">>, DisappearAt),
           NewPacket = xmpp:set_from_to(Packet,From, To),
           GetTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
           if GetTimestamp =:= false ->
@@ -208,7 +209,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             Metadata = MetaData
         end,
 
-        fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid);
+        fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid,DisappearAt);
         S when (S == false) ->
           BlockUser = <<"0">>,
           ok
@@ -448,11 +449,18 @@ now_to_microseconds({Mega, Sec, Micro}) ->
   %%Epoch time in milliseconds from 1 Jan 1970
   (Mega * 1000000 + Sec) * 1000000 + Micro.
 
-send_ack_response(From, To, ReceiptId, Type) ->
+send_ack_response(From, To, ReceiptId, Type, DisappearAt) ->
   #jid{user = _FUser, lserver = ServerHost} = From,
   SentTo = jid:to_string(To),
+  Attrs = case DisappearAt of
+            <<>> ->
+              [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"id">>, ReceiptId}, {<<"sent_to">>, SentTo}, {<<"type">>, Type}];
+            _ ->
+              [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"id">>, ReceiptId}, {<<"sent_to">>, SentTo}, {<<"type">>, Type}, {<<"disappear_at">>, DisappearAt}]
+          end,
+
   XmlBody = #xmlel{name = <<"acknowledge">>,
-      attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"id">>, ReceiptId}, {<<"sent_to">>, SentTo}, {<<"type">>, Type}],
+      attrs = Attrs,
       children = []},
   Proc = gen_mod:get_module_proc(ServerHost, ?MODULE),
   Msg = #message{from = To, to = From, type = chat, sub_els = [XmlBody]},

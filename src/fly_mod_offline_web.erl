@@ -120,7 +120,7 @@ store_offline_user_send(Packet, _C2SState, #jid{luser = FUser, lserver = FServer
               MentionList = <<"">>,
               EditMsgid = MessageId;
             true ->
-              {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,MentionList,_} = ContentAcknowledge
+              {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,MentionList, DisappearAt ,_} = ContentAcknowledge
             end,
 
             if EditMsgid =/= MessageId ->

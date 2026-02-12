@@ -171,6 +171,7 @@ process_iq_set(From, _To, RequestType, IQ) ->
       set_user_validate(From, SubEl, IQ);
     <<"register_notify">> ->
       push_register_notify_presence(From, RequestType, SubEl,IQ);
+     <<"notify_disappear_message">> -> notify_disappear_message(From, RequestType, SubEl,IQ);
     <<"clear_message">> ->
       clear_message(From, RequestType, SubEl, IQ);
     <<"clear_all">> ->
@@ -232,6 +233,7 @@ process_iq_set(From, _To, RequestType, IQ) ->
       read_all(From, RequestType, SubEl, IQ);
     <<"poll_acknowledge">> ->
       poll_ack(From, RequestType, SubEl, IQ);
+    <<"set_message_disappear">> -> set_message_disappear(From, SubEl, IQ);
     <<"privacy_setting">> -> 
       privacy_setting(From, RequestType, SubEl, IQ);
     no_such_subtag ->
@@ -722,7 +724,7 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
         ok
       end,
       fly_mod_stanza_ack:store_in_table(FServer,FUser,TUser,MsgId,BodyString,<<"chat">>,<<"auto_text">>,<<"">>,  <<"{}">> ,<<"0">>,<<"">>, ReceivedFlatTimeStamps),
-      fly_mod_utils:insert_status(FromJid, ToJid, MsgId,<<"auto_text">>,<<"">>, <<"{}">>, <<"chat">>,<<"">>,<<"0">>,BodyString,ReceivedFlatTimeStamps,MsgId);
+      fly_mod_utils:insert_status(FromJid, ToJid, MsgId,<<"auto_text">>,<<"">>, <<"{}">>, <<"chat">>,<<"">>,<<"0">>,BodyString,ReceivedFlatTimeStamps,MsgId, <<"">>);
   true ->
     ok
   end,
@@ -1016,7 +1018,7 @@ fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_typ
         true ->
           ok
         end,
-  fly_mod_utils:insert_status(FromJid, ToJid, MessageId,MessageType,TopicId, MetaData, SType,<<"">>,BlockUser,MsgContent,ReceivedFlatTimeStamp,EditMsgId);
+  fly_mod_utils:insert_status(FromJid, ToJid, MessageId,MessageType,TopicId, MetaData, SType,<<"">>,BlockUser,MsgContent,ReceivedFlatTimeStamp,EditMsgId, <<"">>);
   ChatType == <<"normal">> ->
   FromJid = jid:from_string(MessageFrom),
   ToJid = jid:from_string(GroupId),
@@ -2196,6 +2198,8 @@ message_stanza_result(Result) ->
       children = [{xmlcdata, MetaData}]},
     TopicIdElement = #xmlel{name = <<"topic_id ">>, attrs = [],
       children = [{xmlcdata, TopicId}]},
+    DisappearAtElement = #xmlel{name = <<"disappear_at ">>, attrs = [],
+      children = [{xmlcdata, DisappearAt}]},
     EditStatusElement = #xmlel{name = <<"edit_msg_status ">>, attrs = [],
       children = [{xmlcdata, EditStatus}]},
     MessageTypeElements = #xmlel{name = <<"Message_type">>, attrs = [],
@@ -2203,13 +2207,13 @@ message_stanza_result(Result) ->
     MessageElement = #xmlel{name = <<"message ">>, attrs = [],
       children = [{xmlcdata, MessageTag}]},
     #xmlel{name = <<"chat">>, attrs = [],
-      children = [MessageTimeElements, UserElements, EditStatusElement, EMsgidElement, MessageTypeElements, StatusElements,  TimeElements, MessageElement, MsgidElement, RecallElement, FavouriteElement, FavouriteByElement, TopicIdElement, MetaDataElement, RowIdElement]}
+      children = [DisappearAtElement, MessageTimeElements, UserElements, EditStatusElement, EMsgidElement, MessageTypeElements, StatusElements,  TimeElements, MessageElement, MsgidElement, RecallElement, FavouriteElement, FavouriteByElement, TopicIdElement, MetaDataElement, RowIdElement]}
                       end,
     Result).
 
     meta_message_stanza_result(Result) ->
       SubEl = lists:map(fun(G) ->
-        [RowId, MessageUser, MessageTo, Message_type, MessageTag, MsgId, EditMsgId, Status, RecallStatus, MessageTime, MetaData] = G,
+        [RowId, MessageUser, MessageTo, Message_type, MessageTag, MsgId, EditMsgId, Status, RecallStatus, MessageTime, DisappearAt, MetaData] = G,
         RowIdElement = #xmlel{name = <<"row_id">>, attrs = [],
           children = [{xmlcdata, RowId}]},
         UserElements = #xmlel{name = <<"user">>, attrs = [],
@@ -2736,6 +2740,68 @@ process_user_bulk_messages_batch(From, BatchSize) ->
     end.
 
 
+
+notify_disappear_message(From, RequestType, SubEl, IQ) ->
+  MessageId = fxml:get_path_s(SubEl, [{attr, <<"message_id">>}]),
+  ToUserJid = fxml:get_path_s(SubEl, [{attr, <<"to_user">>}]),
+  MessageDisappear = fxml:get_path_s(SubEl, [{attr, <<"msg_disappear">>}]),
+  Messageid = <<(get_string())/binary>>,
+  #jid{user = FUser, lserver = FServer} = From,
+  [ToUser | _S] = string:tokens(binary_to_list(ToUserJid), "@"),
+
+  #jid{luser = User, lserver = Server, lresource = Resource} = From,
+ 
+  To = jid:make({list_to_binary(ToUser), Server, <<>>}),
+
+  XmlBody = #xmlel{name = <<"message">>,
+                   attrs = [{<<"from">>, jid:to_string(From)},
+                            {<<"to">>, jid:to_string(To)},
+                            {<<"type">>, <<"chat">>},
+                            {<<"id">>, Messageid}],
+                   children = [#xmlel{name = <<"msg_disappear">>,
+                                      attrs = [{<<"xmlns">>, <<"urn:xmpp:receipts">>},
+                                               {<<"msg_disappear">>, MessageDisappear},
+                                               {<<"id">>, MessageId}],
+                                      children = []}]},
+  ReceivedTimestamp = now_to_microseconds(erlang:now()),
+  ReceivedFlatTimeStamp = lists:flatten(io_lib:format("~p", [ReceivedTimestamp])),
+  ReceivedXMLTag = #xmlel{name = <<"timestamp">>,
+                          attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>},
+                                   {<<"time">>, list_to_binary(ReceivedFlatTimeStamp)}],
+                          children = []},
+  XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
+  ejabberd_router:route(From, To, XmlBody1),
+  case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
+    true ->
+      mod_offline:store_packet({From, xmpp:decode(XmlBody1)});
+    false ->
+      ok
+  end,
+  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>}).
+
+
+
+% model stanza for set_message_disappearance "single_chat"
+% <iq id='4CK21-51' type='set'>
+% <query xmlns='jabber:iq:user_activities' id='ig3eheur558qtu2' status='message_disappear' type='chat' msg_disappear='' to_user='1234567890@xmpp'/>
+% </iq>
+
+set_message_disappear(From, SubEl, IQ) ->
+
+    #jid{luser = FUser, lserver = FServer, lresource = LResource} = From,
+    MsgDisappear  = fxml:get_path_s(SubEl, [{attr, <<"msg_disappear">>}]),
+    Type          = fxml:get_path_s(SubEl, [{attr, <<"type">>}]),
+    if Type =:= <<"chat">> ->
+            Recipient = fxml:get_path_s(SubEl, [{attr, <<"to_user">>}]),
+            ToJid = jid:from_string(Recipient),        
+            #jid{luser = ToUser, lserver = ToServer} = ToJid,
+            fly_mod_utils:add_userin_roster_asunknown(ToServer, ToUser, FUser, <<"B">>),
+            fly_mod_utils:set_message_disappear_single_chat(ToServer, FUser, MsgDisappear, ToUser);
+        true ->
+            ok
+    end,
+    fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"set_message_disappear">>, result_type = <<"updated successfully">>}).
+ 
 set_web_password(From, SubEl, IQ) ->
   Password = fxml:get_path_s(SubEl, [{attr, <<"password">>}]),
   RequestType = fxml:get_path_s(SubEl, [{attr, <<"status">>}]),

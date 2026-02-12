@@ -189,7 +189,7 @@
 	   module = 'user_activities',
            result = {user_activities, '$remove_user', '$device_id', '$vote_id', '$edit_message_id', '$type', '$id', '$send_seen', '$license_data', '$result_type','$status','$password',
            '$socket_id','$message_from','$message_to','$to_user', '$from_user', '$mode', '$send_to', '$poll_option_id', '$voter_user_id', '$poll_id', '$send_from', '$message_type','$message_id','$message_ids','$message','$chat_type','$reply_id','$delete_type','$favourite','$_els','$position','$limit','$row_id','$updated_at',
-           '$call_status','$call_type','$caller_device','$call_id','$call_attend_status', '$last_msg_id', '$remove_message_user', '$calllog_ids', '$mute_status','$archive_status','$group_id','$archive','$block_status','$permission_status','$meta_data', '$topic_id', '$topic_time', '$user_list', '$action', '$mute_setting', '$busy_message', '$busy_status', '$busy', '$sim_bind_logout'},
+           '$call_status','$call_type','$caller_device','$call_id','$call_attend_status', '$last_msg_id', '$remove_message_user', '$calllog_ids', '$mute_status','$archive_status','$group_id','$archive','$block_status','$permission_status','$meta_data', '$topic_id', '$topic_time', '$user_list', '$action', '$mute_setting', '$busy_message', '$busy_status', '$busy', '$sim_bind_logout','$msg_disappear'},
                      attrs = [#attr{name = <<"remove_user">>,default = <<"">>},
                               #attr{name = <<"type">>,default = <<"">>},
                               #attr{name = <<"id">>,default = <<"">>},
@@ -246,6 +246,7 @@
                               #attr{name = <<"busy_message">>,default = <<"">>},
                               #attr{name = <<"busy_status">>,default = <<"">>},
                               #attr{name = <<"busy">>,default = <<"">>},
+                              #attr{name = <<"msg_disappear">>,default = <<"">>},
                               #attr{name = <<"sim_bind_logout">>,default = <<"">>}],
                        cdata = #cdata{default = <<"">>, label = '$result_type'}}).
 
@@ -324,7 +325,7 @@
      #elem{name = <<"chatcontent">>,
            xmlns = <<"urn:xmpp:content">>,
 	   module = 'chatcontent',
-           result = {chatcontent, '$block_user', '$broadcast_id','$broadcast_msgid', '$message_type','$topic_id','$meta_data', '$edit_msg_id', '$mention_list', '$scheduled_datetime'},
+           result = {chatcontent, '$block_user', '$broadcast_id','$broadcast_msgid', '$message_type','$topic_id','$meta_data', '$edit_msg_id', '$mention_list','$disappear_at', '$scheduled_datetime'},
            attrs = [#attr{name = <<"block_user">>,default = <<"0">>},
                     #attr{name = <<"broadcast_id">>,default = <<"">>},
                     #attr{name = <<"broadcast_msgid">>,default = <<"">>},
@@ -333,6 +334,7 @@
                     #attr{name = <<"meta_data">>,default = <<"">>},
                     #attr{name = <<"edit_msg_id">>,default = <<"">>},
                     #attr{name = <<"mention_list">>,default = <<"">>},
+                    #attr{name = <<"disappear_at">>,default = <<"">>},
                     #attr{name = <<"scheduled_datetime">>,default = <<"">>}]}).
 
 -xml(delivered,
@@ -426,7 +428,7 @@
       #elem{name = <<"vCard">>,
             xmlns = <<"jabber:iq:roster">>,
       module = 'rfc6121',
-            result = {roster_vcard, '$roster_vcard','$roster_nickname','$roster_status','$roster_is_admin_blocked','$roster_mobilenumber','$roster_thumbimage','$roster_coverimg','$roster_designation','$roster_name','$roster_image','$roster_email'},
+            result = {roster_vcard, '$roster_vcard','$roster_nickname','$roster_status','$roster_is_admin_blocked','$roster_msg_disappear','$roster_mobilenumber','$roster_thumbimage','$roster_coverimg','$roster_designation','$roster_name','$roster_image','$roster_email'},
                             cdata = #cdata{default = <<"">>, label = '$roster_vcard'},
                             refs = [#ref{name = roster_nickname, label = '$roster_nickname'},
                             #ref{name = roster_name, label = '$roster_name'},
@@ -437,6 +439,7 @@
                             #ref{name = roster_coverimg, label = '$roster_coverimg'},
                             #ref{name = roster_designation, label = '$roster_designation'},
                             #ref{name = roster_is_admin_blocked, label = '$roster_is_admin_blocked'},
+                            #ref{name = roster_msg_disappear, label = '$roster_msg_disappear'},
                             #ref{name = roster_status, label = '$roster_status'}
                   ]}).
 
@@ -495,6 +498,13 @@
           module = 'rfc6121',
                 result = {roster_is_admin_blocked, '$roster_is_admin_blocked'},
                 cdata = #cdata{default = <<"">>, label = '$roster_is_admin_blocked'}}).
+
+-xml(roster_msg_disappear,
+          #elem{name = <<"msgDisappear">>,
+                xmlns = <<"jabber:iq:roster">>,
+          module = 'rfc6121',
+                result = {roster_msg_disappear, '$msgDisappear'},
+                cdata = #cdata{default = <<"">>, label = '$msgDisappear'}}).
 
 
 -xml(roster_designation,

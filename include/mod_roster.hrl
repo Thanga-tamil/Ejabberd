@@ -36,7 +36,8 @@
     image = <<>>                           :: binary() | '_',
     thumbimage = <<>>                      :: binary() | '_',
     history = <<>>                      :: binary() | '_',
-    is_admin_blocked = <<>>                :: binary() | '_'
+    is_admin_blocked = <<>>                :: binary() | '_',
+    msg_disappear = 0                        :: non_neg_integer() | '_' 
 }).
 
 -record(roster_version,

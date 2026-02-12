@@ -112,41 +112,49 @@ write_roster_version(LUser, LServer, InTransaction, Ver) ->
 	      fun () -> set_roster_version(LUser, LServer, Ver) end)
     end.
 
+
 get_roster(LUser, LServer) ->
     case ejabberd_sql:sql_query(
-	   LServer,
-	   ?SQL("select @(rosterusers.username)s, @(rosterusers.jid)s, @(rosterusers.nick)s, @(rosterusers.subscription)s, "
-    "@(rosterusers.ask)s,  @(rosterusers.server)s,  "
-    "@(rosterusers.type)s,@(vcard_search.nickname)s,@(case when p.hide_profile = 1 then vcard_search.image else '' end as image)s,@(vcard_search.email)s,@(vcard_search.mobilenumber)s,@(case when p.hide_profile = 1 then vcard_search.thumbimage else '' end as thumbimage)s,@(vcard_search.status)s,@(vcard_search.is_block)s from rosterusers JOIN
-    vcard_search ON vcard_search.lusername = rosterusers.jid_username LEFT JOIN privacy_settings as p on p.username = rosterusers.jid_username"
-    " where rosterusers.username=%(LUser)s and %(LServer)H")) of
-        {selected, Items} when is_list(Items) ->
-             % JIDGroups = case get_roster_jid_groups(LServer, LUser) of
-            %                 {selected, JGrps} when is_list(JGrps) ->
-            %                     JGrps;
-            %                 _ ->
-			% 	[]
-            %             end,
+        LServer,
+        [<<" SELECT rosterusers.username, "
+        "  rosterusers.jid, rosterusers.nick, "
+        "  rosterusers.subscription, rosterusers.ask, "
+        "  rosterusers.server, rosterusers.type, "
+        "  vcard_search.nickname, vcard_search.image, "
+        "  vcard_search.email, vcard_search.mobilenumber, "
+        "  vcard_search.thumbimage, vcard_search.status, "
+        "  vcard_search.is_block,"
+        "  rosterusers.msg_disappear "
+        " FROM rosterusers "
+        "JOIN vcard_search ON vcard_search.lusername = rosterusers.jid_username  WHERE  rosterusers.username = '">>, LUser, <<"' " >>]
+    ) of
+        {selected, _, Items}  when is_list(Items) ->
+
+           
             JIDGroups = [],
-            GroupsDict = lists:foldl(fun({J, G}, Acc) ->
-                                             Gs = maps:get(J, Acc, []),
-                                             maps:put(J, [G | Gs], Acc)
-                                     end,
-                                     maps:new(), JIDGroups),
-	    {ok, lists:flatmap(
-		   fun(I) ->
-			   case raw_to_record(LServer, I) of
-			       %% Bad JID in database:
-			       error -> [];
-			       R ->
-				   SJID = jid:encode(R#roster.jid),
-                                   Groups = maps:get(SJID, GroupsDict, []),
-				   [R#roster{groups = Groups}]
-			   end
-		   end, Items)};
+            GroupsDict = lists:foldl(
+                fun({J, G}, Acc) ->
+                    Gs = maps:get(J, Acc, []),
+                    maps:put(J, [G | Gs], Acc)
+                end,
+                maps:new(),
+                JIDGroups
+            ),
+            {ok,
+             lists:flatmap(
+               fun(Row) ->
+                   case raw_to_record(LServer, Row) of
+                       error -> [];
+                       R ->
+                           SJID = jid:encode(R#roster.jid),
+                           Groups = maps:get(SJID, GroupsDict, []),
+                           [R#roster{groups = Groups}]
+                   end
+               end, Items)};
         _ ->
-	    error
+            error
     end.
+
 
 roster_subscribe(_LUser, _LServer, _LJID, Item) ->
     ItemVals = record_to_row(Item),
@@ -295,13 +303,26 @@ roster_subscribe({LUser, LServer, SJID, Name, SSubscription, SAsk, AskMessage}) 
         "subscribe=''",
         "type='item'"]).
 
+% get_roster_by_jid(LServer, LUser, SJID) ->
+%     ejabberd_sql:sql_query_t(
+% ?SQL("select @(rosterusers.username)s, @(rosterusers.jid)s, @(rosterusers.nick)s, @(rosterusers.subscription)s, "
+% "@(rosterusers.ask)s,  @(rosterusers.server)s,  "
+% "@(rosterusers.type)s,@(vcard_search.nickname)s,@(vcard_search.image)s,@(vcard_search.email)s,@(vcard_search.mobilenumber)s,@(vcard_search.thumbimage)s, "
+% "@(vcard_search.status)s from rosterusers JOIN vcard_search ON vcard_search.lusername = rosterusers.jid_username where rosterusers.username=%(LUser)s and %(LServer)H and rosterusers.jid=%(SJID)s")).
+
 get_roster_by_jid(LServer, LUser, SJID) ->
     ejabberd_sql:sql_query_t(
-?SQL("select @(rosterusers.username)s, @(rosterusers.jid)s, @(rosterusers.nick)s, @(rosterusers.subscription)s, "
-"@(rosterusers.ask)s,  @(rosterusers.server)s,  "
-"@(rosterusers.type)s,@(vcard_search.nickname)s,@(vcard_search.image)s,@(vcard_search.email)s,@(vcard_search.mobilenumber)s,@(vcard_search.thumbimage)s, "
-"@(vcard_search.status)s from rosterusers JOIN vcard_search ON vcard_search.lusername = rosterusers.jid_username where rosterusers.username=%(LUser)s and %(LServer)H and rosterusers.jid=%(SJID)s")).
-
+        ?SQL(
+"SELECT rosterusers.username, rosterusers.jid, rosterusers.nick, "
+"  rosterusers.subscription, rosterusers.ask, rosterusers.server, "
+"  rosterusers.type, vcard_search.nickname, vcard_search.image, "
+"  vcard_search.email, vcard_search.mobilenumber, vcard_search.thumbimage, "
+"  vcard_search.status, "
+"  vcard_search.is_block, "
+"  rosterusers.msg_disappear FROM rosterusers "
+"JOIN vcard_search ON vcard_search.lusername = rosterusers.jid_username  WHERE rosterusers.username=%(LUser)s AND %(LServer)H AND rosterusers.jid=%(SJID)s"
+        )
+    ).
 
 get_rostergroup_by_jid(LServer, LUser, SJID) ->
     ejabberd_sql:sql_query(
@@ -343,60 +364,83 @@ update_roster_sql({LUser, LServer, SJID, Name, SSubscription, SAsk, AskMessage},
        || ItemGroup <- ItemGroups].
 
 raw_to_record(LServer,
-	      [User, LServer, SJID, Nick, SSubscription, SAsk,
-	       _SServer,  _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked]) ->
-    raw_to_record(LServer,
-                  {User, LServer, SJID, Nick, SSubscription, SAsk,
-                   _SServer,  _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked});
-raw_to_record(LServer,
-	      {User, SJID, Nick, SSubscription, SAsk,
-	       _SServer,  _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked}) ->
-    raw_to_record(LServer,
-                  {User, LServer, SJID, Nick, SSubscription, SAsk,
-                   _SServer,  _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked});
-raw_to_record(LServer,
-	      {User, LServer, SJID, Nick, SSubscription, SAsk,
-	       _SServer,  _SType, Nickname, Image,Email,Mobilenumber,Thumbimage,Status,IsAdminBlocked}) ->
-    try jid:decode(SJID) of
-      JID ->
-	  LJID = jid:tolower(JID),
-	  Subscription = decode_subscription(User, LServer, SSubscription),
-	  Ask = decode_ask(User, LServer, SAsk),
-	  #roster{usj = {User, LServer, LJID},
-		  us = {User, LServer}, jid = LJID, name = Nick,
-		  subscription = Subscription, ask = Ask,
+    [User, SJID, Nick, SSubscription, SAsk,
+     _SServer, _SType, Nickname, Image, Email, Mobilenumber,
+     Thumbimage, Status, IsAdminBlockedRaw, MsgDisappearRaw | _Rest]) ->
+  try
+      JID = jid:decode(SJID),
+      LJID = jid:tolower(JID),
+
+      %% Decode subscription and ask as before
+      Subscription = decode_subscription(User, LServer, SSubscription),
+      Ask = decode_ask(User, LServer, SAsk),
+
+      %% Safe integer decoding for is_block
+      IsAdminBlocked = decode_int(IsAdminBlockedRaw),
+      MsgDisappear = decode_int(MsgDisappearRaw),
+
+      #roster{
+          usj = {User, LServer, LJID},
+          us = {User, LServer},
+          jid = LJID,
+          name = Nick,
+          subscription = Subscription,
+          ask = Ask,
           nickname = Nickname,
           status = Status,
           email = Email,
           mobile = Mobilenumber,
           thumbimage = Thumbimage,
           is_admin_blocked = list_to_binary(integer_to_list(IsAdminBlocked)),
-          image = Image}
-    catch _:{bad_jid, _} ->
-	    ?ERROR_MSG("~ts", [format_row_error(User, LServer, {jid, SJID})]),
-	    error
-    end.
+          image = Image,
+          msg_disappear = MsgDisappear
+      }
+  catch
+      _:_ ->
+          ?ERROR_MSG("~ts", [format_row_error(User, LServer, {jid, SJID})]),
+          error
+  end.
 
-record_to_row(
-  #roster{us = {LUser, LServer},
-          jid = JID, name = Name, subscription = Subscription,
-          ask = Ask, askmessage = AskMessage}) ->
+%%--------------------------------------------------------------------
+%% Helper function to decode binary or integer
+%%--------------------------------------------------------------------
+decode_int(Value) when is_integer(Value) ->
+    Value;
+decode_int(Value) when is_binary(Value) ->
+    case catch binary_to_integer(Value) of
+        Int when is_integer(Int) -> Int;
+        _ -> 0
+    end;
+decode_int(_) ->
+    0.
+
+
+record_to_row(#roster{
+    us = {LUser, LServer},
+    jid = JID,
+    name = Name,
+    subscription = Subscription,
+    ask = Ask,
+    askmessage = AskMessage,
+    msg_disappear = MsgDisappear
+}) ->
     SJID = jid:encode(jid:tolower(JID)),
     SSubscription = case Subscription of
-		      both -> <<"B">>;
-		      to -> <<"T">>;
-		      from -> <<"F">>;
-		      none -> <<"N">>
-		    end,
+                      both -> <<"B">>;
+                      to -> <<"T">>;
+                      from -> <<"F">>;
+                      none -> <<"N">>
+                    end,
     SAsk = case Ask of
-	     subscribe -> <<"S">>;
-	     unsubscribe -> <<"U">>;
-	     both -> <<"B">>;
-	     out -> <<"O">>;
-	     in -> <<"I">>;
-	     none -> <<"N">>
-	   end,
-    {LUser, LServer, SJID, Name, SSubscription, SAsk, AskMessage}.
+             subscribe -> <<"S">>;
+             unsubscribe -> <<"U">>;
+             both -> <<"B">>;
+             out -> <<"O">>;
+             in -> <<"I">>;
+             none -> <<"N">>
+           end,
+    {LUser, LServer, SJID, Name, SSubscription, SAsk, AskMessage, MsgDisappear}.
+
 
 decode_subscription(User, Server, S) ->
     case S of

@@ -85,7 +85,7 @@
   update_delivery/4,
   update_delivery_offline/2,
   update_recall/2,
-  insert_status/12,
+  insert_status/13,
   insert_status/2,
   get_message_time/2,
   set_favourite_message/3,
@@ -181,6 +181,11 @@
   get_nick/2,
   get_recent_profile/3,
   read_all/3,
+  set_message_disappear_single_chat/4,
+  add_userin_roster_asunknown/4,
+  get_default_msg_disappearance/2,
+  get_old_default_msg_disappear/2,u
+  update_rosters_on_vcard_change/2,
   get_all_media_conversation/2,empty_from_user_to_chat_media/2,update_tousers_to_chat_media/3,
   revoke_media_permission/3, get_chat_media_by_messageid/2,
   get_all_media_conversation_with_filetoken/2,
@@ -1417,12 +1422,14 @@ update_recall(#jid{luser = _User,lserver = Server}, MessageId) ->
 %% &param ToJid
 %% @return List
 
-insert_status(#jid{luser = User}, #jid{luser = ToUser,lserver = ToServer}, MessageId,MessageType, Topicid, MetaData, ChatType,SentFrom,BlockUser, Msg, MsgTime, EditmsgId) ->
+insert_status(#jid{luser = User}, #jid{luser = ToUser,lserver = ToServer}, MessageId,MessageType, Topicid, MetaData, ChatType,SentFrom,BlockUser, Msg, MsgTime, EditmsgId, DisappearAt) ->
   if EditmsgId =:= <<"">> ->
     EditMsgId = MessageId;
   true ->
     EditMsgId = EditmsgId
 end,
+
+  ?INFO_MSG("Insert message is DisappearAt ~p", [DisappearAt]), 
   if EditMsgId =:= MessageId ->
     if Topicid =:= <<"">> ->
       ejabberd_sql:sql_query( ToServer, [<<"insert into message_status (from_user,to_user,status, recent,message_id, edit_message_id, message_type,  topic_id, meta_data, txt,chat_type,from_notification,blocked,message_time,to_notification,message_notification,received_at,seen_at) values
@@ -1437,7 +1444,7 @@ end,
   %ejabberd_sql:sql_query(ToServer, [<<"delete from spool where username = '">>,ToUser, <<"' and message_id ='">>,MessageId, <<"';">>]), % commented to retain recalled message on edit in offline storage 
   ejabberd_sql:sql_query( ToServer, [<<"update  message_status set edit_status = 1, status = 0,  edit_message_id = '">>, EditMsgId , <<"' where message_id = '">>, MessageId, <<"' ;">>])
   end,
-  ejabberd_sql:sql_query( ToServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg, meta_data) values ('">>, User, <<"', '">>, ToUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'chat', '">>, Msg, <<"', '">>, MetaData, <<"');">>]).
+  ejabberd_sql:sql_query( ToServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg, meta_data, disappear_at) values ('">>, User, <<"', '">>, ToUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'chat', '">>, Msg, <<"', '">>, MetaData, <<"', '">>,DisappearAt,<<"' );">>]).
 
 mute_status(Lserver, Luser, Tuser)->
   ejabberd_sql:sql_query(Lserver,
@@ -2348,3 +2355,50 @@ delete_bulk_messages(LServer, MessageIds, LUser) ->
   IdsStr = join(MessageIds, <<",">>),
   ejabberd_sql:sql_query(LServer, [<<"DELETE FROM bulk_notification WHERE message_id IN (">>, IdsStr, <<") AND user_id = '">>, UserID, <<"';">>]),
   ejabberd_sql:sql_query(LServer, [<<"DELETE FROM schedule_message WHERE message_id IN (">>, IdsStr, <<");">>]).
+
+set_message_disappear_single_chat(FServer, FUser, MsgDisappear, Recipient) ->
+  ejabberd_sql:sql_query(FServer,
+    [<<"update rosterusers set msg_disappear = ">>, MsgDisappear ,<<" where (username = '">>,Recipient, <<"' and jid_username = '">>,FUser,<<"') or (username = '">>, FUser, <<"' and jid_username = '">>, Recipient, <<"');">>]).
+
+add_userin_roster_asunknown(LServer, ToUser, FUser,Subscription) ->
+  case catch ejabberd_sql:sql_query(
+    LServer,
+    [<<"SELECT username FROM rosterusers WHERE username = '">>, ToUser ,<<"' and jid_username = '">>, FUser ,<<"' ;">>]) of
+    {selected, _, []} ->
+      Jid = make_jid_s(FUser, LServer),
+      ejabberd_sql:sql_query(LServer,[<<"INSERT INTO rosterusers(username, jid, jid_username, subscription, ask, server, type, relation) values ('">>,ToUser, <<"','">>, Jid,<<"','">>,FUser,<<"','">>,Subscription,<<"','N','N','item', 'U');">>]);
+    _ ->
+      ok
+  end.
+
+get_default_msg_disappearance(Server, Username) ->
+    case catch ejabberd_sql:sql_query(Server, [<<"select CAST(msg_disappear AS CHAR) from vcard_search where username='">>, Username, <<"';">>]) of
+        {selected, _, [[Val]]} ->
+            days_from_value(Val);
+        _ ->
+            0
+    end.
+
+get_old_default_msg_disappear(LServer, LUser) ->
+    ejabberd_sql:sql_query(
+        LServer,
+        <<"select msg_disappear from vcard_search where username = ?">>,
+        [LUser]
+    ).
+
+update_rosters_on_vcard_change(LServer, LUser) ->
+    ejabberd_sql:sql_query(
+        LServer,
+        <<"update rosterusers
+           set is_default_disp_notified = 0
+           where (username = ? or jid_username = ?)
+           and msg_disappear = 0">>,
+        [LUser, LUser]
+    ).
+
+get_recently_updated_disappearance(ToServer, User) ->
+    ejabberd_sql:sql_query(
+        ToServer,
+        <<"select disp_updated_at from vcard_search where username = ?">>,
+        [User]
+    ).

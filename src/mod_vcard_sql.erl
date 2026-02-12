@@ -89,6 +89,9 @@ sql_schemas() ->
                      #sql_column{name = <<"lorgname">>, type = text},
                      #sql_column{name = <<"orgunit">>, type = text},
                      #sql_column{name = <<"lorgunit">>, type = text},
+                     #sql_column{name = <<"msg_disappear">>, type = text},
+                     #sql_column{name = <<"updated_by">>, type = text},
+                     #sql_column{name = <<"disp_updated_at">>, type = text}
                      #sql_column{name = <<"description">>, type = text}],
                 indices = [#sql_index{
                               columns = [<<"server_host">>, <<"lusername">>],
@@ -136,85 +139,298 @@ get_vcard(LUser, LServer) ->
 	_ -> error
     end.
 
+
 set_vcard(LUser, LServer, VCARD,
-	  #vcard_search{user = {User, _},
-			fn = FN,
-			lfn = LFN,
-			family = Family,
-			lfamily = LFamily,
-			given = Given,
-			lgiven = LGiven,
-			middle = Middle,
-			lmiddle = LMiddle,
-			nickname = Nickname,
-			lnickname = LNickname,
-			bday = BDay,
-			lbday = LBDay,
-			ctry = CTRY,
-			lctry = LCTRY,
-			locality = Locality,
-			llocality = LLocality,
-			email = EMail,
-			lemail = LEMail,
-			orgname = OrgName,
-			lorgname = LOrgName,
-			orgunit = OrgUnit,
-			lorgunit = LOrgUnit,
-            status = Status,
-            lstatus = LStatus,
-            image = Image,
-            limage = LImage,
-            thumbimage = ThumbImage,
-            lthumbimage = LThumbImage,
-            history = History,
-            mobilenumber = MobileNumber,
-            lmobilenumber = LMobileNumber,
-            description = Description}) ->
+          #vcard_search{
+              user = {User, _},
+              fn = FN, lfn = LFN,
+              family = Family, lfamily = LFamily,
+              given = Given, lgiven = LGiven,
+              middle = Middle, lmiddle = LMiddle,
+              nickname = Nickname, lnickname = LNickname,
+              bday = BDay, lbday = LBDay,
+              ctry = CTRY, lctry = LCTRY,
+              locality = Locality, llocality = LLocality,
+              email = EMail, lemail = LEMail,
+              orgname = OrgName, lorgname = LOrgName,
+              orgunit = OrgUnit, lorgunit = LOrgUnit,
+              status = Status, lstatus = LStatus,
+              image = Image, limage = LImage,
+              thumbimage = ThumbImage, lthumbimage = LThumbImage,
+              history = History,
+              mobilenumber = MobileNumber, lmobilenumber = LMobileNumber,
+              msg_disappear = MsgDisappear,
+              updated_by = UpdatedBy,
+              disp_updated_at = DispUpdatedAt
+          }) ->
+
+    %% =========================
+    %% ENTRY LOG
+    %% =========================
+    ?INFO_MSG(
+        "set_vcard called~nLUser=~p~nLServer=~p~nVCARD=~p",
+        [LUser, LServer, fxml:element_to_binary(VCARD)]
+    ),
+
     SVCARD = fxml:element_to_binary(VCARD),
+
+    %% =========================
+    %% FETCH EXISTING ROW (OUTSIDE TRANSACTION)
+    %% =========================
+    
+       ExistingRow =
+        try
+            case ejabberd_sql:sql_query(
+                    LServer,
+                    [<<"select fn, lfn, family, lfamily, given, lgiven, middle, lmiddle, nickname, lnickname, bday, lbday, ctry, lctry, locality, llocality, email, lemail, orgname, lorgname, orgunit, lorgunit, status, lstatus, image, limage, thumbimage, lthumbimage, history, mobilenumber, lmobilenumber, msg_disappear, updated_by, disp_updated_at from vcard_search where lusername= '">>, LUser, <<"' ">>]
+                ) of
+                {selected, []} -> 
+                    ?INFO_MSG("vcard search empty", []),
+                    [];
+                {selected, _Cols, [Row | _]} -> 
+                    ?INFO_MSG("Found existing row with ~p elements", [length(Row)]),
+                    Row;
+                {selected, _Cols, []} -> 
+                    ?INFO_MSG("No existing row found for user ~p", [LUser]),
+                    [];
+                {error, Reason} ->
+                    ?ERROR_MSG("SQL query failed: ~p", [Reason]),
+                    [];
+                Other ->
+                    ?ERROR_MSG("Unexpected SQL result: ~p", [Other]),
+                    [];
+                _ ->
+                    ?ERROR_MSG("Unexpected SQL result: ~p", []),
+                    []
+            end
+        catch
+            _:Error ->
+                ?ERROR_MSG("Exception during SQL query: ~p", [Error]),
+                []
+        end,
+
+    ?INFO_MSG("Existing vcard_search row = ~p", [ExistingRow]),
+    ?INFO_MSG("Existing active User = ~p", [LUser]),
+
+    ToBin = fun
+        (V) when is_binary(V) -> V;
+        (V) when is_integer(V) -> integer_to_binary(V);
+        (V) when is_list(V) -> list_to_binary(V);
+        (V) when is_atom(V) -> 
+            case V of
+                undefined -> <<>>;
+                null -> <<>>;
+                'NULL' -> <<>>;
+                <<>> -> <<>>;
+                _ -> atom_to_binary(V, utf8)
+            end;
+        ({{Y,M,D},{H,Mi,S,_}}) ->
+            list_to_binary(
+                io_lib:format("~4..0B-~2..0B-~2..0B ~2..0B:~2..0B:~2..0B",
+                            [Y,M,D,H,Mi,S])
+            );
+        (_) -> <<>>
+    end,
+
+    SafeNth = fun
+        (N, Row) when is_list(Row), length(Row) >= N ->
+            case lists:nth(N, Row) of
+                Value -> ToBin(Value);
+                _ -> <<>>
+            end;
+        (_, _) ->
+            <<>>
+    end,
+
+    Pick = fun
+        (undefined, Idx) -> SafeNth(Idx, ExistingRow);
+        (null, Idx) -> SafeNth(Idx, ExistingRow);
+        (<<>>, Idx) -> SafeNth(Idx, ExistingRow);
+        (Val, _) -> ToBin(Val)
+    end,
+
+    %% =========================
+    %% FINAL VALUES
+    %% =========================
+
+    FN1 = Pick(FN, 1),
+    LFN1 = Pick(LFN, 2),
+    Family1 = Pick(Family, 3),
+    LFamily1 = Pick(LFamily, 4),
+    Given1 = Pick(Given, 5),
+    LGiven1 = Pick(LGiven, 6),
+    Middle1 = Pick(Middle, 7),
+    LMiddle1 = Pick(LMiddle, 8),
+    Nickname1 = Pick(Nickname, 9),
+    LNickname1 = Pick(LNickname, 10),
+    BDay1 = Pick(BDay, 11),
+    LBDay1 = Pick(LBDay, 12),
+    CTRY1 = Pick(CTRY, 13),
+    LCTRY1 = Pick(LCTRY, 14),
+    Locality1 = Pick(Locality, 15),
+    LLocality1 = Pick(LLocality, 16),
+    EMail1 = Pick(EMail, 17),
+    LEMail1 = Pick(LEMail, 18),
+    OrgName1 = Pick(OrgName, 19),
+    LOrgName1 = Pick(LOrgName, 20),
+    OrgUnit1 = Pick(OrgUnit, 21),
+    LOrgUnit1 = Pick(LOrgUnit, 22),
+    Status1 = Pick(Status, 23),
+    LStatus1 = Pick(LStatus, 24),
+    Image1 = Pick(Image, 25),
+    LImage1 = Pick(LImage, 26),
+    ThumbImage1 = Pick(ThumbImage, 27),
+    LThumbImage1 = Pick(LThumbImage, 28),
+    History1 = Pick(History, 29),
+    MobileNumber1 = Pick(MobileNumber, 30),
+    LMobileNumber1 = Pick(LMobileNumber, 31),
+    MsgDisappear1 = Pick(MsgDisappear, 32),
+    UpdatedBy1 = Pick(UpdatedBy, 33),
+    DispUpdatedAt1 = Pick(DispUpdatedAt, 34), 
+
+    ?INFO_MSG(
+        "Final picked vcard values:~n"
+        "FN=~p LFN=~p~n"
+        "Family=~p LFamily=~p~n"
+        "Given=~p LGiven=~p~n"
+        "Middle=~p LMiddle=~p~n"
+        "Nickname=~p LNickname=~p~n"
+        "BDay=~p LBDay=~p~n"
+        "CTRY=~p LCTRY=~p~n"
+        "Locality=~p LLocality=~p~n"
+        "EMail=~p LEMail=~p~n"
+        "OrgName=~p LOrgName=~p~n"
+        "OrgUnit=~p LOrgUnit=~p~n"
+        "Status=~p LStatus=~p~n"
+        "Image=~p LImage=~p~n"
+        "ThumbImage=~p LThumbImage=~p~n"
+        "History=~p~n"
+        "MobileNumber=~p LMobileNumber=~p~n"
+        "MsgDisappear=~p UpdatedBy=~p DispUpdatedAt=~p",
+        [
+            FN1, LFN1,
+            Family1, LFamily1,
+            Given1, LGiven1,
+            Middle1, LMiddle1,
+            Nickname1, LNickname1,
+            BDay1, LBDay1,
+            CTRY1, LCTRY1,
+            Locality1, LLocality1,
+            EMail1, LEMail1,
+            OrgName1, LOrgName1,
+            OrgUnit1, LOrgUnit1,
+            Status1, LStatus1,
+            Image1, LImage1,
+            ThumbImage1, LThumbImage1,
+            History1,
+            MobileNumber1, LMobileNumber1,
+            MsgDisappear1, UpdatedBy1, DispUpdatedAt1 
+        ]
+    ),
+
+    %% =========================
+    %% WRITE TRANSACTION (ONLY UPSERTS)
+    %% =========================
+
+    DispUpdatedAtSql =
+        case DispUpdatedAt of
+            <<>> -> <<>>;
+            _    -> <<"FROM_UNIXTIME(%(DispUpdatedAt)s)">>
+        end,
+
     ejabberd_sql:sql_transaction(
-      LServer,
-      fun() ->
-              ?SQL_UPSERT(LServer, "vcard",
-                          ["!username=%(LUser)s",
-                           "!server_host=%(LServer)s",
-                           "vcard=%(SVCARD)s"]),
-              ?SQL_UPSERT(LServer, "vcard_search",
-                          ["username=%(User)s",
-                           "!lusername=%(LUser)s",
-                           "!server_host=%(LServer)s",
-                           "fn=%(FN)s",
-                           "lfn=%(LFN)s",
-                           "family=%(Family)s",
-                           "lfamily=%(LFamily)s",
-                           "given=%(Given)s",
-                           "lgiven=%(LGiven)s",
-                           "middle=%(Middle)s",
-                           "lmiddle=%(LMiddle)s",
-                           "nickname=%(Nickname)s",
-                           "lnickname=%(LNickname)s",
-                           "bday=%(BDay)s",
-                           "lbday=%(LBDay)s",
-                           "ctry=%(CTRY)s",
-                           "lctry=%(LCTRY)s",
-                           "locality=%(Locality)s",
-                           "llocality=%(LLocality)s",
-                           "email=%(EMail)s",
-                           "lemail=%(LEMail)s",
-                           "orgname=%(OrgName)s",
-                           "lorgname=%(LOrgName)s",
-                           "orgunit=%(OrgUnit)s",
-                           "lorgunit=%(LOrgUnit)s",
-                           "status=%(Status)s",
-                           "lstatus=%(LStatus)s",
-                           "image=%(Image)s",
-                           "limage=%(LImage)s",
-                           "thumbimage=%(ThumbImage)s",
-                           "lthumbimage=%(LThumbImage)s",
-                           "history=%(History)s",
-                           "mobilenumber=%(MobileNumber)s",
-                           "lmobilenumber=%(LMobileNumber)s",
-                           "description=%(Description)s"])
-      end).
+            LServer,
+            fun() ->
+                ?SQL_UPSERT(
+                    LServer, "vcard",
+                    ["!username=%(LUser)s",
+                     "!server_host=%(LServer)s",
+                     "vcard=%(SVCARD)s",
+                     "is_delete=0",
+                     "updated_at=NOW()"]),
+
+     case DispUpdatedAt of
+    <<>> ->
+        ?SQL_UPSERT(LServer, "vcard_search",
+                                ["username=%(User)s",
+                                    "!lusername=%(LUser)s",
+                                    "!server_host=%(LServer)s",
+                                    "fn=%(FN1)s",
+                                    "lfn=%(LFN1)s",
+                                    "family=%(Family1)s",
+                                    "lfamily=%(LFamily1)s",
+                                    "given=%(Given1)s",
+                                    "lgiven=%(LGiven1)s",
+                                    "middle=%(Middle1)s",
+                                    "lmiddle=%(LMiddle1)s",
+                                    "nickname=%(Nickname1)s",
+                                    "lnickname=%(LNickname1)s",
+                                    "bday=%(BDay1)s",
+                                    "lbday=%(LBDay1)s",
+                                    "ctry=%(CTRY1)s",
+                                    "lctry=%(LCTRY1)s",
+                                    "locality=%(Locality1)s",
+                                    "llocality=%(LLocality1)s",
+                                    "email=%(EMail1)s",
+                                    "lemail=%(LEMail1)s",
+                                    "orgname=%(OrgName1)s",
+                                    "lorgname=%(LOrgName1)s",
+                                    "orgunit=%(OrgUnit1)s",
+                                    "lorgunit=%(LOrgUnit1)s",
+                                    "status=%(Status1)s",
+                                    "lstatus=%(LStatus1)s",
+                                    "image=%(Image1)s",
+                                    "limage=%(LImage1)s",
+                                    "thumbimage=%(ThumbImage1)s",
+                                    "lthumbimage=%(LThumbImage1)s",
+                                    "history=%(History1)s",
+                                    "mobilenumber=%(MobileNumber1)s",
+                                    "lmobilenumber=%(LMobileNumber1)s",
+                                    "msg_disappear=%(MsgDisappear1)s",
+                                    "updated_by=%(UpdatedBy1)s"]);
+    _ ->
+        ?SQL_UPSERT(LServer, "vcard_search",
+                                ["username=%(User)s",
+                                    "!lusername=%(LUser)s",
+                                    "!server_host=%(LServer)s",
+                                    "fn=%(FN1)s",
+                                    "lfn=%(LFN1)s",
+                                    "family=%(Family1)s",
+                                    "lfamily=%(LFamily1)s",
+                                    "given=%(Given1)s",
+                                    "lgiven=%(LGiven1)s",
+                                    "middle=%(Middle1)s",
+                                    "lmiddle=%(LMiddle1)s",
+                                    "nickname=%(Nickname1)s",
+                                    "lnickname=%(LNickname1)s",
+                                    "bday=%(BDay1)s",
+                                    "lbday=%(LBDay1)s",
+                                    "ctry=%(CTRY1)s",
+                                    "lctry=%(LCTRY1)s",
+                                    "locality=%(Locality1)s",
+                                    "llocality=%(LLocality1)s",
+                                    "email=%(EMail1)s",
+                                    "lemail=%(LEMail1)s",
+                                    "orgname=%(OrgName1)s",
+                                    "lorgname=%(LOrgName1)s",
+                                    "orgunit=%(OrgUnit1)s",
+                                    "lorgunit=%(LOrgUnit1)s",
+                                    "status=%(Status1)s",
+                                    "lstatus=%(LStatus1)s",
+                                    "image=%(Image1)s",
+                                    "limage=%(LImage1)s",
+                                    "thumbimage=%(ThumbImage1)s",
+                                    "lthumbimage=%(LThumbImage1)s",
+                                    "history=%(History1)s",
+                                    "mobilenumber=%(MobileNumber1)s",
+                                    "lmobilenumber=%(LMobileNumber1)s",
+                                    "msg_disappear=%(MsgDisappear1)s",
+                                    "updated_by=%(UpdatedBy1)s",
+                                    "disp_updated_at=FROM_UNIXTIME(%(DispUpdatedAt)s)"])
+                            end   
+
+            end
+        ).
 
 search(LServer, Data, AllowReturnAll, MaxMatch) ->
     MatchSpec = make_matchspec(LServer, Data),
