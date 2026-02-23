@@ -427,6 +427,18 @@ del_roster(LUser, LServer, LJID) ->
 	      del_roster_t(LUser, LServer, LJID)
       end).
 
+
+to_binary(Value) when is_binary(Value) ->
+    Value;
+to_binary(Value) when is_integer(Value) ->
+    integer_to_binary(Value);
+to_binary(Value) when is_list(Value) ->
+    list_to_binary(Value);
+to_binary(Value) when is_atom(Value) ->
+    atom_to_binary(Value, utf8);
+to_binary(_) ->
+    <<"">>.
+
 -spec encode_item(#roster{}) -> roster_item().
 encode_item(Item) ->
 	VCard = [#roster_vcard{roster_nickname=[#roster_nickname{roster_nickname = Item#roster.name}],
