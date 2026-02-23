@@ -184,7 +184,7 @@
   set_message_disappear_single_chat/4,
   add_userin_roster_asunknown/4,
   get_default_msg_disappearance/2,
-  get_old_default_msg_disappear/2,u
+  get_old_default_msg_disappear/2,
   update_rosters_on_vcard_change/2,
   get_all_media_conversation/2,empty_from_user_to_chat_media/2,update_tousers_to_chat_media/3,
   revoke_media_permission/3, get_chat_media_by_messageid/2,
@@ -2370,6 +2370,17 @@ add_userin_roster_asunknown(LServer, ToUser, FUser,Subscription) ->
     _ ->
       ok
   end.
+
+days_from_value(<<"0">>) -> 0;
+days_from_value(Val) when is_binary(Val) ->
+    case string:to_integer(binary_to_list(Val)) of
+        {Int, _} -> Int;
+        _ -> 0
+    end;
+days_from_value(Val) when is_integer(Val) ->
+    Val;
+days_from_value(_) ->
+    0.
 
 get_default_msg_disappearance(Server, Username) ->
     case catch ejabberd_sql:sql_query(Server, [<<"select CAST(msg_disappear AS CHAR) from vcard_search where username='">>, Username, <<"';">>]) of
