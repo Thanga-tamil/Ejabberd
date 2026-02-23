@@ -449,6 +449,9 @@ now_to_microseconds({Mega, Sec, Micro}) ->
   %%Epoch time in milliseconds from 1 Jan 1970
   (Mega * 1000000 + Sec) * 1000000 + Micro.
 
+send_ack_response(From, To, ReceiptId, Type) ->
+  send_ack_response(From, To, ReceiptId, Type, <<"">>).
+
 send_ack_response(From, To, ReceiptId, Type, DisappearAt) ->
   #jid{user = _FUser, lserver = ServerHost} = From,
   SentTo = jid:to_string(To),
