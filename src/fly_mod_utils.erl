@@ -2348,8 +2348,12 @@ delete_bulk_message_row(LServer, MessageId, LUser) ->
   UserID = <<LUser/binary, "@", LServer/binary>>,
   ejabberd_sql:sql_query(LServer, [<<"DELETE FROM bulk_notification WHERE message_id = '">>, MessageId, <<"' AND user_id = '">>, UserID, <<"';">>]).
 
-delete_bulk_messages(_LServer, [], _LUser) ->
-  ok;
+
+join([], _Sep) -> <<>>;
+join([H | T], Sep) ->
+  lists:foldl(fun(E, Acc) -> <<Acc/binary, Sep/binary, "'", E/binary, "'">> end, <<"'", H/binary, "'">>, T).
+
+delete_bulk_messages(_LServer, [], _LUser) -> ok;
 delete_bulk_messages(LServer, MessageIds, LUser) ->
   UserID = <<LUser/binary, "@", LServer/binary>>,
   IdsStr = join(MessageIds, <<",">>),
