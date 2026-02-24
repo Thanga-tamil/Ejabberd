@@ -91,7 +91,7 @@ sql_schemas() ->
                      #sql_column{name = <<"lorgunit">>, type = text},
                      #sql_column{name = <<"msg_disappear">>, type = text},
                      #sql_column{name = <<"updated_by">>, type = text},
-                     #sql_column{name = <<"disp_updated_at">>, type = text}
+                     #sql_column{name = <<"disp_updated_at">>, type = text},
                      #sql_column{name = <<"description">>, type = text}],
                 indices = [#sql_index{
                               columns = [<<"server_host">>, <<"lusername">>],
@@ -161,7 +161,8 @@ set_vcard(LUser, LServer, VCARD,
               mobilenumber = MobileNumber, lmobilenumber = LMobileNumber,
               msg_disappear = MsgDisappear,
               updated_by = UpdatedBy,
-              disp_updated_at = DispUpdatedAt
+              disp_updated_at = DispUpdatedAt,
+              description = Description
           }) ->
 
     %% =========================
@@ -182,7 +183,7 @@ set_vcard(LUser, LServer, VCARD,
         try
             case ejabberd_sql:sql_query(
                     LServer,
-                    [<<"select fn, lfn, family, lfamily, given, lgiven, middle, lmiddle, nickname, lnickname, bday, lbday, ctry, lctry, locality, llocality, email, lemail, orgname, lorgname, orgunit, lorgunit, status, lstatus, image, limage, thumbimage, lthumbimage, history, mobilenumber, lmobilenumber, msg_disappear, updated_by, disp_updated_at from vcard_search where lusername= '">>, LUser, <<"' ">>]
+                    [<<"select fn, lfn, family, lfamily, given, lgiven, middle, lmiddle, nickname, lnickname, bday, lbday, ctry, lctry, locality, llocality, email, lemail, orgname, lorgname, orgunit, lorgunit, status, lstatus, image, limage, thumbimage, lthumbimage, history, mobilenumber, lmobilenumber, msg_disappear, updated_by, disp_updated_at, description from vcard_search where lusername= '">>, LUser, <<"' ">>]
                 ) of
                 {selected, []} -> 
                     ?INFO_MSG("vcard search empty", []),
@@ -287,6 +288,7 @@ set_vcard(LUser, LServer, VCARD,
     MsgDisappear1 = Pick(MsgDisappear, 32),
     UpdatedBy1 = Pick(UpdatedBy, 33),
     DispUpdatedAt1 = Pick(DispUpdatedAt, 34), 
+    Description1 = Pick(Description, 35), 
 
     ?INFO_MSG(
         "Final picked vcard values:~n"
@@ -306,7 +308,7 @@ set_vcard(LUser, LServer, VCARD,
         "ThumbImage=~p LThumbImage=~p~n"
         "History=~p~n"
         "MobileNumber=~p LMobileNumber=~p~n"
-        "MsgDisappear=~p UpdatedBy=~p DispUpdatedAt=~p",
+        "MsgDisappear=~p UpdatedBy=~p DispUpdatedAt=~p Description=~p",
         [
             FN1, LFN1,
             Family1, LFamily1,
@@ -324,7 +326,7 @@ set_vcard(LUser, LServer, VCARD,
             ThumbImage1, LThumbImage1,
             History1,
             MobileNumber1, LMobileNumber1,
-            MsgDisappear1, UpdatedBy1, DispUpdatedAt1 
+            MsgDisappear1, UpdatedBy1, DispUpdatedAt1, Description1
         ]
     ),
 
@@ -350,7 +352,7 @@ set_vcard(LUser, LServer, VCARD,
                      "updated_at=NOW()"]),
 
      case DispUpdatedAt of
-    <<>> ->
+    V when V == <<>>; V == undefined ->
         ?SQL_UPSERT(LServer, "vcard_search",
                                 ["username=%(User)s",
                                     "!lusername=%(LUser)s",
@@ -387,7 +389,9 @@ set_vcard(LUser, LServer, VCARD,
                                     "mobilenumber=%(MobileNumber1)s",
                                     "lmobilenumber=%(LMobileNumber1)s",
                                     "msg_disappear=%(MsgDisappear1)s",
-                                    "updated_by=%(UpdatedBy1)s"]);
+                                    "updated_by=%(UpdatedBy1)s",
+                                    "description=%(Description1)s",
+                                    "disp_updated_at=%(DispUpdatedAt1)s"]);
     _ ->
         ?SQL_UPSERT(LServer, "vcard_search",
                                 ["username=%(User)s",
@@ -426,6 +430,7 @@ set_vcard(LUser, LServer, VCARD,
                                     "lmobilenumber=%(LMobileNumber1)s",
                                     "msg_disappear=%(MsgDisappear1)s",
                                     "updated_by=%(UpdatedBy1)s",
+                                    "description=%(Description1)s",
                                     "disp_updated_at=FROM_UNIXTIME(%(DispUpdatedAt)s)"])
                             end   
 
