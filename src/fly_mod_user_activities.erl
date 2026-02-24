@@ -2173,7 +2173,7 @@ get_group_chat_messages( From, RequestType, SubEl, IQ) ->
 
 message_stanza_result(Result) ->
   SubEl = lists:map(fun(G) ->
-    [RowId, MessageUser, Message_type, MessageTag, Time, MsgId, EditMsgId, Status, RecallStatus, FavouriteStatus, FavouriteBy, MessageTime, TopicId, EditStatus,  MetaData] = G,
+    [RowId, MessageUser, Message_type, MessageTag, Time, MsgId, EditMsgId, Status, RecallStatus, FavouriteStatus, FavouriteBy, MessageTime, TopicId, EditStatus, DisappearAt, MetaData] = G,
     RowIdElement = #xmlel{name = <<"row_id">>, attrs = [],
       children = [{xmlcdata, RowId}]},
     UserElements = #xmlel{name = <<"user">>, attrs = [],
