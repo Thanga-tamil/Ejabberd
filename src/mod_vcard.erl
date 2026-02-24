@@ -396,6 +396,12 @@ make_vcard_search(User, LUser, LServer, VCARD) ->
 	        	[{elem, <<"history">>}, cdata]),
     Description = fxml:get_path_s(VCARD,
 	        	[{elem, <<"description">>}, cdata]),                
+    MsgDisappear = fxml:get_path_s(VCARD,
+	        	[{elem, <<"msgDisappear">>}, cdata]),
+    UpdatedBy = fxml:get_path_s(VCARD,
+	        	[{elem, <<"updatedBy">>}, cdata]),
+    DispUpdatedAt = fxml:get_path_s(VCARD,
+	        	[{elem, <<"dispUpdatedAt">>}, cdata]),
     EMail = case EMail1 of
 	      <<"">> -> EMail2;
 	      _ -> EMail1
@@ -457,6 +463,9 @@ make_vcard_search(User, LUser, LServer, VCARD) ->
           history = History,
           mobilenumber = MobileNumber,
           lmobilenumber = LMobileNumber,
+          msg_disappear = MsgDisappear,
+          updated_by = UpdatedBy,
+          disp_updated_at = DispUpdatedAt,
           description = Description}.
 
 -spec vcard_iq_set(iq()) -> iq() | {stop, stanza_error()}.
