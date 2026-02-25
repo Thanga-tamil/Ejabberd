@@ -358,7 +358,7 @@ create_msg(From, To, ReasonMsg, ReplyId,Packet)->
             MetaData = <<"">>,
             EditMsgid = ReplyId;
             true ->
-              {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,_} = ContentAcknowledge
+              {chatcontent,_,_,_, MessageType,Topicid, MetaData, EditMsgid,_,_,_} = ContentAcknowledge
           end,
           GetTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
           if GetTimestamp =:= false ->
