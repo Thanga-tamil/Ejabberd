@@ -42,7 +42,7 @@
 %% ====================================================================
 -export([start_link/0]).
 -export([start/2, stop/1,depends/2, mod_options/1]).
--export([on_user_send_packet/1, send_ack_response/5, store_in_table/12, should_acknowledge_on_send/1, should_acknowledge_on_receive/1, should_acknowledge_on_receipts/1]).
+-export([on_user_send_packet/1, send_ack_response/5, send_ack_response/4, store_in_table/12, should_acknowledge_on_send/1, should_acknowledge_on_receive/1, should_acknowledge_on_receipts/1]).
 %% gen_server callbacks.
 -export([init/1,
   handle_call/3,
