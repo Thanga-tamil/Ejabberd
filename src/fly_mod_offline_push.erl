@@ -145,6 +145,32 @@ handle_cast({pushnotification, <<"chat">>,
         ok
         end,
   {noreply, State};
+handle_cast({pushnotification, <<"normal">>, {Sender, Recipient, ChatType, SubEl, Packet}}, State) ->
+	case catch fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser, Sender#jid.luser) of
+		{selected, _, []} ->
+			Call = true;
+		{selected, _, [[_T]]} ->
+			if ChatType =:= <<"mediacall">> ->
+				   Call = true;
+			   true ->
+				   Call = false,
+				   ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
+				   ok
+			end
+	end,
+	if Call =:= true ->
+		   case catch send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) of
+			   {ok, _Result} -> ok;
+			   {error, Error} ->
+				   ?INFO_MSG("push error ~p", [Error]), ok;
+			   _Exception ->
+				   ?INFO_MSG("push status ~p", [_Exception]), ok
+		   end;
+	   true ->
+		   ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
+		   ok
+	end,
+  {noreply, State};
 handle_cast({queryexecution, <<"clear_all">>,
   {From, Last_Msg_Id, Delete_Type, XMLBody}},
     State) ->
@@ -289,6 +315,13 @@ send_offline_message(({_Action, #message{from = Sender, to = Recipient, type = C
             push(Server, <<"chat">>, Sender, Recipient,
               <<"seen">>, SubEl, Packet)
         end,
+        Reaction = fxml:get_subtag_with_xmlns(Packet, <<"reaction">>,
+        <<"urn:xmpp:receipts">>),
+        if Reaction =:= false ->
+            ok;
+          true ->
+            push(Server, <<"chat">>, Sender, Recipient, <<"reaction">>, SubEl, Packet)
+        end,
         Poll = fxml:get_subtag_with_xmlns(Packet, <<"poll">>,
           <<"urn:xmpp:receipts">>),
         if Poll =:= false -> ok;
@@ -346,24 +379,20 @@ send_offline_message(({_Action, #message{from = Sender, to = Recipient, type = C
               <<"recall">>, SubEl, Packet)
         end
     end;
-%%    ChatType == normal->
-%%      Mix = fxml:get_subtag(Packet, <<"mix">>),
-%%      Nick = fxml:get_subtag(Mix, <<"nick">>),
-%%      GroupName =fxml:get_tag_cdata(Nick),
-%%      ?INFO_MSG("GroupName: ~p",[GroupName]),
-%%      EventTag = fxml:get_subtag(Packet, <<"event">>),
-%%      Items = fxml:get_subtag(EventTag, <<"items">>),
-%%      if Items =/= false ->
-%%        Item = fxml:get_subtag(Items, <<"item">>),
-%%        if Item =/= false ->
-%%          MsgBody = fxml:get_subtag(Item, <<"body">>),
-%%%%					group_push(Server, <<"normal">>, Sender, Recipient,
-%%%%						ChatType, MsgBody, Packet, GroupName);
-%%          ok;
-%%          true -> ok
-%%        end;
-%%        true -> ok
-%%      end;
+  ChatType == normal ->
+    ?LOG_INFO("ChatType is normal, check for reaction or group_reaction and send push accordingly"),
+    case SubEl of
+      <<"">> ->
+        Reaction = fxml:get_subtag_with_xmlns(Packet, <<"reaction">>,
+        <<"urn:xmpp:receipts">>),
+        if Reaction =:= false ->
+            ok;
+          true ->
+            push(Server, <<"normal">>, Sender, Recipient, <<"group_reaction">>, SubEl, Packet)
+        end;
+      _ -> 
+        ok
+    end;
     true -> ok
   end,
   Acc.
@@ -467,6 +496,8 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
       ChatType == <<"mediacall">> ->
         TimestampValue = <<"">>;
       ChatType == <<"adminblock">> ->
+        TimestampValue = <<"">>;
+      ChatType == <<"reaction">>; ChatType == <<"group_reaction">> ->
         TimestampValue = <<"">>;
       true ->
         Timestamp = fxml:get_subtag(Packet, <<"timestamp">>),
@@ -595,6 +626,93 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     true ->
       ok
     end;
+    ChatType == <<"reaction">>; ChatType == <<"group_reaction">> ->
+    Server = To#jid.server,
+    ToUser = To#jid.luser, % message sender
+    ?LOG_INFO("message sender ~p from reaction pkt", [ToUser]),
+    FromUser = From#jid.luser,
+    StanzaId = fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs),
+    ReactionEl = fxml:get_subtag_with_xmlns(Packet, <<"reaction">>, <<"urn:xmpp:receipts">>),
+    case ReactionEl of
+        #xmlel{attrs = Attrs} ->
+            Action     = fxml:get_attr_s(<<"action">>, Attrs),
+            EmojiId    = fxml:get_attr_s(<<"emoji_id">>, Attrs),
+            MsgId      = fxml:get_attr_s(<<"message_id">>, Attrs),
+            FromUserJid= fxml:get_attr_s(<<"from_user">>, Attrs), % reaction sender
+            Timestamp  = fxml:get_attr_s(<<"timestamp">>, Attrs),
+            BF0 = [
+                {<<"type">>, binary_to_list(<<"reaction">>)},
+                {<<"chat_type">>, binary_to_list(if ChatType == <<"group_reaction">> -> <<"normal">>; true -> <<"chat">> end)},
+                {<<"action">>, binary_to_list(Action)},
+                {<<"message_id">>, binary_to_list(MsgId)},
+                {<<"reaction_id">>, binary_to_list(StanzaId)},
+                {<<"reaction_to">>, binary_to_list(jid:to_string(To))},
+                {<<"reaction_from">>, binary_to_list(FromUserJid)},
+                {<<"emoji_id">>, binary_to_list(EmojiId)},
+                {<<"timestamp">>, binary_to_list(Timestamp)},
+                {<<"userDomain">>, binary_to_list(Server)},
+                {<<"user_type">>, binary_to_list(PushType)},
+                {<<"chat_id">>, binary_to_list(jid:to_string(From))},
+                {<<"push_from">>, binary_to_list(<<"MirrorFly">>)}
+            ],
+            
+            
+        case ChatType of
+          <<"group_reaction">> ->
+            MsgSender = fxml:get_attr_s(<<"message_sender">>, Attrs),
+            
+            BF1 = BF0 ++ [{<<"message_sender">>,  binary_to_list(MsgSender)}],
+            ?LOG_INFO("MsgSender ~p ToUser ~p is equal? ~p", [MsgSender, ToUser, MsgSender =:= ToUser]),
+
+            case MsgSender =:= ToUser of
+              true ->
+                Payload = create_android_json(DeviceToken, BF1),
+                ?LOG_INFO("[android_push] reaction payload : ~p", [Payload]),
+                case DeviceType of
+                    <<"android">> ->
+                          if Action == <<"update">> -> 
+                            FUser = fly_mod_utils:get_user_from_string_jid(FromUserJid),
+                            ?LOG_INFO("Updating push sent status for reaction update, message id: ~p, user: ~p, toUser: ~p", [MsgId, FUser, ToUser]),
+                            fly_mod_utils:update_push_sent(Server, FUser, ToUser, MsgId);
+                            true -> 
+                            ok
+                          end,
+                        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server);
+                    _ ->
+                        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server)
+                end;
+              false ->
+                ?LOG_INFO("skipping push, reaction should only route for message sender ~p but got ~p",[MsgSender, ToUser]),
+                ok
+            end;
+
+          <<"reaction">> ->
+            Q = fly_mod_utils:chat_history_query(Server, MsgId),
+            ?LOG_INFO("Chat history query result for reaction push: ~p", [Q]),
+
+            case Q of 
+              {selected, _, [[F, _, _, _, _]]} -> 
+                if FromUser =/= F -> 
+                  Payload = create_android_json(DeviceToken, BF0),
+                  ?LOG_INFO("[android_push] reaction payload : ~p", [Payload]),
+
+                  case DeviceType of
+                    <<"android">> ->
+                      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server);
+                    _ ->
+                      send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server)
+                  end;
+                true -> 
+                  ok
+                end;
+              _ -> 
+                ok
+            end;
+          _ ->
+            ok
+        end;
+        _ -> ok
+      end;
     ChatType == <<"poll">> ->
     FromUser = From#jid.luser,
     Server = To#jid.server,
@@ -1169,6 +1287,20 @@ send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host) ->
         "server: ~p",
           [Error])
     end;
+     ChatType =:= <<"group_reaction">> ->
+    ?LOG_INFO("chat type group_reaction, send payload to -> Q[aos_grp_react_push]"),
+      case amqp_channel:cast(ChannelPid,
+        #'basic.publish'{
+          exchange = RMExchange,
+          routing_key = <<"aos_grp_react_push">>},
+        #amqp_msg{payload = list_to_binary(Payload)}) of
+        ok ->
+          {ok, <<"success">>};
+        Error ->
+          ?ERROR_MSG("Android: Unable to send push messages to the rabbitmq server Q[aos_grp_react_push]"
+          "server: ~p",
+            [Error])
+      end;
     true ->
       case amqp_channel:cast(ChannelPid,
         #'basic.publish'{
@@ -1236,11 +1368,15 @@ send_payload(Payload, ChatType, RMQConnection, RMExchange,Host, PushType) ->
           [Error])
     end;
     true ->
-      if PushType =:= <<"fcm">> ->
-      Queue = <<"ios_message_fcm">>;
-      true ->
-      Queue = <<"ios_message">>
-    end,
+      Queue =
+      if
+          PushType =:= <<"fcm">> ->
+              <<"ios_message_fcm">>;
+          ChatType =:= <<"group_reaction">> ->
+              <<"ios_grp_react_push">>;
+          true ->
+              <<"ios_message">>
+      end,
       case amqp_channel:cast(ChannelPid,
         #'basic.publish'{
           exchange = RMExchange,
@@ -1491,7 +1627,112 @@ end,
 
         send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType)
                       end, Range);
+      ChatType == <<"reaction">>; ChatType == <<"group_reaction">> ->
 
+          Server = Recipient#jid.server,
+          FromUser = Sender#jid.luser,
+
+          %% Get nickname
+          case catch fly_mod_utils:get_nickname(Server, FromUser) of
+              {selected, _, []} ->
+                  UserprofileNickName = FromUser;
+              {selected, [{UserprofileNick}]} ->
+                  UserprofileNickName = UserprofileNick
+          end,
+
+          case catch fly_mod_utils:get_roster_nick(
+                  Server, Recipient#jid.user, FromUser) of
+              {selected, _, []} ->
+                  UserNickName = UserprofileNickName;
+              {selected, _, [[Nick]]} ->
+                  UserNickName = Nick
+          end,
+
+          %% Extract reaction element safely
+          ReactionEl = fxml:get_subtag_with_xmlns(Packet, <<"reaction">>,<<"urn:xmpp:receipts">>),
+          case ReactionEl of
+              #xmlel{attrs = Attrs} ->
+                  Action    = fxml:get_attr_s(<<"action">>, Attrs),
+                  EmojiId   = fxml:get_attr_s(<<"emoji_id">>, Attrs),
+                  FromUserJid= fxml:get_attr_s(<<"from_user">>, Attrs), % reaction sender
+                  MsgId     = fxml:get_attr_s(<<"message_id">>, Attrs),
+                  Timestamp = fxml:get_attr_s(<<"timestamp">>, Attrs),
+                  StanzaId = fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs),
+                  ToUser = Recipient#jid.luser, % messag sender
+
+                  AlertMessage = binary_to_list(UserNickName) ++ " reacted with " ++ binary_to_list(EmojiId), {<<"type">>, <<"reaction">>},
+
+                  Args0 = [
+                      {type, binary_to_list(<<"reaction">>)},
+                      {chat_type, binary_to_list(if ChatType == <<"group_reaction">> -> <<"normal">>; true -> <<"chat">> end)},
+                      {action, binary_to_list(Action)},
+                      {message_id, binary_to_list(MsgId)},
+                      {reaction_id, binary_to_list(StanzaId)},
+                      {reaction_to, binary_to_list(jid:to_string(Recipient))},
+                      {reaction_from, binary_to_list(FromUserJid)},
+                      {emoji_id, binary_to_list(EmojiId)},
+                      {timestamp, binary_to_list(Timestamp)},
+                      {userDomain, binary_to_list(Server)},
+                      {user_type, binary_to_list(PushType)},
+                      {chat_id, binary_to_list(jid:to_string(Sender))},
+                      {push_from, binary_to_list(<<"MirrorFly">>)}
+                  ],
+
+                  Msg = [
+                      {<<"mutable-content">>, integer_to_list(1)},
+                      {alert, AlertMessage},
+                      {mode, binary_to_list(Mode)},
+                      {sound, binary_to_list(<<"default">>)}
+                  ],
+
+                  case ChatType of
+                    <<"group_reaction">> ->
+                      MsgSender = fxml:get_attr_s(<<"message_sender">>, Attrs),
+                      
+                      Args1 = Args0 ++ [{message_sender,  binary_to_list(MsgSender)}],
+                      ?LOG_INFO("MsgSender ~p ToUser ~p is equal? ~p", [MsgSender, ToUser, MsgSender =:= ToUser]),
+
+                      case MsgSender =:= ToUser of
+                        true ->
+                            JSON = create_json(Msg, Args1, binary_to_list(DeviceToken), Mode, 0, 0, PushType),
+
+                            ?LOG_INFO("[group ios_push] reaction payload: ~p", [JSON]),
+                            if Action == <<"update">> -> 
+                              FUser = fly_mod_utils:get_user_from_string_jid(FromUserJid),
+                              ?LOG_INFO("Updating push sent status for reaction update, message id: ~p, user: ~p, toUser: ~p", [MsgId, FUser, ToUser]),
+                              fly_mod_utils:update_push_sent(Server, FUser, ToUser, MsgId);
+                             true -> 
+                              ok
+                            end,
+                            send_payload(JSON, ChatType, Channel, RMExchange, Server, PushType);
+                        false ->
+                          ?LOG_INFO("skipping ios group push, reaction should only route for message sender ~p but got ~p",[MsgSender, ToUser]),
+                          ok
+                      end;
+
+                    <<"reaction">> ->
+                      Q = fly_mod_utils:chat_history_query(Server, MsgId),
+                      ?LOG_INFO("Chat history query result for reaction push: ~p", [Q]),
+                      case Q of 
+                        {selected, _, [[F, _, _, _, _]]} -> 
+                          if FromUser =/= F -> 
+                            JSON = create_json(Msg, Args0, binary_to_list(DeviceToken), Mode, 0, 0, PushType),
+
+                            ?LOG_INFO("[ios_push]] reaction payload: ~p", [JSON]),
+                            send_payload(JSON, ChatType, Channel, RMExchange, Server, PushType);
+                          true ->
+                            ?LOG_INFO("skipping ios push, reaction is from message sender ~p",[FromUser]),
+                            ok
+                          end;
+                        _ ->
+                          ok
+                        end;
+                    _ ->
+                      ok
+                  end;
+              _ ->
+                  ok
+          end;
         ChatType == <<"poll">> ->
           MessageId = fxml:get_attr_s(<<"id">>,Packet#xmlel.attrs),
                         Server = Recipient#jid.server,

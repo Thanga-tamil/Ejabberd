@@ -144,6 +144,19 @@
   check_blockedlist/3,
   check_chatmuted/3,
   get_reply_message/2,
+
+  update_push_sent/4,
+  set_msg_reaction/8,
+  generate_uuid_v4/0,
+  update_reaction_status_chat/6,
+  chat_history_query/2,
+  get_msg_from/2,
+  update_reaction_status_normal/7,
+  get_recent_chat_query/3,
+  get_reacted_msg_ids/2,
+  update_msg_reaction_sent/3,
+  get_now_timestamp/0,
+
   delete_spool/2,
   get_busy_status/1,
   update_user_busy/3,
@@ -2417,3 +2430,343 @@ get_recently_updated_disappearance(ToServer, User) ->
         <<"select disp_updated_at from vcard_search where username = ?">>,
         [User]
     ).
+
+
+now_to_microseconds({Mega, Sec, Micro}) ->
+  (Mega * 1000000 + Sec) * 1000000 + Micro.
+
+now_to_micro() ->
+  Timestamp = now_to_microseconds(erlang:now()),
+  FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
+  list_to_binary(FlatTimeStamp).
+
+update_push_sent(FServer, FUser, MsgSender, MessageId) -> 
+  ejabberd_sql:sql_query(FServer, [<<"update message_reactions set push_sent = '0' where username = '">>,FUser,<<"' and chat_id = '">>,MsgSender,<<"' and message_id = '">>,MessageId,<<"' ;">>]).
+
+get_now_timestamp() ->
+    {{Y, M, D}, {H, Min, S}} = calendar:universal_time(),
+    iolist_to_binary(io_lib:format("~4..0B-~2..0B-~2..0B ~2..0B:~2..0B:~2..0B", [Y, M, D, H, Min, S])).
+
+set_msg_reaction(Lserver, Luser, Recipient, MessageId, Action, EmojiId, ChatType, StanzaId) ->
+  Now = get_now_timestamp(),
+
+  MsgReactionQ = 
+      [<<"insert into message_reactions (username, message_id, chat_id, created_at, is_deleted, emoji_id, chat_type) values 
+      ('">>,Luser,<<"','">>,MessageId,<<"','">>,Recipient,<<"','">>,Now,<<"','0','">>,EmojiId,<<"','">>,ChatType,<<"')
+      on duplicate key update updated_at = '">>,Now,<<"', is_deleted = '">>,if Action == <<"remove">> -> <<"1">>; true -> <<"0">> end,
+      <<"', emoji_id='">>,EmojiId,<<"';">>],
+
+    MsgStatusQ =
+      [<<"insert into message_status 
+          (
+          from_user, to_user, message_id, message_type, chat_type, status, recent, recall_status, favourite_status, favourite_by, favourite_date, deleted_status,
+          deleted_by, blocked, from_notification, to_notification, message_notification, txt, mentioned_user_ids, created_at, received_at, seen_at, updated_at, message_time,
+          meta_data, edit_message_id, topic_id, edit_status, sd_timer
+          ) 
+          values 
+          (
+          '">>,Luser,<<"', '">>,Recipient,<<"', '">>,StanzaId,<<"', 'emoji', 'reaction', '0', '0', '0', '0', '0', NULL, '0', '0', '0', '', '', '0', '', NULL, now(), 
+          '0000-00-00 00:00:00', '0000-00-00 00:00:00', now(), '0', '{}', '">>,MessageId,<<"', '', '0', NULL
+      );">>],
+
+    DeleteMsgQ = [<<"DELETE FROM message_status WHERE edit_message_id = '">>,MessageId,<<"' AND from_user = '">>,Luser,<<"' AND to_user = '">>,Recipient,<<"' and chat_type = 'reaction';">>],
+
+  ejabberd_sql:sql_query(Lserver, MsgReactionQ),
+  case Action of 
+      <<"add">> -> 
+        ?LOG_INFO("[add reaction: insert message_status] StanzaId as reaction_id: ~p", [StanzaId]),
+        ejabberd_sql:sql_query(Lserver, MsgStatusQ);
+      <<"update">> -> 
+        ?LOG_INFO("[update reaction: delete and insert message_status] msg_id ~p", [MessageId]),
+        ejabberd_sql:sql_query(Lserver, DeleteMsgQ),
+        ejabberd_sql:sql_query(Lserver, MsgStatusQ);
+      <<"remove">> -> 
+        ?LOG_INFO("[remove reaction: delete message_status] msg_id ~p", [MessageId]),
+        ejabberd_sql:sql_query(Lserver, DeleteMsgQ);
+      _ ->
+        ?LOG_INFO("invalid action for msg reaction"),
+        ok
+  end,
+
+  Id = 
+  case ejabberd_sql:sql_query(Lserver, [<<"select id from message_reactions where username = '">>,Luser,<<"' and message_id = '">>,MessageId,<<"' and chat_id = '">>,Recipient,<<"';">>]) of
+    {selected, _, [[ReactionId]]} -> 
+      ReactionId;
+    _ -> 
+      ?LOG_INFO("message reaction Id not found"),
+      <<"">>
+    end,
+
+  {Now, Id}.
+
+generate_uuid_v4() ->
+    <<A:32, B:16, C:16, D:16, E:48>> = crypto:strong_rand_bytes(16),
+    C1 = (C band 16#0FFF) bor 16#4000,
+    D1 = (D band 16#3FFF) bor 16#8000,
+    io_lib:format("~8.16.0b-~4.16.0b-~4.16.0b-~4.16.0b-~12.16.0b",[A, B, C1, D1, E]).
+
+upsert_recent_chat(LServer, SUser, BarePeer, MessageId, MessageFrom, Body, SType, MessageType, Topicid, MetaData, Notification_to, Unread, FlatTimeStamp, Status) ->
+
+        MuteStatus =
+        case catch mute_status(LServer, BarePeer, SUser) of
+          {selected, _, []} ->
+            <<"0">>;
+          {selected, _, [[MuteCount]]} ->
+            MuteCount;
+          _ ->
+            <<"0">>
+        end,
+
+    InsertQuery = [
+        <<"INSERT INTO chat_recent (from_user, to_user, message_id, message_from, txt, chat_type, message_type, topic_id, meta_data, unread, notification_to, message_time, mute_status, status) VALUES
+        ('">>, SUser, <<"','">>, BarePeer, <<"','">>, MessageId, <<"','">>, MessageFrom, <<"','">>, Body, <<"','">>, SType, <<"','">>, MessageType, <<"','">>, Topicid, <<"','">>, MetaData, <<"','">>, Unread, <<"','">>, Notification_to, <<"','">>, FlatTimeStamp, <<"','">>, MuteStatus, <<"','">>,Status,<<"');">>
+    ],
+
+    ejabberd_sql:sql_query(LServer, InsertQuery).
+
+update_reaction_status_chat(Server, FUser, TUser, MessageId, ReactionId, Action) ->
+
+  case Action of 
+    A when A =:= <<"add">>; A =:= <<"update">> ->
+        case chat_history_query(Server, MessageId) of 
+          {selected, _, [[FromUser, ToUser, Msg, MsgType, FStatus]]} -> 
+            if FromUser == TUser andalso ToUser == FUser -> 
+              ?LOG_INFO("[type 'chat'] recipient reaction, msg_id: ~p", [MessageId]),
+
+                delete_chat_recent(Server, FUser, TUser),
+                FromUnread = get_unread_from_chat_recent(Server, FUser, TUser),
+                
+                delete_chat_recent(Server, TUser, FUser),
+                ToUnread = get_unread_from_chat_recent(Server, TUser, FUser),
+
+                upsert_recent_chat(Server, FromUser, ToUser, MessageId, FromUser, Msg, <<"chat">>, MsgType, <<"">>, <<"{}">>, <<"">>, FromUnread, now_to_micro(), <<"0">>),
+                upsert_recent_chat(Server, ToUser, FromUser, MessageId, FromUser, Msg, <<"chat">>, MsgType, <<"">>, <<"{}">>, <<"">>, ToUnread, now_to_micro(), FStatus);
+            true -> 
+              ?LOG_INFO("[type 'chat'] own reaction, msg_id: ~p", [MessageId]),
+
+              delete_chat_recent(Server, TUser, FUser),
+              ToUnread = get_unread_from_chat_recent(Server, TUser, FUser),
+              upsert_recent_chat(Server, ToUser, FromUser, MessageId, FromUser, Msg, <<"chat">>, MsgType, <<"">>, <<"{}">>, <<"">>, ToUnread, now_to_micro(), FStatus)
+            end;
+
+          _ -> ?LOG_INFO("chat history not found, stop the process"), ok
+        end;
+    <<"remove">> ->
+      ?LOG_INFO("..remove.."),
+		  case recent_chat_query(Server, TUser, FUser) of 
+			  {selected, _, [[CMF, CMT, Id]]} -> 
+          ?LOG_INFO("check message id matches ~p == ~p |  ~p ", [Id, MessageId, Id == MessageId]),
+				  if Id == MessageId ->
+					     case get_recent_event(Server, FUser, TUser) of 
+						     {selected, _, [[_, FromUser, ToUser, MsgId, MsgType, Status, Msg]]} -> 
+
+                  if FUser == CMT andalso TUser == CMF ->
+                    ?LOG_INFO("[type 'chat'] recipient removes the reaction for received message [update both user recent_chat], msg_id: ~p", [MessageId]),
+
+                    delete_chat_recent(Server, FUser, TUser),
+                    FromUnread = get_unread_from_chat_recent(Server, FUser, TUser),
+
+                    delete_chat_recent(Server, TUser, FUser),
+                    ToUnread = get_unread_from_chat_recent(Server, TUser, FUser),
+
+                    upsert_recent_chat(Server, FromUser, ToUser, MsgId, FromUser, Msg, <<"chat">>, MsgType, <<"">>, <<"{}">>, <<"">>, FromUnread, now_to_micro(), Status),
+                    upsert_recent_chat(Server, ToUser, FromUser, MsgId, FromUser, Msg, <<"chat">>, MsgType, <<"">>, <<"{}">>, <<"">>, ToUnread, now_to_micro(), Status);
+                  true ->
+                    ?LOG_INFO("[type 'chat'] user removes own message reaction [update own recent_chat], msg_id: ~p", [MessageId]),
+
+                    delete_chat_recent(Server, TUser, FUser),
+                    ToUnread = get_unread_from_chat_recent(Server, TUser, FUser),
+                    upsert_recent_chat(Server, ToUser, FromUser, MsgId, FromUser, Msg, <<"chat">>, MsgType, <<"">>, <<"{}">>, <<"">>, ToUnread, now_to_micro(), Status)
+                  end;
+                _ -> 
+                  ok
+               end;
+          true ->
+            ?LOG_INFO("[chat] reaction removal not matches to msg_id with chat_recent, [ok]"),
+            ok
+          end;
+        _ -> 
+          ok
+      end;
+
+    _ -> ok
+  end.      
+
+chat_history_query(Server, MessageId) -> 
+        ejabberd_sql:sql_query(Server,[<<"select max(from_user) as from_user, max(to_user) as to_user, max(msg) as msg, 
+            max(message_type) as message_type, max(status) as status from 
+        (select c.from_user, c.to_user, c.msg, null as message_type, null as status 
+        from chat_message_edit_history as c where c.message_id = '">>,MessageId,<<"'
+        union all    
+        select null from_user, null as to_user, null as msg, m.message_type, m.status 
+        from message_status as m where m.message_id = '">>,MessageId,<<"') as max;">>]).
+
+get_msg_from(S, MessageId) -> 
+  case ejabberd_sql:sql_query(S, [<<"select from_user from chat_message_edit_history where edit_message_id = '">>,MessageId,<<"' limit 1;">>]) of
+    {selected, _, [[FromUser]]} -> 
+      FromUser;
+    _ -> 
+      <<"">>
+  end.
+
+get_recent_event(Server, FUser, TUser) ->
+      ejabberd_sql:sql_query(Server, [<<"
+        select * from (
+        select s.id, s.from_user, s.to_user, s.edit_message_id, s1.message_type, s1.status, c.msg
+        from message_status as s left join chat_message_edit_history as c on c.message_id = s.edit_message_id
+        left join message_reactions as r on r.username = s.from_user and r.chat_id = s.to_user and r.message_id = s.edit_message_id and r.is_deleted = 0 
+        left join message_status as s1 on s1.message_id = s.edit_message_id
+        where s.from_user = '">>,FUser,<<"' and s.to_user = '">>,TUser,<<"'
+        union
+        select s.id, s.from_user, s.to_user, s.edit_message_id, s1.message_type, s1.status, c.msg
+        from message_status as s left join chat_message_edit_history as c on c.message_id = s.edit_message_id 
+        left join message_reactions as r on r.username = s.from_user and r.chat_id = s.to_user and r.message_id = s.edit_message_id and r.is_deleted = 0
+        left join message_status as s1 on s1.message_id = s.edit_message_id
+        where s.from_user = '">>,TUser,<<"' and s.to_user = '">>,FUser,<<"'
+        ) as sub
+        order by id desc limit 1;
+      ">>]).
+
+update_reaction_status_normal(Server, FUser, GroupId, MessageId, ReactionId, Action, MsgSender) -> 
+
+  case Action of 
+    A when A =:= <<"add">>; A =:= <<"update">> ->
+        case chat_history_query(Server, MessageId) of 
+          {selected, _, [[MsgSender, _, Msg, MsgType, FStatus]]} ->
+            if FUser /= MsgSender -> 
+              ?LOG_INFO("[type 'normal'] recipient reaction, msg_id: ~p", [MessageId]),
+              
+              delete_chat_recent(Server, GroupId, FUser),
+              FromUnread = get_unread_from_chat_recent(Server, GroupId, FUser),
+
+              delete_chat_recent(Server, GroupId, MsgSender),
+              ToUnread = get_unread_from_chat_recent(Server, GroupId, MsgSender),
+              
+              upsert_recent_chat(Server, GroupId, FUser, MessageId, MsgSender, Msg, <<"normal">>, MsgType, <<"">>, <<"{}">>, <<"">>, FromUnread, now_to_micro(), <<"0">>),
+              upsert_recent_chat(Server, GroupId, MsgSender, MessageId, MsgSender, Msg, <<"normal">>, MsgType, <<"">>, <<"{}">>, <<"">>, ToUnread, now_to_micro(), FStatus);
+             true -> 
+              ?LOG_INFO("[type 'normal'] own reaction, msg_id: ~p", [MessageId]),
+
+              delete_chat_recent(Server, GroupId, FUser),
+              FromUnread = get_unread_from_chat_recent(Server, GroupId, FUser),
+              upsert_recent_chat(Server, GroupId, FUser, MessageId, MsgSender, Msg, <<"normal">>, MsgType, <<"">>, <<"{}">>, <<"">>, FromUnread, now_to_micro(), <<"0">>)
+            end;
+          _ -> 
+            ok
+        end;
+    <<"remove">> ->
+      ?LOG_INFO("[normal]..remove.."),
+    
+		  case recent_chat_query(Server, GroupId, FUser) of 
+			  {selected, _, [[MF, _, Id]]} -> 
+          ?LOG_INFO("check message id matches ~p == ~p |  ~p ", [Id, MessageId, Id == MessageId]),
+				  if Id == MessageId ->
+					     case get_recent_event_normal(Server, FUser, GroupId, MsgSender) of 
+						     {selected, _, [[_, FromUser, ToUser, MsgId, MessageType, Status, Message]]} -> 
+
+                  if FUser == MF ->
+                    ?LOG_INFO("[type 'normal'] user removes own message reaction [update own recent_chat], msg_id: ~p", [MessageId]),
+                    
+                    delete_chat_recent(Server, GroupId, FUser),
+                    FromUnread = get_unread_from_chat_recent(Server, GroupId, FUser),
+                    upsert_recent_chat(Server, GroupId, FUser, MsgId, MsgSender, Message, <<"normal">>, MessageType, <<"">>, <<"{}">>, <<"">>, FromUnread, now_to_micro(), Status);
+                  true ->
+                    ?LOG_INFO("[type 'normal'] recipient removes the reaction for received message [update both user recent_chat], msg_id: ~p", [MessageId]),
+
+                    delete_chat_recent(Server, GroupId, FUser),
+                    FromUnread = get_unread_from_chat_recent(Server, GroupId, FUser),
+
+                    delete_chat_recent(Server, GroupId, MsgSender),
+                    ToUnread = get_unread_from_chat_recent(Server, GroupId, MsgSender),
+                    upsert_recent_chat(Server, GroupId, FUser, MsgId, MsgSender, Message, <<"normal">>, MessageType, <<"">>, <<"{}">>, <<"">>, FromUnread, now_to_micro(), <<"0">>),
+                    upsert_recent_chat(Server, GroupId, MsgSender, MsgId, MsgSender, Message, <<"normal">>, MessageType, <<"">>, <<"{}">>, <<"">>, ToUnread, now_to_micro(), Status)
+                  end;
+                _ -> 
+                  ok
+               end;
+          true ->
+            ?LOG_INFO("[normal] reaction removal not matches to msg_id with chat_recent, [ok]"),
+            ok
+          end;
+        _ -> 
+          ok
+      end;
+    _ -> ok
+  end.
+
+  get_recent_event_normal(Server, FUser, GroupId, MsgSender) ->
+      ejabberd_sql:sql_query(Server,[<<"
+        select s.id,
+        s.from_user, s.to_user, s.edit_message_id, s1.message_type, s1.status, c.msg
+        from message_status as s 
+        left join chat_message_edit_history as c on c.message_id = s.edit_message_id
+        left join message_reactions as r on r.username = s.from_user and r.chat_id = s.to_user and r.message_id = s.edit_message_id 
+        left join message_status as s1 on s1.message_id = s.edit_message_id
+        where ( s.from_user = '">>,MsgSender,<<"' or s.from_user = '">>,GroupId,<<"' ) and s.to_user = '">>,FUser,<<"' 
+        and ( c.chat_type = 'normal' or r.chat_type = 'normal' )
+        group by s.message_id 
+        order by id desc limit 1;
+      ">>]).
+
+recent_chat_query(Server, From, To) -> 
+  ejabberd_sql:sql_query(Server, [<<"select m.from_user, m.to_user, c.message_id from chat_recent as c 
+                                     join chat_message_edit_history as m on m.edit_message_id = c.message_id
+                                     where c.from_user = '">>,From,<<"' and c.to_user = '">>,To,<<"';">>]).
+
+get_recent_chat_query(Server, FUser, TUser) -> 
+  ejabberd_sql:sql_query(Server, [<<"
+  select 
+  m.msg, m.from_user, m.to_user, m.seen_receipt, c.message_id, s.chat_type, s.message_type, s.message_time, s.created_at, s.status, 
+  s.recall_status, s.deleted_by, s.deleted_status, s.message_notification, s.from_notification, s.to_notification, 
+  r.chat_id as reaction_to, r.username as reaction_from, r.emoji_id
+  from chat_recent as c 
+  join chat_message_edit_history as m on m.edit_message_id = c.message_id
+  join message_status as s on s.edit_message_id = c.message_id and s.from_user = '">>,FUser,<<"' and s.to_user = '">>,TUser,<<"'
+  left join message_reactions as r on r.message_id = c.message_id and ( r.username = '">>,FUser,<<"' and r.chat_id = '">>,TUser,<<"' ) or ( r.username = '">>,TUser,<<"' and r.chat_id = '">>,FUser,<<"' )
+  where c.from_user = '">>,TUser,<<"' and c.to_user = '">>,FUser,<<"' limit 1;">>]).                                     
+                                     
+delete_chat_recent(Server, From, To) ->
+  ejabberd_sql:sql_query(Server, [<<"delete from chat_recent where from_user = '">>,From,<<"' and to_user = '">>,To,<<"';">>]).
+
+get_unread_from_chat_recent(Server, From, To) ->
+  case ejabberd_sql:sql_query(Server, [<<"select unread from chat_recent where from_user = '">>,From,<<"' and to_user = '">>,To,<<"';">>])of 
+    {selected, _, [[Unread]]} -> 
+      Unread;
+    _ -> 
+      <<"0">>
+  end.
+
+get_reacted_msg_ids(Server, User) ->
+  case ejabberd_sql:sql_query(Server, [<<"SELECT s.message_id 
+        FROM message_reactions r
+        JOIN message_status s ON r.username = s.from_user and r.chat_id = s.to_user AND r.message_id = s.edit_message_id
+        join spool as sp on sp.message_id = s.message_id
+        WHERE s.to_user = '">>,User,<<"' AND s.chat_type = 'reaction' and r.chat_type = 'normal' and r.push_sent = 0 group by s.message_id;">>]) of 
+      {selected, _, Rows} ->
+        Rows;
+      _ ->
+        []  
+  end.
+
+update_msg_reaction_sent(Server, ReactionIds, C2sUser) ->
+  case ejabberd_sql:sql_query(Server, [<<"select from_user, to_user, edit_message_id from message_status where message_id in ">>,ReactionIds,<<";">>]) of
+        {selected, _, Rows} when Rows =/= [] ->
+        lists:foreach(
+            fun([FromUser, ToUser, MsgId]) ->
+                if C2sUser == ToUser ->
+                  ?LOG_INFO("C2sUser ~p == msg sender ~p, proceed to update message_reaction sent = 1", [C2sUser, FromUser]),
+                  ?LOG_INFO("[ update message_reaction status ] offline stanza id matches to message_status id: ~p", [MsgId]),
+                  ejabberd_sql:sql_query(Server, [<<"update message_reactions set push_sent = '1' where username = '">>,FromUser,<<"' and chat_id = '">>,ToUser,<<"' and message_id = '">>,MsgId,<<"' ;">>]);
+                 true -> 
+                  ok
+                end
+            end,
+            Rows
+        );
+
+    {selected, _, []} ->
+        ok;
+    Error ->
+        ?LOG_ERROR("SQL error: ~p", [Error]),
+        ok
+  end.    

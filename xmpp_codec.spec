@@ -409,11 +409,14 @@
      #elem{name = <<"acknowledge">>,
            xmlns = <<"urn:xmpp:receipts">>,
 	   module = 'acknowledge',
-           result = {acknowledge, '$broadcast_msgid', '$type','$id','$sent_to'},
+           result = {acknowledge, '$broadcast_msgid', '$type','$id','$sent_to','$message_id','$emoji_id','$action'},
            attrs = [#attr{name = <<"id">>,default = <<"">>},
                     #attr{name = <<"broadcast_msgid">>,default = <<"">>},
                     #attr{name = <<"sent_to">>,default = <<"">>},
-                    #attr{name = <<"type">>,default = <<"">>}
+                    #attr{name = <<"type">>,default = <<"">>},
+                    #attr{name = <<"message_id">>,default = <<"">>},
+                    #attr{name = <<"emoji_id">>,default = <<"">>},
+                    #attr{name = <<"action">>,default = <<"">>}
                     ]}).
 
 -xml(roster_profile,
