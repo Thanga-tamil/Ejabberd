@@ -152,7 +152,7 @@
   chat_history_query/2,
   get_msg_from/2,
   update_reaction_status_normal/7,
-  get_recent_chat_query/3,
+  get_recent_chat_details/4,
   get_reacted_msg_ids/2,
   update_msg_reaction_sent/3,
   get_now_timestamp/0,
@@ -2713,18 +2713,33 @@ recent_chat_query(Server, From, To) ->
                                      join chat_message_edit_history as m on m.edit_message_id = c.message_id
                                      where c.from_user = '">>,From,<<"' and c.to_user = '">>,To,<<"';">>]).
 
-get_recent_chat_query(Server, FUser, TUser) -> 
-  ejabberd_sql:sql_query(Server, [<<"
-  select 
-  m.msg, m.from_user, m.to_user, m.seen_receipt, c.message_id, s.chat_type, s.message_type, s.message_time, s.created_at, s.status, 
-  s.recall_status, s.deleted_by, s.deleted_status, s.message_notification, s.from_notification, s.to_notification, 
-  r.chat_id as reaction_to, r.username as reaction_from, r.emoji_id
-  from chat_recent as c 
-  join chat_message_edit_history as m on m.edit_message_id = c.message_id
-  join message_status as s on s.edit_message_id = c.message_id and s.from_user = '">>,FUser,<<"' and s.to_user = '">>,TUser,<<"'
-  left join message_reactions as r on r.message_id = c.message_id and ( r.username = '">>,FUser,<<"' and r.chat_id = '">>,TUser,<<"' ) or ( r.username = '">>,TUser,<<"' and r.chat_id = '">>,FUser,<<"' )
-  where c.from_user = '">>,TUser,<<"' and c.to_user = '">>,FUser,<<"' limit 1;">>]).                                     
-                                     
+get_recent_chat_details(Server, FUser, TUser, ChatType) -> 
+  if ChatType =:= <<"chat">> -> 
+    ejabberd_sql:sql_query(Server, [<<"
+        select 
+        m.msg, m.from_user, m.to_user, m.seen_receipt, c.message_id, s.chat_type, s.message_type, s.message_time, s.created_at, s.status, 
+        s.recall_status, s.deleted_by, s.deleted_status, s.message_notification, s.from_notification, s.to_notification, 
+        r.chat_id as reaction_to, r.username as reaction_from, r.emoji_id
+        from chat_recent as c 
+        join chat_message_edit_history as m on m.edit_message_id = c.message_id
+        join message_status as s on s.edit_message_id = c.message_id and ( (s.from_user = '">>,FUser,<<"' and s.to_user = '">>,TUser,<<"') or (s.from_user = '">>,TUser,<<"' and s.to_user = '">>,FUser,<<"') )
+        left join message_reactions as r on r.message_id = c.message_id and r.chat_type = 'chat' and ( r.username = '">>,FUser,<<"' and r.chat_id = '">>,TUser,<<"' ) or ( r.username = '">>,TUser,<<"' and r.chat_id = '">>,FUser,<<"' )
+        where c.from_user = '">>,TUser,<<"' and c.to_user = '">>,FUser,<<"' limit 1;">>]);
+    ChatType =:= <<"normal">> ->
+      ejabberd_sql:sql_query(Server, [<<"select 
+        m.msg, m.from_user, m.to_user, m.seen_receipt, c.message_id, s.chat_type, s.message_type, s.message_time, s.created_at, s.status, 
+        s.recall_status, s.deleted_by, s.deleted_status, s.message_notification, s.from_notification, s.to_notification, 
+        r.chat_id as reaction_to, r.username as reaction_from, r.emoji_id
+        from chat_recent as c 
+        join chat_message_edit_history as m on m.edit_message_id = c.message_id
+        join message_status as s on s.edit_message_id = c.message_id and s.from_user = '">>,TUser,<<"' and s.to_user = '">>,FUser,<<"' 
+        LEFT JOIN message_reactions r ON r.id = (SELECT r2.id FROM message_reactions r2 WHERE r2.message_id = c.message_id AND r2.chat_type = 'normal' 
+        ORDER BY r2.updated_at DESC LIMIT 1 )
+        WHERE c.from_user = '">>,TUser,<<"' AND c.to_user   = '">>,FUser,<<"' LIMIT 1;">>]);
+    true -> 
+      []
+  end.
+
 delete_chat_recent(Server, From, To) ->
   ejabberd_sql:sql_query(Server, [<<"delete from chat_recent where from_user = '">>,From,<<"' and to_user = '">>,To,<<"';">>]).
 
@@ -2754,7 +2769,6 @@ update_msg_reaction_sent(Server, ReactionIds, C2sUser) ->
         lists:foreach(
             fun([FromUser, ToUser, MsgId]) ->
                 if C2sUser == ToUser ->
-                  ?LOG_INFO("C2sUser ~p == msg sender ~p, proceed to update message_reaction sent = 1", [C2sUser, FromUser]),
                   ?LOG_INFO("[ update message_reaction status ] offline stanza id matches to message_status id: ~p", [MsgId]),
                   ejabberd_sql:sql_query(Server, [<<"update message_reactions set push_sent = '1' where username = '">>,FromUser,<<"' and chat_id = '">>,ToUser,<<"' and message_id = '">>,MsgId,<<"' ;">>]);
                  true -> 

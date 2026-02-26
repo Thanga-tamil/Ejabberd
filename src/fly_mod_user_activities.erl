@@ -2967,12 +2967,13 @@ get_recent_chat(From, _RequestType, SubEl, IQ) ->
     #jid{luser = FUser, lserver = FServer} = From,
 
     To = fxml:get_path_s(SubEl, [{attr, <<"to_user">>}]),
+    ChatType = fxml:get_path_s(SubEl, [{attr, <<"chat_type">>}]),
     #jid{luser = TUser} = jid:from_string(To),
 
     EscFUser = ejabberd_sql:escape(FUser),
     EscTUser = ejabberd_sql:escape(TUser),
 
-    Result = fly_mod_utils:get_recent_chat_query(FServer, EscFUser, EscTUser),
+    Result = fly_mod_utils:get_recent_chat_details(FServer, EscFUser, EscTUser, ChatType),
     ?LOG_INFO("Recent chat result: ~p", [Result]),
 
     case Result of
@@ -3032,7 +3033,7 @@ get_recent_chat(From, _RequestType, SubEl, IQ) ->
 null_to_empty(null) -> <<>>;
 null_to_empty(undefined) -> <<>>;
 null_to_empty(Value) -> Value.
-    
+
 get_string() ->
   R = crypto:rand_uniform(0, 16#100000000000000000000000000000000),
   AlphanumericList = string:to_lower(integer_to_list(R, 36)),
