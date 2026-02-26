@@ -2873,7 +2873,6 @@ message_reaction(IQ, SubEl, From, _RequestType) ->
       
       case fly_mod_utils:get_mobile_user_message(TUser, FServer) of
         true ->
-          ?LOG_INFO("send [reaction] push ~p", [TUser]),
           fly_mod_offline_push:send_offline_message({ToJid, xmpp:decode(ChatPkt, ?NS_CLIENT, Opts)}),
           if Action == <<"update">> -> 
               fly_mod_utils:update_push_sent(FServer, FUser, MsgSender, MessageId);
@@ -2901,12 +2900,10 @@ message_reaction(IQ, SubEl, From, _RequestType) ->
                           fly_mix_group_chat:carboncall_message(LUser, LServer, GrpPkt, jid:from_string(Recipient)),
                           ejabberd_router:route(GrpPkt),
 
-                          ?LOG_INFO("check member and message sender to send push ~p == ~p | LUser =:= MsgSender ~p | LUser == MsgSender ~p ", [LUser, MsgSender, LUser =:= MsgSender, LUser == MsgSender]),
                           if LUser =:= MsgSender -> 
                               case fly_mod_utils:get_mobile_user_message(LUser, LServer) of
                                 true ->
                                   MsgSenderJid = jid:make(MsgSender, FServer, <<>>),
-                                  ?LOG_INFO("send [reaction] push for group ~p", [MsgSenderJid]),
                                   PushPkt = #message{from = jid:from_string(Recipient), to = MsgSenderJid, type = binary_to_atom(ChatType), id = StanzaId, sub_els = [ReactionElGrp]},
                                   fly_mod_offline_push:send_offline_message({MsgSenderJid, xmpp:decode(PushPkt,?NS_CLIENT, Opts)});
                                 false ->

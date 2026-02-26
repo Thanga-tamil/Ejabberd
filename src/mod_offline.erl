@@ -837,34 +837,29 @@ route_offline_message(#{jid := #jid{luser = LUser, lserver = LServer, lresource 
     ReactionIds = 
     case offline_msg_to_route(LServer, OffMsg) of
 	error ->
-	    ok;
+	    [];
 	{route, Msg} ->
 		Id = xmpp:get_id(Msg),
 	    case is_message_expired(Expire, Msg) of
 		true ->
-		    ok;
+		    [];
 		false ->
 		    case privacy_check_packet(State, Msg, in) of
 			allow ->
 				NewMsg = xmpp:set_to(Msg, #jid{luser = LUser, lserver = LServer, lresource = LResource}),
-				?LOG_INFO("Routing offline message id ~p to ~p", [Id, LResource]),
 				ejabberd_router:route(NewMsg),
 
 				MatchedReactionIds = case lists:member(Id, ReactionMsgIds) of true  -> [Id]; false -> [] end,
-				?LOG_INFO("MatchedReactionIds ~p for message id ~p", [MatchedReactionIds, Id]),
 				MatchedReactionIds;
 			deny ->
-				ok
+				[]
 		    end
 	    end
     end,
     case ReactionIds of
 	[] ->
-		?LOG_INFO("ReactionIds is empty"),
 	    ok;
 	_ ->
-	    ?LOG_INFO("reaction_id matches from spool to update message_reaction push sent"),
-	    ?LOG_INFO("ReactionIds []", [ReactionIds]),
 	    fly_mod_utils:update_msg_reaction_sent(LServer, fly_mod_media:sql_in(ReactionIds), LUser)
     end.
 

@@ -2552,7 +2552,6 @@ update_reaction_status_chat(Server, FUser, TUser, MessageId, ReactionId, Action)
           _ -> ?LOG_INFO("chat history not found, stop the process"), ok
         end;
     <<"remove">> ->
-      ?LOG_INFO("..remove.."),
 		  case recent_chat_query(Server, TUser, FUser) of 
 			  {selected, _, [[CMF, CMT, Id]]} -> 
           ?LOG_INFO("check message id matches ~p == ~p |  ~p ", [Id, MessageId, Id == MessageId]),
@@ -2655,8 +2654,6 @@ update_reaction_status_normal(Server, FUser, GroupId, MessageId, ReactionId, Act
             ok
         end;
     <<"remove">> ->
-      ?LOG_INFO("[normal]..remove.."),
-    
 		  case recent_chat_query(Server, GroupId, FUser) of 
 			  {selected, _, [[MF, _, Id]]} -> 
           ?LOG_INFO("check message id matches ~p == ~p |  ~p ", [Id, MessageId, Id == MessageId]),
@@ -2769,7 +2766,6 @@ update_msg_reaction_sent(Server, ReactionIds, C2sUser) ->
         lists:foreach(
             fun([FromUser, ToUser, MsgId]) ->
                 if C2sUser == ToUser ->
-                  ?LOG_INFO("[ update message_reaction status ] offline stanza id matches to message_status id: ~p", [MsgId]),
                   ejabberd_sql:sql_query(Server, [<<"update message_reactions set push_sent = '1' where username = '">>,FromUser,<<"' and chat_id = '">>,ToUser,<<"' and message_id = '">>,MsgId,<<"' ;">>]);
                  true -> 
                   ok
