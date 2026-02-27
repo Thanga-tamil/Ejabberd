@@ -375,7 +375,6 @@ sql_in(List) when is_list(List), List =/= [] ->
   JoinedIolist = lists:join(<<",">>, [<< "'", V/binary, "'" >> || V <- List]), Joined = iolist_to_binary(JoinedIolist), << "(", Joined/binary, ")" >>;
 sql_in([]) -> <<"('')">>.
 
-
 send_payload(CallStatus, SubEl, TargetJids, Bool)->
   RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),
   CallType = fxml:get_path_s(SubEl, [{attr, <<"call_type">>}]),
