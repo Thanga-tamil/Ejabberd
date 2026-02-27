@@ -373,7 +373,7 @@ normalize(Bin) when is_binary(Bin) -> list_to_binary(string:lowercase(binary_to_
 
 sql_in(List) when is_list(List), List =/= [] ->
   JoinedIolist = lists:join(<<",">>, [<< "'", V/binary, "'" >> || V <- List]), Joined = iolist_to_binary(JoinedIolist), << "(", Joined/binary, ")" >>;
-sql_in([]) -> <<"(NULL)">>.
+sql_in([]) -> <<"('')">>.
 
 
 send_payload(CallStatus, SubEl, TargetJids, Bool)->
