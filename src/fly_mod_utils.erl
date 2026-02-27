@@ -156,6 +156,7 @@
   get_reacted_msg_ids/2,
   update_msg_reaction_sent/3,
   get_now_timestamp/0,
+  get_mix_channel_service/2,
 
   delete_spool/2,
   get_busy_status/1,
@@ -2783,3 +2784,11 @@ update_msg_reaction_sent(Server, ReactionIds, C2sUser) ->
         ?LOG_ERROR("SQL error: ~p", [Error]),
         ok
   end.    
+
+get_mix_channel_service(Server, Channel) ->
+  case ejabberd_sql:sql_query(Server, [<<"select service from mix_channel where channel='">>,Channel,<<"';">>]) of
+    {selected, _, [[Service]]} ->
+      Service;
+    _ ->
+      <<"">>
+  end.
