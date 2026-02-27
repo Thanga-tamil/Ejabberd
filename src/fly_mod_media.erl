@@ -233,7 +233,7 @@ update_call_status(From, RequestType, SubEl, IQ) ->
                   FDeviceType = [ DType || [_C, DType] <- FDevList ],
                   case not lists:member(get_device_type(FRes), FDeviceType) of 
                       true ->
-                          ?LOG_INFO("call not allowed for From_User &&&& 2"),
+                          ?LOG_INFO("call not allowed for From_User &&&& 2 ~p ~p", [FDeviceType, FRes]),
                           fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling is unavailable due to regional restrictions.">>});
                       false -> 
                           Users  = fxml:get_subtag(SubEl, <<"users">>),
