@@ -2297,8 +2297,10 @@ get_mobile_user_resource(TUser, TServer) ->
   end.
 
 get_users_devices_detail(FServer, TUserIds, Codes) ->
-  case ejabberd_sql:sql_query(FServer,
-  [<<"select country_code, case when device_type in ('android', 'ios') then 'mobile' else device_type end as type from chat_users_details where username in ">>,TUserIds,<<" and (country_code not in ">>,Codes,<<" or country_code is null);">>]) of
+
+  Query = [<<"select country_code, case when device_type in ('android', 'ios') then 'mobile' else device_type end as type from chat_users_details where username in ">>,TUserIds,<<" and (country_code not in ">>,Codes,<<" or country_code is null);">>],
+  ?INFO_MSG("get_users_devices_detail SQL Query: ~s", [iolist_to_binary(Query)]),
+  case ejabberd_sql:sql_query(FServer,Query) of
     {selected, _Cols, Rows} ->
       Rows;
     _ ->
@@ -2332,7 +2334,7 @@ is_session_exists(FServer, User) ->
   ?LOG_INFO("Checking session exists for user: ~p", [User]),
   case ejabberd_sql:sql_query(FServer,
     [<<"select username from chat_users_details where username='">>,User,<<"';">>]) of
-    {selected, _, [[_]]} ->
+    {selected, _, [_ | _]} ->
       true;
     _ ->
       false
