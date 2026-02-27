@@ -2874,7 +2874,7 @@ message_reaction(IQ, SubEl, From, _RequestType) ->
       case fly_mod_utils:get_mobile_user_message(TUser, FServer) of
         true ->
           fly_mod_offline_push:send_offline_message({ToJid, xmpp:decode(ChatPkt, ?NS_CLIENT, Opts)}),
-          if Action == <<"update">> -> 
+          if Action == <<"update">>; Action == <<"remove">> ->  
               fly_mod_utils:update_push_sent(FServer, FUser, MsgSender, MessageId);
               true -> 
                 ok

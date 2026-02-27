@@ -2720,7 +2720,8 @@ get_recent_chat_details(Server, FUser, TUser, ChatType) ->
         from chat_recent as c 
         join chat_message_edit_history as m on m.edit_message_id = c.message_id
         join message_status as s on s.edit_message_id = c.message_id and ( (s.from_user = '">>,FUser,<<"' and s.to_user = '">>,TUser,<<"') or (s.from_user = '">>,TUser,<<"' and s.to_user = '">>,FUser,<<"') )
-        left join message_reactions as r on r.message_id = c.message_id and r.chat_type = 'chat' and ( r.username = '">>,FUser,<<"' and r.chat_id = '">>,TUser,<<"' ) or ( r.username = '">>,TUser,<<"' and r.chat_id = '">>,FUser,<<"' )
+        LEFT JOIN message_reactions r ON r.id = (SELECT r2.id FROM message_reactions r2 WHERE r2.message_id = c.message_id AND r2.chat_type = 'chat' and ( r.username = '">>,FUser,<<"' and r.chat_id = '">>,TUser,<<"' ) or ( r.username = '">>,TUser,<<"' and r.chat_id = '">>,FUser,<<"' )
+        ORDER BY r2.updated_at DESC LIMIT 1 )
         where c.from_user = '">>,TUser,<<"' and c.to_user = '">>,FUser,<<"' limit 1;">>]);
     ChatType =:= <<"normal">> ->
       ejabberd_sql:sql_query(Server, [<<"select 

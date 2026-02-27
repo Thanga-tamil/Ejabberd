@@ -670,7 +670,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
                 ?LOG_INFO("[android_push] reaction payload : ~p", [Payload]),
                 case DeviceType of
                     <<"android">> ->
-                          if Action == <<"update">> -> 
+                          if Action == <<"update">>; Action == <<"remove">> ->  
                             FUser = fly_mod_utils:get_user_from_string_jid(FromUserJid),
                             ?LOG_INFO("Updating push sent status for reaction update, message id: ~p, user: ~p, toUser: ~p", [MsgId, FUser, ToUser]),
                             fly_mod_utils:update_push_sent(Server, FUser, ToUser, MsgId);
@@ -1697,7 +1697,7 @@ end,
                             JSON = create_json(Msg, Args1, binary_to_list(DeviceToken), Mode, 0, 0, PushType),
 
                             ?LOG_INFO("[group ios_push] reaction payload: ~p", [JSON]),
-                            if Action == <<"update">> -> 
+                            if Action == <<"update">>; Action == <<"remove">> ->  
                               FUser = fly_mod_utils:get_user_from_string_jid(FromUserJid),
                               ?LOG_INFO("Updating push sent status for reaction update, message id: ~p, user: ~p, toUser: ~p", [MsgId, FUser, ToUser]),
                               fly_mod_utils:update_push_sent(Server, FUser, ToUser, MsgId);
