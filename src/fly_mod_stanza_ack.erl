@@ -306,7 +306,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
       if ReceiptsElementAcknowledge == false ->
         ok;
         true ->
-          {_,ReceiptId,_BroadcastId,_SendTo,_MessageType} = ReceiptsElementAcknowledge,
+          #acknowledge{id = ReceiptId} = ReceiptsElementAcknowledge,
 
           fly_mod_utils:remove_offline(FServer, ReceiptId, MResource)
       end;
@@ -315,7 +315,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
       if ReceiptsElementAcknowledge == false ->
         ok;
         true ->
-          {_,ReceiptId,_BroadcastId,_SendTo,_MessageType} = ReceiptsElementAcknowledge,
+          #acknowledge{id = ReceiptId} = ReceiptsElementAcknowledge,
 
           fly_mod_utils:remove_offline(FServer, ReceiptId, MResource)
       end;
@@ -324,7 +324,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
       if ReceiptsElementAcknowledge == false ->
         ok;
         true ->
-          {_,ReceiptId,_BroadcastId,_SendTo,_MessageType} = ReceiptsElementAcknowledge,
+          #acknowledge{id = ReceiptId} = ReceiptsElementAcknowledge,
 
           fly_mod_utils:remove_offline(FServer, ReceiptId, MResource)
 
@@ -433,7 +433,7 @@ should_acknowledge_on_receipts(Packet) ->
   if ElementAcknowledge == false ->
     ok;
     true ->
-      {_,_,Type,_,_} = ElementAcknowledge,
+      #acknowledge{type = Type} = ElementAcknowledge,
       if Type == <<"delivered">> ->
         received_receipt;
         Type == <<"seen">> ->
