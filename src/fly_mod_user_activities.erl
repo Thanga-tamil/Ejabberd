@@ -164,6 +164,7 @@ process_local_iq(#iq{from = From, to = To, type = Type, sub_els = [#user_activit
 %% Set method for the IQ
 process_iq_set(From, _To, RequestType, IQ) ->
   SubEl = fxml:get_subtag_with_xmlns(IQ, <<"query">>, <<"jabber:iq:user_activities">>),
+   ?INFO_MSG ("process_iq_set ~p", [RequestType]),
   case RequestType of
     <<"set_web_password">> ->
       set_web_password(From, SubEl, IQ);
@@ -171,7 +172,8 @@ process_iq_set(From, _To, RequestType, IQ) ->
       set_user_validate(From, SubEl, IQ);
     <<"register_notify">> ->
       push_register_notify_presence(From, RequestType, SubEl,IQ);
-     <<"notify_disappear_message">> -> notify_disappear_message(From, RequestType, SubEl,IQ);
+     <<"notify_disappear_message">> -> 
+      notify_disappear_message(From, RequestType, SubEl,IQ);
     <<"clear_message">> ->
       clear_message(From, RequestType, SubEl, IQ);
     <<"clear_all">> ->
@@ -212,7 +214,8 @@ process_iq_set(From, _To, RequestType, IQ) ->
       update_user_busy(From, RequestType, SubEl, IQ);
     <<"register_update">> ->
       register_update_to_rosters(From, RequestType, SubEl, IQ);
-    <<"send_bulk_message">> -> send_bulk_message(From, RequestType, SubEl,IQ);
+    <<"send_bulk_message">> -> 
+      send_bulk_message(From, RequestType, SubEl,IQ);
     <<"user_settings">> ->
       set_user_settings(From, RequestType, SubEl, IQ);
     <<"update_unread_count">> ->
@@ -233,7 +236,8 @@ process_iq_set(From, _To, RequestType, IQ) ->
       read_all(From, RequestType, SubEl, IQ);
     <<"poll_acknowledge">> ->
       poll_ack(From, RequestType, SubEl, IQ);
-    <<"set_message_disappear">> -> set_message_disappear(From, SubEl, IQ);
+    <<"set_message_disappear">> -> 
+      set_message_disappear(From, SubEl, IQ);
     <<"privacy_setting">> -> 
       privacy_setting(From, RequestType, SubEl, IQ);
     <<"message_reaction">> -> 
@@ -2661,6 +2665,7 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
     end.
 
 send_bulk_message(From, RequestType, SubEl, IQ) ->
+    ?INFO_MSG("send_bulk_message enter: ~p ", [From]),
     Attributes = [<<"message_from">>, <<"message_to">>, <<"message_type">>, <<"message_id">>, <<"message">>, <<"group_id">>, <<"chat_type">>,<<"to_user">>],
     Results = lists:map(fun(Attr) -> fxml:get_path_s(SubEl, [{attr, Attr}]) end, Attributes),
     [MessageFrom, MessageTo, MessageType, MessageId, MessageTag, GroupId, ChatType, TeamId] = Results,
