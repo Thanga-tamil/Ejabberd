@@ -638,7 +638,10 @@ process_add_participants(From, To, SubEl, IQ) ->
       GroupNameElement = fxml:get_subtag(SubEl, <<"nick">>),
       GroupName = fxml:get_tag_cdata(GroupNameElement);
     true ->
-      {selected, [{GroupName}]} = fly_mod_utils:get_nickname(FServer, TUser)
+      case fly_mod_utils:get_nickname(FServer, TUser) of
+        {selected, [{GN}]} -> GroupName = GN;
+        _ -> GroupName = TUser
+      end
   end,
   lists:foreach(
     fun(Participant) ->
@@ -749,7 +752,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
   ?INFO_MSG("IncomingDescription : ~p", [IncomingDescription]),
   
   IncomingImage = fxml:get_path_s(VCard, [{elem, <<"image">>}, cdata]),
-  ?INFO_MSG("IncomingImage : ~p", [IncomingImage]),
+  ?INFO_MSG("IncomingImage : ~p", [VCard]),
   
   if NewStatus =:= <<"new">> ->
     mod_vcard:set_vcard(LUser, FServer, VCard),
@@ -762,8 +765,12 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
         
         GroupInfo = fly_mod_utils:get_existing_group_info(FServer, LUser),
 
-        {selected, [<<"nickname">>, <<"description">>, <<"image">>], [[Nickname, Description, Image]]} = GroupInfo,
-        ?INFO_MSG("Existing Group Info - Nickname: ~p, Description: ~p, Image: ~p", [Nickname, Description, Image]),
+        case GroupInfo of
+          {selected, _, [[Nickname, Description, Image]]} ->
+            ?INFO_MSG("Existing Group Info - Nickname: ~p, Description: ~p, Image: ~p", [Nickname, Description, Image]);
+          _ ->
+            ?LOG_INFO("No existing group info found for ~p", [LUser])
+        end,
         
         JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
         SetVcard = mod_vcard:set_vcard(LUser, FServer, VCard),
