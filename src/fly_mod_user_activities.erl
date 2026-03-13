@@ -2655,7 +2655,8 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
                                 %   false ->
                                 %     ok
                                 %  end, 
-                               fly_mod_offline_push:send_own_offline_message(ToJID, FromJID, MsgWithMeta),
+                                
+                               fly_mod_offline_push:send_own_offline_message(ToJID, FromJID, EncodedXML),
                                ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
                             _ -> ok
                            end,
