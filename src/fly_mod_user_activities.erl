@@ -2572,10 +2572,6 @@ send_deleted_user_status(_From, RequestType, SubEl, IQ) ->
 %%
 %% @param record From
 %% @param attributes
-
-
-
-
 send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
    
     TypeBin = binary:copy(Type),
@@ -2646,13 +2642,9 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
                 case xmpp:decode(EncodedXML, ?NS_CLIENT, CodecOpts) of
                     #message{from = JID} = Msg ->
                         State = #{jid => JID},
-                        MsgWithMeta = Msg#message{from = ToJID, meta = MetaMap},
+                        MsgWithMeta = Msg#message{meta = MetaMap},
                          case TypeBin of
-                            <<"chat">> -> 
-                              %  UpdatedLocal = Msg#message{from = ToJID, meta = MetaMap}, 
-                              %  mod_offline:store_packet({ToJID, UpdatedLocal}),
-                              %  fly_mod_offline_push:send_own_offline_message(ToJID, FromJID, EncodedXML),
-                               ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
+                            <<"chat">> -> ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
                             _ -> ok
                            end,
                         ejabberd_router:route(MsgWithMeta),
