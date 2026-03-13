@@ -2669,7 +2669,6 @@ send_bulk_message(From, RequestType, SubEl, IQ) ->
     Results = lists:map(fun(Attr) -> fxml:get_path_s(SubEl, [{attr, Attr}]) end, Attributes),
     [MessageFrom, MessageTo, MessageType, MessageId, MessageTag, GroupId, ChatType, TeamId] = Results,
     FromServer = From#jid.lserver,
-    ?INFO_MSG("send_bulk_message: ~p =>>>>>>>>>>> ~p ", [MessageFrom, MessageTo]),
     case ChatType of
         <<"chat">> -> 
             ChunkSize = 100,
@@ -2697,6 +2696,7 @@ process_bulk_chunks(From, TeamId, MessageFrom, MessageType, ChunkSize, Offset, I
             end;
         {selected, _, Rosters} ->
             lists:foreach(fun ([UserId, MessageIdFromDb, MessageContent]) ->
+                 ?INFO_MSG("send_bulk_message: ~p =>>>>>>>>>>> ~p ", [MessageFrom, UserId]),
                 send_message(ChatType, MessageFrom, UserId, MessageType, MessageContent, MessageIdFromDb, #{ from_broadcast => true })
             end, Rosters),
              case length(Rosters) of
