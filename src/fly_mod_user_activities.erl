@@ -2704,7 +2704,7 @@ process_bulk_chunks(From, TeamId, MessageFrom, MessageType, ChunkSize, Offset, I
             end;
         {selected, _, Rosters} ->
             lists:foreach(fun ([UserId, MessageIdFromDb, MessageContent]) ->
-                 ?INFO_MSG("send_bulk_message: ~p =>>>>>>>>>>> ~p ", [MessageFrom, MessageTo]),
+                 ?INFO_MSG("send_bulk_message: ~p =>>>>>>>>>>> ~p ", [MessageFrom, UserId]),
                  send_message(ChatType, MessageFrom, UserId, MessageType, MessageContent, MessageIdFromDb, #{ from_broadcast => true })
             end, Rosters),
              case length(Rosters) of
