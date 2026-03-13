@@ -103,6 +103,28 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal functions
 %% ====================================================================
 
+
+% on_user_send_packet({#message{from = From, to = To,type = normal,
+%   id = SubmissionID} = Packet, _C2SState}) ->
+%   {_FUser, FServer, _} = jid:tolower(From),
+%   IsValid = fly_mod_utils:validate_license(FServer, true, <<"chat">>),
+%   if IsValid =:= true ->
+%   case fxml:get_subtag(xmpp:encode(Packet),<<"composing">>) of
+%     false ->
+%     case fxml:get_subtag(xmpp:encode(Packet),<<"gone">>) of
+%       false ->
+%         send_ack_response(From, To, SubmissionID, <<"acknowledge">>, <<"">>, <<"">>);
+%       _ ->
+%         ok
+%       end;
+%     _ ->
+%       ok
+%     end,
+%   {Packet,_C2SState};
+% true ->
+%     {drop,_C2SState}
+% end;
+
 %% Function triggers when receive message packets from sender
 on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SState}) ->
   #jid{user = FUser, lserver = FServer, lresource = LResource} = From,
@@ -160,7 +182,8 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
               {_, _, FlatTimeStamp} = GetTimestamp,
               TimeStampedPacket = NewPacket
           end,
-        
+          store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, MetaData,BlockUser, EditMsgid, FlatTimeStamp),
+
         if BlockUser == <<"0">> ->
           case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
             true ->
@@ -186,15 +209,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             Metadata = MetaData
         end,
 
-        case xmpp:get_meta(Packet) of
-          #{from_broadcast := true} -> ok;
-        _ ->
-
-          store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, MetaData,BlockUser, EditMsgid, FlatTimeStamp),
-          fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid,DisappearAt)
-        
-        end;
-    
+        fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid,DisappearAt);
         S when (S == false) ->
           BlockUser = <<"0">>,
           ok
