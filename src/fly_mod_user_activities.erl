@@ -2665,7 +2665,6 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
     end.
 
 send_bulk_message(From, RequestType, SubEl, IQ) ->
-    ?INFO_MSG("send_bulk_message enter: ~p ", [From]),
     Attributes = [<<"message_from">>, <<"message_to">>, <<"message_type">>, <<"message_id">>, <<"message">>, <<"group_id">>, <<"chat_type">>,<<"to_user">>],
     Results = lists:map(fun(Attr) -> fxml:get_path_s(SubEl, [{attr, Attr}]) end, Attributes),
     [MessageFrom, MessageTo, MessageType, MessageId, MessageTag, GroupId, ChatType, TeamId] = Results,
