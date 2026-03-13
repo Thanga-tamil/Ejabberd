@@ -879,10 +879,10 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   true ->
     MResource = <<"">>
   end,
-  Seq = fly_mod_utils:get_spool_seq(FServer, FUser, MsgId, MResource),
-  Result = fly_mod_utils:batch_remove_spool(FServer, FUser, Seq, MResource),
+  % Seq = fly_mod_utils:get_spool_seq(FServer, FUser, MsgId, MResource),
+  % Result = fly_mod_utils:batch_remove_spool(FServer, FUser, Seq, MResource),
   % Result = fly_mod_utils:remove_poll_offline(FServer, MResource,MsgId),
-  ?LOG_INFO("spool delete status: ~p for msg_id: ~p", [Result, MsgId]),
+  % ?LOG_INFO("spool delete status: ~p for msg_id: ~p", [Result, MsgId]),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Ack successfully">>}).
 
 read_all(From,RequestType,SubEl,IQ) ->
