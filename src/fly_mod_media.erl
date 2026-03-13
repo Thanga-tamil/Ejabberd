@@ -227,13 +227,13 @@ update_call_status(From, RequestType, SubEl, IQ) ->
 
           case FDevList of 
               [] -> 
-                  ?LOG_INFO("call not allowed for From_User"),
+                  ?LOG_INFO("call not allowed for From_User =>>>>>>>>>>>>> 1"),
                   fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling is unavailable due to regional restrictions.">>});
               [_ | _] ->
                   FDeviceType = [ DType || [_C, DType] <- FDevList ],
                   case not lists:member(get_device_type(FRes), FDeviceType) of 
                       true ->
-                          ?LOG_INFO("call not allowed for From_User"),
+                          ?LOG_INFO("call not allowed for From_User &&&& 2 ~p ~p", [FDeviceType, FRes]),
                           fly_mod_utils:generate_subel(IQ, #media_call_activities{type = <<"restricted_country">>, result_type = <<"Calling is unavailable due to regional restrictions.">>});
                       false -> 
                           Users  = fxml:get_subtag(SubEl, <<"users">>),
@@ -373,8 +373,7 @@ normalize(Bin) when is_binary(Bin) -> list_to_binary(string:lowercase(binary_to_
 
 sql_in(List) when is_list(List), List =/= [] ->
   JoinedIolist = lists:join(<<",">>, [<< "'", V/binary, "'" >> || V <- List]), Joined = iolist_to_binary(JoinedIolist), << "(", Joined/binary, ")" >>;
-sql_in([]) -> <<"(NULL)">>.
-
+sql_in([]) -> <<"('')">>.
 
 send_payload(CallStatus, SubEl, TargetJids, Bool)->
   RoomId = fxml:get_path_s(SubEl, [{attr, <<"room_id">>}]),

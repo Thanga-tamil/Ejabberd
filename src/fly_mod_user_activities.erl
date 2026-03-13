@@ -16,7 +16,8 @@
 
 %% API
 -export([start/2, stop/1, depends/2, mod_options/1, mod_opt_type/1, process_terminated/2, process_local_iq/1, push_vcard_updates/1,
-        set_presence/4, unset_presence/4, update_user_stream/1, send_block_list/3, push_to_rosters/2, media_permission_revoke/3]).
+        set_presence/4, unset_presence/4, update_user_stream/1, send_block_list/3, push_to_rosters/2, media_permission_revoke/3, 
+        check_and_send_user_bulk_messages/1]).
 
 -export([ handle_cast/2,  handle_info/2, handle_call/3]).
 
@@ -163,6 +164,7 @@ process_local_iq(#iq{from = From, to = To, type = Type, sub_els = [#user_activit
 %% Set method for the IQ
 process_iq_set(From, _To, RequestType, IQ) ->
   SubEl = fxml:get_subtag_with_xmlns(IQ, <<"query">>, <<"jabber:iq:user_activities">>),
+   ?INFO_MSG ("process_iq_set ~p", [RequestType]),
   case RequestType of
     <<"set_web_password">> ->
       set_web_password(From, SubEl, IQ);
@@ -170,6 +172,8 @@ process_iq_set(From, _To, RequestType, IQ) ->
       set_user_validate(From, SubEl, IQ);
     <<"register_notify">> ->
       push_register_notify_presence(From, RequestType, SubEl,IQ);
+     <<"notify_disappear_message">> -> 
+      notify_disappear_message(From, RequestType, SubEl,IQ);
     <<"clear_message">> ->
       clear_message(From, RequestType, SubEl, IQ);
     <<"clear_all">> ->
@@ -210,6 +214,8 @@ process_iq_set(From, _To, RequestType, IQ) ->
       update_user_busy(From, RequestType, SubEl, IQ);
     <<"register_update">> ->
       register_update_to_rosters(From, RequestType, SubEl, IQ);
+    <<"send_bulk_message">> -> 
+      send_bulk_message(From, RequestType, SubEl,IQ);
     <<"user_settings">> ->
       set_user_settings(From, RequestType, SubEl, IQ);
     <<"update_unread_count">> ->
@@ -230,8 +236,12 @@ process_iq_set(From, _To, RequestType, IQ) ->
       read_all(From, RequestType, SubEl, IQ);
     <<"poll_acknowledge">> ->
       poll_ack(From, RequestType, SubEl, IQ);
+    <<"set_message_disappear">> -> 
+      set_message_disappear(From, SubEl, IQ);
     <<"privacy_setting">> -> 
       privacy_setting(From, RequestType, SubEl, IQ);
+    <<"message_reaction">> -> 
+      message_reaction(IQ, SubEl, From, RequestType);
     no_such_subtag ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"no_such_subtag">>, result_type = <<"unknown request">>});
     empty_value ->
@@ -284,7 +294,8 @@ process_iq_get(From, To, RequestType, IQ) ->
       get_busy_status(From, RequestType, SubEl, IQ);
     <<"get_recentchat_profile">> ->
       process_get_recent_profile(From, RequestType, SubEl, IQ);
-
+    <<"get_recent_chat">> ->
+      get_recent_chat(From, RequestType, SubEl, IQ);
     no_such_subtag ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"no_such_subtag">>, result_type = <<"unknown request">>});
     empty_value ->
@@ -487,6 +498,7 @@ set_presence(User, Server, Resource, _Status) ->
       fly_mod_utils:set_last_o(User, Server, <<"1">>),
       fly_mod_utils:remove_offline_by_user(Server, User),
       JID = jid:make({User, Server, <<>>}),
+      check_and_send_user_bulk_messages(JID),
       push_to_rosters(JID, #xmlel{name = <<"presence">>,
         attrs = [{<<"type">>, <<"available">>}],
         children = []
@@ -719,7 +731,7 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
         ok
       end,
       fly_mod_stanza_ack:store_in_table(FServer,FUser,TUser,MsgId,BodyString,<<"chat">>,<<"auto_text">>,<<"">>,  <<"{}">> ,<<"0">>,<<"">>, ReceivedFlatTimeStamps),
-      fly_mod_utils:insert_status(FromJid, ToJid, MsgId,<<"auto_text">>,<<"">>, <<"{}">>, <<"chat">>,<<"">>,<<"0">>,BodyString,ReceivedFlatTimeStamps,MsgId);
+      fly_mod_utils:insert_status(FromJid, ToJid, MsgId,<<"auto_text">>,<<"">>, <<"{}">>, <<"chat">>,<<"">>,<<"0">>,BodyString,ReceivedFlatTimeStamps,MsgId, <<"">>);
   true ->
     ok
   end,
@@ -1013,7 +1025,7 @@ fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_typ
         true ->
           ok
         end,
-  fly_mod_utils:insert_status(FromJid, ToJid, MessageId,MessageType,TopicId, MetaData, SType,<<"">>,BlockUser,MsgContent,ReceivedFlatTimeStamp,EditMsgId);
+  fly_mod_utils:insert_status(FromJid, ToJid, MessageId,MessageType,TopicId, MetaData, SType,<<"">>,BlockUser,MsgContent,ReceivedFlatTimeStamp,EditMsgId, <<"">>);
   ChatType == <<"normal">> ->
   FromJid = jid:from_string(MessageFrom),
   ToJid = jid:from_string(GroupId),
@@ -2168,7 +2180,7 @@ get_group_chat_messages( From, RequestType, SubEl, IQ) ->
 
 message_stanza_result(Result) ->
   SubEl = lists:map(fun(G) ->
-    [RowId, MessageUser, Message_type, MessageTag, Time, MsgId, EditMsgId, Status, RecallStatus, FavouriteStatus, FavouriteBy, MessageTime, TopicId, EditStatus,  MetaData] = G,
+    [RowId, MessageUser, Message_type, MessageTag, Time, MsgId, EditMsgId, Status, RecallStatus, FavouriteStatus, FavouriteBy, MessageTime, TopicId, EditStatus, DisappearAt, MetaData] = G,
     RowIdElement = #xmlel{name = <<"row_id">>, attrs = [],
       children = [{xmlcdata, RowId}]},
     UserElements = #xmlel{name = <<"user">>, attrs = [],
@@ -2193,6 +2205,8 @@ message_stanza_result(Result) ->
       children = [{xmlcdata, MetaData}]},
     TopicIdElement = #xmlel{name = <<"topic_id ">>, attrs = [],
       children = [{xmlcdata, TopicId}]},
+    DisappearAtElement = #xmlel{name = <<"disappear_at ">>, attrs = [],
+      children = [{xmlcdata, DisappearAt}]},
     EditStatusElement = #xmlel{name = <<"edit_msg_status ">>, attrs = [],
       children = [{xmlcdata, EditStatus}]},
     MessageTypeElements = #xmlel{name = <<"Message_type">>, attrs = [],
@@ -2200,13 +2214,13 @@ message_stanza_result(Result) ->
     MessageElement = #xmlel{name = <<"message ">>, attrs = [],
       children = [{xmlcdata, MessageTag}]},
     #xmlel{name = <<"chat">>, attrs = [],
-      children = [MessageTimeElements, UserElements, EditStatusElement, EMsgidElement, MessageTypeElements, StatusElements,  TimeElements, MessageElement, MsgidElement, RecallElement, FavouriteElement, FavouriteByElement, TopicIdElement, MetaDataElement, RowIdElement]}
+      children = [DisappearAtElement, MessageTimeElements, UserElements, EditStatusElement, EMsgidElement, MessageTypeElements, StatusElements,  TimeElements, MessageElement, MsgidElement, RecallElement, FavouriteElement, FavouriteByElement, TopicIdElement, MetaDataElement, RowIdElement]}
                       end,
     Result).
 
     meta_message_stanza_result(Result) ->
       SubEl = lists:map(fun(G) ->
-        [RowId, MessageUser, MessageTo, Message_type, MessageTag, MsgId, EditMsgId, Status, RecallStatus, MessageTime, MetaData] = G,
+        [RowId, MessageUser, MessageTo, Message_type, MessageTag, MsgId, EditMsgId, Status, RecallStatus, MessageTime, DisappearAt, MetaData] = G,
         RowIdElement = #xmlel{name = <<"row_id">>, attrs = [],
           children = [{xmlcdata, RowId}]},
         UserElements = #xmlel{name = <<"user">>, attrs = [],
@@ -2560,6 +2574,242 @@ send_deleted_user_status(_From, RequestType, SubEl, IQ) ->
 %% @param attributes
 
 
+
+
+send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
+   
+    TypeBin = binary:copy(Type),
+    FromBin = binary:copy(From),
+    ToBin = binary:copy(To),
+    SubjectBin = binary:copy(Messagetype),
+    FromJID = jid:make(FromBin),
+    ToJID = jid:make(ToBin),
+
+    case {FromJID, ToJID} of
+        {#jid{}, #jid{}} ->
+            CodecOpts = ejabberd_config:codec_options(),
+            try
+
+                ChatContentChildren = case TypeBin of
+                            <<"chat">> -> [{xmlcdata, BodyString}];
+                            _ -> []
+                           end,
+
+                XML = #xmlel{
+                    name = <<"message">>,
+                    attrs = [
+                        {<<"to">>, jid:to_string(ToJID)},
+                        {<<"from">>, jid:to_string(FromJID)},
+                        {<<"type">>, TypeBin},
+                        {<<"id">>, MessageId }
+                    ],
+                    children = [
+                        #xmlel{
+                            name = <<"subject">>,
+                            attrs = [],
+                            children = [{xmlcdata, SubjectBin}]
+                        },
+                        #xmlel{
+                          name = <<"chatcontent">>,
+                          attrs = [
+                              {<<"xmlns">>, <<"urn:xmpp:content">>},
+                              {<<"message_type">>, Messagetype},
+                              {<<"broadcast_id">>, <<"">>},
+                              {<<"broadcast_msgid">>, <<"">>},
+                              {<<"block_user">>, <<"0">>}
+                          ],
+                          children = ChatContentChildren
+                        },
+                        #xmlel{
+                            name = <<"body">>,
+                            attrs = [],
+                            children = [{xmlcdata, BodyString}]
+                        },
+                        #xmlel{
+                            name = <<"timestamp">>,
+                            attrs = [
+                                {<<"xmlns">>, <<"urn:xmpp:messagetime">>},
+                                {<<"time">>, 
+                                list_to_binary(
+                                    lists:flatten(
+                                        io_lib:format("~p", [now_to_microseconds(erlang:now())])
+                                    )
+                                )
+                                }
+                            ],
+                            children = []
+                        }
+                    ]
+                },
+              
+                EncodedXML = xmpp:encode(XML),
+                case xmpp:decode(EncodedXML, ?NS_CLIENT, CodecOpts) of
+                    #message{from = JID} = Msg ->
+                        State = #{jid => JID},
+                        MsgWithMeta = Msg#message{meta = MetaMap},
+                         case TypeBin of
+                            <<"chat">> -> ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
+                            _ -> ok
+                           end,
+                        ejabberd_router:route(MsgWithMeta),
+                        {ok, <<"Message sent">>};
+                    Decoded ->
+                        {error, <<"Failed to decode XMPP message">>}
+                end
+            catch
+                _:{xmpp_codec, Why} ->
+                    {error, xmpp:format_error(Why)}
+            end;
+        _ ->
+            {error, <<"Invalid JID format">>}
+    end.
+
+send_bulk_message(From, RequestType, SubEl, IQ) ->
+    ?INFO_MSG("send_bulk_message enter: ~p ", [From]),
+    Attributes = [<<"message_from">>, <<"message_to">>, <<"message_type">>, <<"message_id">>, <<"message">>, <<"group_id">>, <<"chat_type">>,<<"to_user">>],
+    Results = lists:map(fun(Attr) -> fxml:get_path_s(SubEl, [{attr, Attr}]) end, Attributes),
+    [MessageFrom, MessageTo, MessageType, MessageId, MessageTag, GroupId, ChatType, TeamId] = Results,
+    FromServer = From#jid.lserver,
+    ?INFO_MSG("send_bulk_message: ~p ", [TeamId]),
+    case ChatType of
+        <<"chat">> -> 
+            ChunkSize = 100,
+            process_bulk_chunks(
+                From, TeamId, MessageFrom, MessageType, ChunkSize, 0, 
+                IQ, RequestType, ChatType
+            );
+        <<"normal">> -> 
+            send_message(ChatType, MessageFrom, GroupId, MessageType, MessageTag, MessageId, #{ from_broadcast => true }),
+            fly_mod_utils:remove_bulk_notification(From, TeamId),
+            ?INFO_MSG("send_message: ~p ", [TeamId]),
+            fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>});
+        _ -> 
+            undefined
+    end.
+
+process_bulk_chunks(From, TeamId, MessageFrom, MessageType, ChunkSize, Offset, IQ, RequestType, ChatType) ->
+    case catch fly_mod_utils:get_bulk_message_details(From, TeamId, Offset, ChunkSize) of
+        {selected, _, []} ->
+            if Offset == 0 ->
+                fly_mod_utils:generate_subel(IQ, #query{type = RequestType, result_type = <<"Members not found">>});
+            true ->
+                fly_mod_utils:remove_bulk_notification(From, TeamId),
+                fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>})
+            end;
+        {selected, _, Rosters} ->
+            lists:foreach(fun ([UserId, MessageIdFromDb, MessageContent]) ->
+                send_message(ChatType, MessageFrom, UserId, MessageType, MessageContent, MessageIdFromDb, #{ from_broadcast => true })
+            end, Rosters),
+             case length(Rosters) of
+                ChunkSize ->
+                    process_bulk_chunks(
+                        From, TeamId, MessageFrom, MessageType, ChunkSize,
+                        Offset + ChunkSize, IQ, RequestType, ChatType
+                    );
+                _ ->
+                    fly_mod_utils:remove_bulk_notification(From, TeamId),
+                    fly_mod_utils:generate_subel(IQ, #user_activities{
+                        type = RequestType, result_type = <<"Send successfully">>
+                    })
+            end;
+        _ ->
+            fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Message Not Sent">>})
+    end.
+
+
+check_and_send_user_bulk_messages(From) ->
+    process_user_bulk_messages_batch(From, 100).
+
+process_user_bulk_messages_batch(From, BatchSize) ->
+    #jid{luser = LUser, lserver = LServer} = From,
+    ?INFO_MSG("process_user_bulk_messages_batch LUser ~p ", [LUser]),
+    case catch fly_mod_utils:get_pending_bulk_messages_for_user(LServer, LUser, BatchSize) of
+        {selected, _, Rows} ->
+             lists:foreach(fun([MessageFrom, MessageType, ChatType, MessageId, MessageContent, GroupId]) ->
+                 ?INFO_MSG("process_user_bulk_messages_batch Inner ~p ~p ~p ~p ~p ~p ~p", [LUser, MessageFrom, MessageType, ChatType, MessageId, MessageContent, GroupId]),  
+                   ToUser = case ChatType of
+                      <<"chat">> -> <<LUser/binary, "@", LServer/binary>>;
+                      <<"normal">> -> GroupId;
+                      _ -> undefined
+                  end,
+                   ?INFO_MSG("process_user_bulk_messages_batch before sending message ~p", [ToUser]),
+                  send_message(ChatType, MessageFrom, ToUser, MessageType, MessageContent, MessageId, #{ from_broadcast => true }),
+                   ?INFO_MSG("process_user_bulk_messages_batch before sending after ~p", [ToUser])
+             end, Rows),
+             MessageIds = [MsgId || [_, _, _, MsgId, _, _] <- Rows],
+             fly_mod_utils:delete_bulk_messages(LServer, MessageIds, LUser),
+             if length(Rows) == BatchSize ->
+                 process_user_bulk_messages_batch(From, BatchSize);
+             true ->
+                 ok
+             end;
+        _ ->
+            ok
+    end.
+
+
+
+notify_disappear_message(From, RequestType, SubEl, IQ) ->
+  MessageId = fxml:get_path_s(SubEl, [{attr, <<"message_id">>}]),
+  ToUserJid = fxml:get_path_s(SubEl, [{attr, <<"to_user">>}]),
+  MessageDisappear = fxml:get_path_s(SubEl, [{attr, <<"msg_disappear">>}]),
+  Messageid = <<(get_string())/binary>>,
+  #jid{user = FUser, lserver = FServer} = From,
+  [ToUser | _S] = string:tokens(binary_to_list(ToUserJid), "@"),
+
+  #jid{luser = User, lserver = Server, lresource = Resource} = From,
+ 
+  To = jid:make({list_to_binary(ToUser), Server, <<>>}),
+
+  XmlBody = #xmlel{name = <<"message">>,
+                   attrs = [{<<"from">>, jid:to_string(From)},
+                            {<<"to">>, jid:to_string(To)},
+                            {<<"type">>, <<"chat">>},
+                            {<<"id">>, Messageid}],
+                   children = [#xmlel{name = <<"msg_disappear">>,
+                                      attrs = [{<<"xmlns">>, <<"urn:xmpp:receipts">>},
+                                               {<<"msg_disappear">>, MessageDisappear},
+                                               {<<"id">>, MessageId}],
+                                      children = []}]},
+  ReceivedTimestamp = now_to_microseconds(erlang:now()),
+  ReceivedFlatTimeStamp = lists:flatten(io_lib:format("~p", [ReceivedTimestamp])),
+  ReceivedXMLTag = #xmlel{name = <<"timestamp">>,
+                          attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>},
+                                   {<<"time">>, list_to_binary(ReceivedFlatTimeStamp)}],
+                          children = []},
+  XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
+  ejabberd_router:route(From, To, XmlBody1),
+  case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
+    true ->
+      mod_offline:store_packet({From, xmpp:decode(XmlBody1)});
+    false ->
+      ok
+  end,
+  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>}).
+
+
+
+% model stanza for set_message_disappearance "single_chat"
+% <iq id='4CK21-51' type='set'>
+% <query xmlns='jabber:iq:user_activities' id='ig3eheur558qtu2' status='message_disappear' type='chat' msg_disappear='' to_user='1234567890@xmpp'/>
+% </iq>
+
+set_message_disappear(From, SubEl, IQ) ->
+
+    #jid{luser = FUser, lserver = FServer, lresource = LResource} = From,
+    MsgDisappear  = fxml:get_path_s(SubEl, [{attr, <<"msg_disappear">>}]),
+    Type          = fxml:get_path_s(SubEl, [{attr, <<"type">>}]),
+    if Type =:= <<"chat">> ->
+            Recipient = fxml:get_path_s(SubEl, [{attr, <<"to_user">>}]),
+            ToJid = jid:from_string(Recipient),        
+            #jid{luser = ToUser, lserver = ToServer} = ToJid,
+            fly_mod_utils:add_userin_roster_asunknown(ToServer, ToUser, FUser, <<"B">>),
+            fly_mod_utils:set_message_disappear_single_chat(ToServer, FUser, MsgDisappear, ToUser);
+        true ->
+            ok
+    end,
+    fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"set_message_disappear">>, result_type = <<"updated successfully">>}).
+ 
 set_web_password(From, SubEl, IQ) ->
   Password = fxml:get_path_s(SubEl, [{attr, <<"password">>}]),
   RequestType = fxml:get_path_s(SubEl, [{attr, <<"status">>}]),
@@ -2585,6 +2835,206 @@ set_user_validate(From, SubEl, IQ) ->
     fly_mod_utils:update_license_lookup(FServer)
   end,
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"License Key updated successfully">>}).
+
+
+
+% action='add'
+% action='update'
+% action='remove'
+
+% type='chat'
+% type='normal'
+
+% <iq id='4CK21-51' type='set'>
+% <query xmlns='jabber:iq:user_activities' id='ig3eheur558qtu2' status='message_reaction' action='add' type='normal' to_user='9181480511741767603644601' 
+%  reaction_id='000_1' message_id='d84b705b-aea8-4f56-b739-117d977f25af' emoji_id='999'>
+% </query>
+% </iq>
+
+message_reaction(IQ, SubEl, From, _RequestType) -> 
+	#jid{luser = FUser, lserver = FServer, lresource = LResource} = From,
+  
+  Recipient   = fxml:get_path_s(SubEl, [{attr, <<"to_user">>}]),
+	Action      = fxml:get_path_s(SubEl, [{attr, <<"action">>}]),
+	ChatType    = fxml:get_path_s(SubEl, [{attr, <<"type">>}]),
+	MessageId   = fxml:get_path_s(SubEl, [{attr, <<"message_id">>}]),
+	EmojiId     = fxml:get_path_s(SubEl, [{attr, <<"emoji_id">>}]),
+  Opts        = ejabberd_config:codec_options(),
+  ToJid       = jid:from_string(Recipient),
+  #jid{luser  = TUser} = ToJid,
+  StanzaId    = list_to_binary(fly_mod_utils:generate_uuid_v4()),
+  MsgSender   = if ChatType =:= <<"normal">> -> fly_mod_utils:get_msg_from(FServer, MessageId); true -> TUser end,
+
+  {Timestamp, ReactionId} = fly_mod_utils:set_msg_reaction(FServer, FUser, MsgSender, MessageId, Action, EmojiId, ChatType, StanzaId),
+     
+	case ChatType of
+		<<"chat">> -> 
+        ReactionElChat = #xmlel{name = <<"reaction">>,
+                      attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"action">>, Action}, {<<"type">>, ChatType}, {<<"from_user">>, jid:to_string(From)}, {<<"emoji_id">>, EmojiId}, {<<"message_id">>, MessageId}, {<<"timestamp">>, Timestamp}],
+                      children = []},
+      ChatPkt = #message{from = jid:make(FUser, FServer), to = ToJid, type = binary_to_atom(ChatType), id = StanzaId, sub_els = [ReactionElChat]},
+      user_send_reaction_carboncall(ChatPkt, From, ToJid),
+      ejabberd_router:route(ChatPkt),
+      
+      case fly_mod_utils:get_mobile_user_message(TUser, FServer) of
+        true ->
+          fly_mod_offline_push:send_offline_message({ToJid, xmpp:decode(ChatPkt, ?NS_CLIENT, Opts)}),
+          if Action == <<"update">>; Action == <<"remove">> ->  
+              fly_mod_utils:update_push_sent(FServer, FUser, MsgSender, MessageId);
+              true -> 
+                ok
+          end;
+        false ->
+          ok
+      end,
+
+      fly_mod_utils:update_reaction_status_chat(FServer, FUser, TUser, MessageId, ReactionId, Action);
+		<<"normal">> -> 
+			MixChannel = mod_mix_sql:get_participants(FServer, TUser, fly_mod_utils:get_mix_channel_service(FServer, TUser)),
+			case MixChannel of 
+				{ok, Mix} ->
+          
+					lists:foreach(fun(P) ->
+								      case P of
+									      {Participant, _, _} -> 
+                          #jid{luser = LUser, lserver = LServer} = Participant,
+                          ReactionElGrp = #xmlel{name = <<"reaction">>,
+                                        attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"action">>, Action}, {<<"type">>, ChatType}, {<<"from_user">>, jid:to_string(From)}, {<<"emoji_id">>, EmojiId}, {<<"message_id">>, MessageId}, {<<"timestamp">>, Timestamp}, {<<"message_sender">>, MsgSender}],
+                                        children = []},
+                          GrpPkt = #message{from = jid:from_string(Recipient), to = jid:make(LUser, LServer), type = binary_to_atom(ChatType), id = StanzaId, sub_els = [ReactionElGrp]},
+                          fly_mix_group_chat:carboncall_message(LUser, LServer, GrpPkt, jid:from_string(Recipient)),
+                          ejabberd_router:route(GrpPkt),
+
+                          if LUser =:= MsgSender -> 
+                              case fly_mod_utils:get_mobile_user_message(LUser, LServer) of
+                                true ->
+                                  MsgSenderJid = jid:make(MsgSender, FServer, <<>>),
+                                  PushPkt = #message{from = jid:from_string(Recipient), to = MsgSenderJid, type = binary_to_atom(ChatType), id = StanzaId, sub_els = [ReactionElGrp]},
+                                  fly_mod_offline_push:send_offline_message({MsgSenderJid, xmpp:decode(PushPkt,?NS_CLIENT, Opts)});
+                                false ->
+                                  ok
+                              end;
+                            true -> 
+                              ok
+                            end;
+
+									      _ -> 
+                          ?LOG_INFO("Invalid Participant in Message Reaction from ~p", [From]),
+                          ?LOG_INFO("Participant detail ~p", [P]),
+										      ok
+								      end
+						      end, 
+                Mix),
+
+                  fly_mod_utils:update_reaction_status_normal(FServer, FUser, TUser, MessageId, ReactionId, Action, MsgSender);
+				_ -> ok
+			end;
+		_ -> 
+      ?LOG_INFO("Invalid Chat Type in Message Reaction from ~p", [From]),
+      ok
+	end,
+
+  AckPkt = #xmlel{name = <<"acknowledge">>,
+      attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"message_id">>, MessageId}, {<<"sent_to">>, Recipient}, {<<"emoji_id">>, EmojiId}, {<<"action">>, Action}],
+      children = []},
+  ejabberd_router:route(#message{from = From, to = From, type = binary_to_atom(ChatType), sub_els = [AckPkt]}),
+
+	fly_mod_utils:generate_subel(IQ, #user_activities{type = _RequestType, result_type = <<"Message reacted successfully">>}).
+
+  user_send_reaction_carboncall(Packet, #jid{luser = FUser, lserver = FServer, lresource = LResource} = From, To) ->
+  Resources = ejabberd_sm:get_user_resources(FUser, FServer),
+  if length(Resources) =:= 0 ->
+    {U, S, R} = jid:tolower(From),
+    Sender = jid:make({U, S, R}),
+    Dest = jid:make({U, S, <<>>}),
+    NewPacket = build_forward_packet(xmpp:decode(Packet), Sender, Dest, sent),
+    mod_offline:store_packet({To,NewPacket});
+  true ->
+    lists:foldl(fun(SResource,_Acc) ->
+      {U, S, RS} = jid:tolower(From),
+      Dest = jid:make({U, S, SResource}),
+      if 
+        Dest =:= From ->
+          ?LOG_INFO("Skipping sending reaction carboncall to the same resource ~p", [Dest]),
+        ok;
+      true ->
+        Sender = jid:make({U, S, <<>>}),
+        New = build_forward_packet(xmpp:decode(Packet), Sender, Dest, sent),
+        ejabberd_router:route(xmpp:set_from_to(New, Sender, Dest))
+      end
+      end,[],Resources)
+  end.
+
+get_recent_chat(From, _RequestType, SubEl, IQ) ->
+    #jid{luser = FUser, lserver = FServer} = From,
+
+    To = fxml:get_path_s(SubEl, [{attr, <<"to_user">>}]),
+    ChatType = fxml:get_path_s(SubEl, [{attr, <<"chat_type">>}]),
+    #jid{luser = TUser} = jid:from_string(To),
+
+    EscFUser = ejabberd_sql:escape(FUser),
+    EscTUser = ejabberd_sql:escape(TUser),
+
+    Result = fly_mod_utils:get_recent_chat_details(FServer, EscFUser, EscTUser, ChatType),
+    ?LOG_INFO("Recent chat result: ~p", [Result]),
+
+    case Result of
+        {selected, _, []} -> 
+            fly_mod_utils:generate_subel(IQ, #user_activities{type = _RequestType, result_type = <<"No recent chat for you">>});
+        {selected, _, [Row]} ->
+            [
+                Msg, FromUser, ToUser, SeenReceipt,
+                MessageId, ChatType, MessageType,
+                MessageTime, CreatedAt, Status,
+                RecallStatus, DeletedBy, DeletedStatus,
+                MsgNotification, FromNotification, ToNotification,
+                ReactionTo, ReactionFrom, EmojiId
+            ] = Row,
+
+            SafeReactionTo   = null_to_empty(ReactionTo),
+            SafeReactionFrom = null_to_empty(ReactionFrom),
+            SafeEmojiId      = null_to_empty(EmojiId),
+
+            ReactionEl =
+                case SafeEmojiId of
+                    <<>> -> [];
+                    _ ->
+                        [#xmlel{name = <<"reaction">>, attrs = [{<<"reaction_to">>, SafeReactionTo}, {<<"reaction_from">>, SafeReactionFrom}, {<<"emoji_id">>, SafeEmojiId}]}]
+                end,
+
+            MessageEl =
+                #xmlel{
+                    name = <<"recent_chat">>,
+                    attrs = [
+                        {<<"message_id">>, MessageId},
+                        {<<"from_user">>, FromUser},
+                        {<<"to_user">>, ToUser},
+                        {<<"chat_type">>, ChatType},
+                        {<<"message_type">>, MessageType},
+                        {<<"message_time">>, MessageTime},
+                        {<<"created_at">>, CreatedAt},
+                        {<<"status">>, Status},
+                        {<<"seen_receipt">>, SeenReceipt},
+                        {<<"recall_status">>, RecallStatus},
+                        {<<"deleted_by">>, DeletedBy},
+                        {<<"deleted_status">>, DeletedStatus},
+                        {<<"message_notification">>, MsgNotification},
+                        {<<"from_notification">>, FromNotification},
+                        {<<"to_notification">>, ToNotification}
+                    ],
+                    children = [#xmlel{name = <<"body">>, children = [{xmlcdata, Msg}]}] ++ ReactionEl
+                },
+
+            fly_mod_utils:generate_subel(IQ, #user_activities{type = _RequestType, sub_els = [MessageEl]});
+
+        Error ->
+            ?LOG_ERROR("Unexpected recent chat result: ~p", [Error]),
+            fly_mod_utils:generate_subel(IQ, #user_activities{type = _RequestType, result_type = <<"Internal server error">>})
+    end.
+
+null_to_empty(null) -> <<>>;
+null_to_empty(undefined) -> <<>>;
+null_to_empty(Value) -> Value.
 
 get_string() ->
   R = crypto:rand_uniform(0, 16#100000000000000000000000000000000),

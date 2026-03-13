@@ -427,6 +427,18 @@ del_roster(LUser, LServer, LJID) ->
 	      del_roster_t(LUser, LServer, LJID)
       end).
 
+
+to_binary(Value) when is_binary(Value) ->
+    Value;
+to_binary(Value) when is_integer(Value) ->
+    integer_to_binary(Value);
+to_binary(Value) when is_list(Value) ->
+    list_to_binary(Value);
+to_binary(Value) when is_atom(Value) ->
+    atom_to_binary(Value, utf8);
+to_binary(_) ->
+    <<"">>.
+
 -spec encode_item(#roster{}) -> roster_item().
 encode_item(Item) ->
 	VCard = [#roster_vcard{roster_nickname=[#roster_nickname{roster_nickname = Item#roster.name}],
@@ -436,6 +448,7 @@ encode_item(Item) ->
 	roster_thumbimage = [#roster_thumbimage{roster_thumbimage=Item#roster.thumbimage}],
 	roster_status = [#roster_status{roster_status=Item#roster.status}],
 	roster_is_admin_blocked = [#roster_is_admin_blocked{roster_is_admin_blocked=Item#roster.is_admin_blocked}],
+	roster_msg_disappear = [#roster_msg_disappear{msgDisappear=to_binary(Item#roster.msg_disappear)}],
 	roster_email= [#roster_email{roster_email=Item#roster.email}]}],
     #roster_item{jid = jid:make(Item#roster.jid),
 		 name = Item#roster.name,

@@ -738,7 +738,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
                 end,
                 case Content of
                     [MessageType, MessageId, MessageSend, _GroupName,
-                     MsgData, EditMsgId0, MentionList, MetaData] ->
+                     MsgData, EditMsgId0, MentionList, DisappearAt, MetaData] ->
                         % timestamp
                         FlatTimeStampNew =
                             case xmpp:get_subtag(Pkt, #timestampmsg{}) of
@@ -802,9 +802,9 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
 
                         ejabberd_sql:sql_query(LServer,
                           [<<"INSERT INTO chat_message_edit_history ",
-                             "(from_user,to_user,message_id,edit_message_id,chat_type,msg,meta_data) VALUES ('">>,
+                             "(from_user,to_user,message_id,edit_message_id,chat_type,msg,meta_data, disappear_at) VALUES ('">>,
                             SUser, <<"','">>, FromUser, <<"','">>, MessageId, <<"','">>, EditMsgId,
-                            <<"','normal','">>, MsgData, <<"','">>, MetaData, <<"');">>]);
+                            <<"','normal','">>, MsgData, <<"','">>, MetaData, <<"','">>, DisappearAt, <<"');">>]);
                     _ -> ok
                 end,
             send_in_batches(Subscribers, BatchSize,
@@ -902,16 +902,17 @@ get_message_content(Stanza, Pkt) ->
 													if ContentAcknowledge == false ->
 													MetaData = <<"">>,
 													MentionList = <<"">>,
+													DisappearAt = <<"">>,
 													EditMsgid = Id;
 													true ->
-													{_,_,_,_,_,_, MetaData,EditMsgid,MentionList,_} = ContentAcknowledge
+													{_,_,_,_,_,_, MetaData,EditMsgid,MentionList,DisappearAt,_} = ContentAcknowledge
 												        end,
 													if  MetaData =:= <<"">> ->
 														Metadata = <<"{}">>;
 													    true ->
 														Metadata = MetaData
 													    end,
-												[Type, Id, SentFrom, GroupName, MSG, EditMsgid, MentionList,Metadata]
+												[Type, Id, SentFrom, GroupName, MSG, EditMsgid, MentionList, DisappearAt ,Metadata]
 											end
 
 										end
