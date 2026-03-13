@@ -879,10 +879,10 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   true ->
     MResource = <<"">>
   end,
-  % Seq = fly_mod_utils:get_spool_seq(FServer, FUser, MsgId, MResource),
-  % Result = fly_mod_utils:batch_remove_spool(FServer, FUser, Seq, MResource),
+  Seq = fly_mod_utils:get_spool_seq(FServer, FUser, MsgId, MResource),
+  Result = fly_mod_utils:batch_remove_spool(FServer, FUser, Seq, MResource),
   % Result = fly_mod_utils:remove_poll_offline(FServer, MResource,MsgId),
-  % ?LOG_INFO("spool delete status: ~p for msg_id: ~p", [Result, MsgId]),
+  ?LOG_INFO("spool delete status: ~p for msg_id: ~p", [Result, MsgId]),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Ack successfully">>}).
 
 read_all(From,RequestType,SubEl,IQ) ->
@@ -2648,7 +2648,15 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
                         State = #{jid => JID},
                         MsgWithMeta = Msg#message{meta = MetaMap},
                          case TypeBin of
-                            <<"chat">> -> ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
+                            <<"chat">> -> 
+                                % case fly_mod_utils:get_mobile_user_message(ToJID#jid.luser, ToJID#jid.lserver) of
+                                %   true ->
+                                %      mod_offline:store_packet({ToJID, MsgWithMeta});
+                                %   false ->
+                                %     ok
+                                %  end, 
+                               fly_mod_offline_push:send_own_offline_message(ToJID, FromJID, MsgWithMeta),
+                               ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
                             _ -> ok
                            end,
                         ejabberd_router:route(MsgWithMeta),
@@ -2696,8 +2704,8 @@ process_bulk_chunks(From, TeamId, MessageFrom, MessageType, ChunkSize, Offset, I
             end;
         {selected, _, Rosters} ->
             lists:foreach(fun ([UserId, MessageIdFromDb, MessageContent]) ->
-                 ?INFO_MSG("send_bulk_message: ~p =>>>>>>>>>>> ~p ", [MessageFrom, UserId]),
-                send_message(ChatType, MessageFrom, UserId, MessageType, MessageContent, MessageIdFromDb, #{ from_broadcast => true })
+                 ?INFO_MSG("send_bulk_message: ~p =>>>>>>>>>>> ~p ", [MessageFrom, MessageTo]),
+                 send_message(ChatType, MessageFrom, UserId, MessageType, MessageContent, MessageIdFromDb, #{ from_broadcast => true })
             end, Rosters),
              case length(Rosters) of
                 ChunkSize ->
