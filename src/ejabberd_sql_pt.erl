@@ -711,14 +711,14 @@ make_sql_upsert_select(Table, ParseRes) ->
     Where = join_states(Where0, " AND "),
     State =
     concat_states(
-        [#state{'query' = [{str, "SELECT "}],
+        [#state{'query' = [{str, "SELECT IFNULL("}],
                 res_vars = [erl_syntax:variable("__VSel")],
                 res = [erl_syntax:application(
                     erl_syntax:atom(ejabberd_sql),
                     erl_syntax:atom(to_bool),
                     [erl_syntax:variable("__VSel")])]},
          Fields,
-         #state{'query' = [{str, " FROM "}, {str, Table}, {str, " WHERE "}]},
+         #state{'query' = [{str, ", 0) FROM "}, {str, Table}, {str, " WHERE "}]},
          Where
         ]),
     State.

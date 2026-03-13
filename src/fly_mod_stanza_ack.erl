@@ -42,7 +42,7 @@
 %% ====================================================================
 -export([start_link/0]).
 -export([start/2, stop/1,depends/2, mod_options/1]).
--export([on_user_send_packet/1, send_ack_response/4, store_in_table/12, should_acknowledge_on_send/1, should_acknowledge_on_receive/1, should_acknowledge_on_receipts/1]).
+-export([on_user_send_packet/1, send_ack_response/5, send_ack_response/4, store_in_table/12, should_acknowledge_on_send/1, should_acknowledge_on_receive/1, should_acknowledge_on_receipts/1]).
 %% gen_server callbacks.
 -export([init/1,
   handle_call/3,
@@ -151,9 +151,10 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             Topicid = <<"">>,
             MetaData = <<"">>,
             MentionList = <<"">>,
+            DisappearAt = <<"">>,
             EditMsgid = MessageId;
             true ->
-              {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,MentionList, _} = ContentAcknowledge
+              {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,MentionList, DisappearAt , _} = ContentAcknowledge
           end,
           case catch fly_mod_utils:check_blockeduser(FServer, FUser, TUser) of
             {selected, _, []} ->
@@ -168,7 +169,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           SType = erlang:atom_to_binary(ChatType, utf8),
           BarePeer = TUser,
           MsgContent = xmpp:get_text(Packet#message.body),
-          send_ack_response(From, To, IdValue, <<"acknowledge">>),
+          send_ack_response(From, To, IdValue, <<"acknowledge">>, DisappearAt),
           NewPacket = xmpp:set_from_to(Packet,From, To),
           GetTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
           if GetTimestamp =:= false ->
@@ -208,7 +209,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             Metadata = MetaData
         end,
 
-        fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid);
+        fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid,DisappearAt);
         S when (S == false) ->
           BlockUser = <<"0">>,
           ok
@@ -305,7 +306,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
       if ReceiptsElementAcknowledge == false ->
         ok;
         true ->
-          {_,ReceiptId,_BroadcastId,_SendTo,_MessageType} = ReceiptsElementAcknowledge,
+          #acknowledge{id = ReceiptId} = ReceiptsElementAcknowledge,
 
           fly_mod_utils:remove_offline(FServer, ReceiptId, MResource)
       end;
@@ -314,7 +315,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
       if ReceiptsElementAcknowledge == false ->
         ok;
         true ->
-          {_,ReceiptId,_BroadcastId,_SendTo,_MessageType} = ReceiptsElementAcknowledge,
+          #acknowledge{id = ReceiptId} = ReceiptsElementAcknowledge,
 
           fly_mod_utils:remove_offline(FServer, ReceiptId, MResource)
       end;
@@ -323,7 +324,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
       if ReceiptsElementAcknowledge == false ->
         ok;
         true ->
-          {_,ReceiptId,_BroadcastId,_SendTo,_MessageType} = ReceiptsElementAcknowledge,
+          #acknowledge{id = ReceiptId} = ReceiptsElementAcknowledge,
 
           fly_mod_utils:remove_offline(FServer, ReceiptId, MResource)
 
@@ -432,7 +433,7 @@ should_acknowledge_on_receipts(Packet) ->
   if ElementAcknowledge == false ->
     ok;
     true ->
-      {_,_,Type,_,_} = ElementAcknowledge,
+      #acknowledge{type = Type} = ElementAcknowledge,
       if Type == <<"delivered">> ->
         received_receipt;
         Type == <<"seen">> ->
@@ -449,10 +450,20 @@ now_to_microseconds({Mega, Sec, Micro}) ->
   (Mega * 1000000 + Sec) * 1000000 + Micro.
 
 send_ack_response(From, To, ReceiptId, Type) ->
+  send_ack_response(From, To, ReceiptId, Type, <<"">>).
+
+send_ack_response(From, To, ReceiptId, Type, DisappearAt) ->
   #jid{user = _FUser, lserver = ServerHost} = From,
   SentTo = jid:to_string(To),
+  Attrs = case DisappearAt of
+            <<>> ->
+              [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"id">>, ReceiptId}, {<<"sent_to">>, SentTo}, {<<"type">>, Type}];
+            _ ->
+              [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"id">>, ReceiptId}, {<<"sent_to">>, SentTo}, {<<"type">>, Type}, {<<"disappear_at">>, DisappearAt}]
+          end,
+
   XmlBody = #xmlel{name = <<"acknowledge">>,
-      attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"id">>, ReceiptId}, {<<"sent_to">>, SentTo}, {<<"type">>, Type}],
+      attrs = Attrs,
       children = []},
   Proc = gen_mod:get_module_proc(ServerHost, ?MODULE),
   Msg = #message{from = To, to = From, type = chat, sub_els = [XmlBody]},

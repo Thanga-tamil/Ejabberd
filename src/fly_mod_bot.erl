@@ -358,7 +358,7 @@ create_msg(From, To, ReasonMsg, ReplyId,Packet)->
             MetaData = <<"">>,
             EditMsgid = ReplyId;
             true ->
-              {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,_} = ContentAcknowledge
+              {chatcontent,_,_,_, MessageType,Topicid, MetaData, EditMsgid,_,_,_} = ContentAcknowledge
           end,
           GetTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
           if GetTimestamp =:= false ->
@@ -429,7 +429,7 @@ ReceivedTimestamps = now_to_microseconds(erlang:now()),
 ReceivedFlatTimeStamps = lists:flatten(io_lib:format("~p", [ReceivedTimestamps])),
 ReceivedMsgTags = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(ReceivedFlatTimeStamps)}], children = []},
 fly_mod_stanza_ack:store_in_table(FServer,TUser,FUser,MsgId,BodyString,<<"chat">>,<<"irrelevant">>,<<"">>,  <<"{}">> ,<<"0">>,MsgId, ReceivedFlatTimeStamps),
-fly_mod_utils:insert_status(To, From, MsgId,<<"irrelevant">>,<<"">>, <<"{}">>, <<"chat">>,<<"">>,<<"0">>,BodyString,ReceivedFlatTimeStamps,MsgId),
+fly_mod_utils:insert_status(To, From, MsgId,<<"irrelevant">>,<<"">>, <<"{}">>, <<"chat">>,<<"">>,<<"0">>,BodyString,ReceivedFlatTimeStamps,MsgId, <<"">>),
 fly_mod_utils:delete_message(To, MsgId),
 MsgBody2 = fxml:append_subtags(MsgBody3, [ReceivedMsgTags]).
 

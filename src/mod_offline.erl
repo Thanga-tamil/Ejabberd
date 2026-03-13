@@ -805,14 +805,15 @@ route_total_count(#{jid := U} = State, Msgs) ->
 route_in_batches(_State, [], _BatchSize) ->
     ok;
 
-route_in_batches(State, Msgs, BatchSize) ->
+route_in_batches(#{jid := #jid{luser = LUser, lserver = LServer, lresource = LResource}} = State, Msgs, BatchSize) ->
 
+    ReactionMsgIds = fly_mod_utils:get_reacted_msg_ids(LServer, LUser),
 
     case length(Msgs) =< BatchSize of
         true ->
             lists:foreach(
                 fun(OffMsg) ->
-                    route_offline_message(State, OffMsg)
+                    route_offline_message(State, OffMsg, ReactionMsgIds)
                 end,
                 Msgs
             );
@@ -820,7 +821,7 @@ route_in_batches(State, Msgs, BatchSize) ->
             {Batch, Rest} = lists:split(BatchSize, Msgs),
             lists:foreach(
                 fun(OffMsg) ->
-                    route_offline_message(State, OffMsg)
+                    route_offline_message(State, OffMsg, ReactionMsgIds)
                 end,
                 Batch
             ),
@@ -832,25 +833,34 @@ now_to_microseconds({Mega, Sec, Micro}) ->
   (Mega * 1000000 + Sec) * 1000000 + Micro.
 
 route_offline_message(#{jid := #jid{luser = LUser, lserver = LServer, lresource = LResource}} = State,
-		      #offline_msg{expire = Expire} = OffMsg) ->
+		      #offline_msg{expire = Expire} = OffMsg, ReactionMsgIds) ->
+    ReactionIds = 
     case offline_msg_to_route(LServer, OffMsg) of
 	error ->
-	    ok;
+	    [];
 	{route, Msg} ->
 		Id = xmpp:get_id(Msg),
 	    case is_message_expired(Expire, Msg) of
 		true ->
-		    ok;
+		    [];
 		false ->
 		    case privacy_check_packet(State, Msg, in) of
 			allow ->
 				NewMsg = xmpp:set_to(Msg, #jid{luser = LUser, lserver = LServer, lresource = LResource}),
-				?LOG_INFO("Routing offline message id ~p to ~p", [Id, LResource]),
-				ejabberd_router:route(NewMsg);
+				ejabberd_router:route(NewMsg),
+
+				MatchedReactionIds = case lists:member(Id, ReactionMsgIds) of true  -> [Id]; false -> [] end,
+				MatchedReactionIds;
 			deny ->
-				ok
+				[]
 		    end
 	    end
+    end,
+    case ReactionIds of
+	[] ->
+	    ok;
+	_ ->
+	    fly_mod_utils:update_msg_reaction_sent(LServer, fly_mod_media:sql_in(ReactionIds), LUser)
     end.
 
 -spec is_message_expired(erlang:timestamp() | never, message()) -> boolean().
