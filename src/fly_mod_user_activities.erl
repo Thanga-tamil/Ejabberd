@@ -2646,17 +2646,12 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
                 case xmpp:decode(EncodedXML, ?NS_CLIENT, CodecOpts) of
                     #message{from = JID} = Msg ->
                         State = #{jid => JID},
-                        MsgWithMeta = Msg#message{meta = MetaMap},
+                        MsgWithMeta = Msg#message{from = ToJID, meta = MetaMap},
                          case TypeBin of
                             <<"chat">> -> 
-                                % case fly_mod_utils:get_mobile_user_message(ToJID#jid.luser, ToJID#jid.lserver) of
-                                %   true ->
-                                %      mod_offline:store_packet({ToJID, MsgWithMeta});
-                                %   false ->
-                                %     ok
-                                %  end, 
-                                
-                               fly_mod_offline_push:send_own_offline_message(ToJID, FromJID, EncodedXML),
+                               UpdatedLocal = Msg#message{from = ToJID, meta = MetaMap}, 
+                               mod_offline:store_packet({ToJID, UpdatedLocal}),
+                              %  fly_mod_offline_push:send_own_offline_message(ToJID, FromJID, EncodedXML),
                                ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
                             _ -> ok
                            end,
