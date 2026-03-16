@@ -1291,8 +1291,9 @@ remove_offline(Server,  MessageId) ->
   %   Server,
   %   [<<"DELETE from spool where message_id='">>,MessageId,<<"';">>]).
 
-remove_offline(Server, MessageId, LResource) -> ok.
+remove_offline(Server, MessageId, LResource) -> 
   ?INFO_MSG("remove_offline =>>>>>>>>>>. 3: ~p ", [MessageId]),
+ ok.
   % ejabberd_sql:sql_query(
   %   Server,
   %   [<<"DELETE from spool where message_id='">>,MessageId,<<"' and (device_id = '">>,LResource,<<"' or device_id = '') ;">>]).
