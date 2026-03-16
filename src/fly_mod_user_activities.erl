@@ -2649,7 +2649,7 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
                               % %  SyncFromJID = jid:from_string(ToBin),
                               %  UpdatedLocal = Msg#message{from = SyncJID, to = SyncJID, meta = MetaMap}, 
                               %  mod_offline:store_packet({SyncJID, UpdatedLocal}),
-                               mod_offline:store_sender_sync_msg(JID, Msg#message.to, MsgWithMeta),
+                               mod_offline:store_sender_sync_msg(JID, Msg#message.from, MsgWithMeta),
                                ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
                             _ -> ok
                            end,
@@ -2723,19 +2723,15 @@ check_and_send_user_bulk_messages(From) ->
 
 process_user_bulk_messages_batch(From, BatchSize) ->
     #jid{luser = LUser, lserver = LServer} = From,
-    ?INFO_MSG("process_user_bulk_messages_batch LUser ~p ", [LUser]),
     case catch fly_mod_utils:get_pending_bulk_messages_for_user(LServer, LUser, BatchSize) of
         {selected, _, Rows} ->
              lists:foreach(fun([MessageFrom, MessageType, ChatType, MessageId, MessageContent, GroupId]) ->
-                 ?INFO_MSG("process_user_bulk_messages_batch Inner ~p ~p ~p ~p ~p ~p ~p", [LUser, MessageFrom, MessageType, ChatType, MessageId, MessageContent, GroupId]),  
                    ToUser = case ChatType of
                       <<"chat">> -> <<LUser/binary, "@", LServer/binary>>;
                       <<"normal">> -> GroupId;
                       _ -> undefined
                   end,
-                   ?INFO_MSG("process_user_bulk_messages_batch before sending message ~p", [ToUser]),
-                  send_message(ChatType, MessageFrom, ToUser, MessageType, MessageContent, MessageId, #{ from_broadcast => true }),
-                   ?INFO_MSG("process_user_bulk_messages_batch before sending after ~p", [ToUser])
+                  send_message(ChatType, MessageFrom, ToUser, MessageType, MessageContent, MessageId, #{ from_broadcast => true })
              end, Rows),
              MessageIds = [MsgId || [_, _, _, MsgId, _, _] <- Rows],
              fly_mod_utils:delete_bulk_messages(LServer, MessageIds, LUser),
@@ -2747,8 +2743,6 @@ process_user_bulk_messages_batch(From, BatchSize) ->
         _ ->
             ok
     end.
-
-
 
 notify_disappear_message(From, RequestType, SubEl, IQ) ->
   MessageId = fxml:get_path_s(SubEl, [{attr, <<"message_id">>}]),
