@@ -63,7 +63,8 @@
 	 webadmin_user/4,
 	 webadmin_user_parse_query/5,
 	 route_offline_messages/1,
-	 c2s_handle_bind2_inline/1]).
+	 c2s_handle_bind2_inline/1,
+	 store_sender_sync_msg/3]).
 
 -export([mod_opt_type/1, mod_options/1, mod_doc/0, depends/2]).
 
@@ -186,6 +187,18 @@ flush_cache(Mod, User, Server) ->
 	false ->
 	    ok
     end.
+
+-spec store_sender_sync_msg(jid(), jid(), message()) -> ok | {error, full | any()}.
+store_sender_sync_msg(From, To, Packet) ->
+    TimeStamp = erlang:timestamp(),
+    Expire = find_x_expire(TimeStamp, Packet),
+    OffMsg = #offline_msg{us = {From#jid.luser, From#jid.lserver},
+                         timestamp = TimeStamp,
+                         expire = Expire,
+                         from = From,
+                         to = To,
+                         packet = Packet},
+    store_offline_msg(OffMsg).
 
 -spec store_offline_msg(#offline_msg{}) -> ok | {error, full | any()}.
 store_offline_msg(#offline_msg{us = {User, Server}, packet = Pkt} = Msg) ->

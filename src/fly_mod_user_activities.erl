@@ -23,7 +23,6 @@
 
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
--include("mod_offline.hrl").
 
 -type host() :: string().
 -type name() :: string().
@@ -870,7 +869,7 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Privacy settings updated successfully">>}).
   
-acknowledge(From,RequestType,SubEl,IQ) ->
+  acknowledge(From,RequestType,SubEl,IQ) ->
     
   #jid{user = FUser, lserver = FServer,lresource = LResource} = From,
   MsgId = fxml:get_path_s(SubEl, [{attr, <<"id">>}]),
@@ -880,10 +879,10 @@ acknowledge(From,RequestType,SubEl,IQ) ->
   true ->
     MResource = <<"">>
   end,
-  % Seq = fly_mod_utils:get_spool_seq(FServer, FUser, MsgId, MResource),
-  % Result = fly_mod_utils:batch_remove_spool(FServer, FUser, Seq, MResource),
+  Seq = fly_mod_utils:get_spool_seq(FServer, FUser, MsgId, MResource),
+  Result = fly_mod_utils:batch_remove_spool(FServer, FUser, Seq, MResource),
   % Result = fly_mod_utils:remove_poll_offline(FServer, MResource,MsgId),
-  % ?LOG_INFO("spool delete status: ~p for msg_id: ~p", [Result, MsgId]),
+  ?LOG_INFO("spool delete status: ~p for msg_id: ~p", [Result, MsgId]),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Ack successfully">>}).
 
 read_all(From,RequestType,SubEl,IQ) ->
@@ -2646,17 +2645,12 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
                         MsgWithMeta = Msg#message{meta = MetaMap},
                          case TypeBin of
                             <<"chat">> -> 
-                                ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []),
-                                %% NEW: Store copy for sender sync
-                                TimeStamp = erlang:timestamp(),
-                                OffMsg = #offline_msg{
-                                    us = {JID#jid.luser, JID#jid.lserver},
-                                    timestamp = TimeStamp,
-                                    from = JID,
-                                    to = Msg#message.to,
-                                    packet = MsgWithMeta
-                                },
-                                mod_offline:store_offline_msg(OffMsg);
+                              %  SyncJID = jid:from_string(FromBin),
+                              % %  SyncFromJID = jid:from_string(ToBin),
+                              %  UpdatedLocal = Msg#message{from = SyncJID, to = SyncJID, meta = MetaMap}, 
+                              %  mod_offline:store_packet({SyncJID, UpdatedLocal}),
+                               mod_offline:store_sender_sync_msg(JID, Msg#message.to, MsgWithMeta);
+                               ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
                             _ -> ok
                            end,
                         ejabberd_router:route(MsgWithMeta),
