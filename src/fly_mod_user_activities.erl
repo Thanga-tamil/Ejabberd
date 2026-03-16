@@ -2645,9 +2645,11 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
                         MsgWithMeta = Msg#message{meta = MetaMap},
                          case TypeBin of
                             <<"chat">> -> 
-                              UpdatedLocal = Msg#message{from = FromJID, to = FromJID, meta = MetaMap}, 
-                              mod_offline:store_packet({FromJID, UpdatedLocal}),
-                              ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
+                               SyncJID = jid:from_string(FromBin),
+                               SyncFromJID = jid:from_string(ToBin),
+                               UpdatedLocal = Msg#message{from = SyncFromJID, to = SyncJID, meta = MetaMap}, 
+                               mod_offline:store_packet({SyncJID, UpdatedLocal}),
+                               ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
                             _ -> ok
                            end,
                         ejabberd_router:route(MsgWithMeta),
