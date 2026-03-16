@@ -23,6 +23,7 @@
 
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
+-include("mod_offline.hrl").
 
 -type host() :: string().
 -type name() :: string().
@@ -2645,11 +2646,17 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
                         MsgWithMeta = Msg#message{meta = MetaMap},
                          case TypeBin of
                             <<"chat">> -> 
-                              %  SyncJID = jid:from_string(FromBin),
-                              %  SyncFromJID = jid:from_string(ToBin),
-                              %  UpdatedLocal = Msg#message{from = SyncJID, to = SyncJID, meta = MetaMap}, 
-                              %  mod_offline:store_packet({SyncJID, UpdatedLocal}),
-                               ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
+                                ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []),
+                                %% NEW: Store copy for sender sync
+                                TimeStamp = erlang:timestamp(),
+                                OffMsg = #offline_msg{
+                                    us = {JID#jid.luser, JID#jid.lserver},
+                                    timestamp = TimeStamp,
+                                    from = JID,
+                                    to = Msg#message.to,
+                                    packet = MsgWithMeta
+                                },
+                                mod_offline:store_offline_msg(OffMsg);
                             _ -> ok
                            end,
                         ejabberd_router:route(MsgWithMeta),
