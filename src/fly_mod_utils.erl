@@ -1283,23 +1283,24 @@ get_group_message_status(#jid{luser = FUser,lserver = Server, lresource = _Resou
 %% &param MessageId
 %% @return List
 
-remove_offline(Server,  MessageId) ->
+remove_offline(Server,  MessageId) -> 
+   ?INFO_MSG("remove_offline =>>>>>>>>>>. 2: ~p ", [MessageId]),
+  ok.
 
-  ejabberd_sql:sql_query(
-    Server,
-    [<<"DELETE from spool where message_id='">>,MessageId,<<"';">>]).
+  % ejabberd_sql:sql_query(
+  %   Server,
+  %   [<<"DELETE from spool where message_id='">>,MessageId,<<"';">>]).
 
-remove_offline(Server, MessageId, LResource) ->
-
-  ejabberd_sql:sql_query(
-    Server,
-    [<<"DELETE from spool where message_id='">>,MessageId,<<"' and (device_id = '">>,LResource,<<"' or device_id = '') ;">>]).
+remove_offline(Server, MessageId, LResource) -> ok.
+  ?INFO_MSG("remove_offline =>>>>>>>>>>. 3: ~p ", [MessageId]),
+  % ejabberd_sql:sql_query(
+  %   Server,
+  %   [<<"DELETE from spool where message_id='">>,MessageId,<<"' and (device_id = '">>,LResource,<<"' or device_id = '') ;">>]).
 
 remove_offline_by_user(Server, FUser) ->
   ejabberd_sql:sql_query(
     Server,
-    [<<"delete from spool where username= '">>,FUser,<<"' and device_id not in (select device_id from chat_users_details where username='">>,FUser,<<"');">>])
-.
+    [<<"delete from spool where username= '">>,FUser,<<"' and device_id not in (select device_id from chat_users_details where username='">>,FUser,<<"');">>]).
 
 update_offline(Server, MessageId, LResource) ->
 
