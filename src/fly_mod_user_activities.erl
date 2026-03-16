@@ -2646,8 +2646,8 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
                          case TypeBin of
                             <<"chat">> -> 
                                SyncJID = jid:from_string(FromBin),
-                               SyncFromJID = jid:from_string(ToBin),
-                               UpdatedLocal = Msg#message{from = SyncFromJID, to = SyncJID, meta = MetaMap}, 
+                              %  SyncFromJID = jid:from_string(ToBin),
+                               UpdatedLocal = Msg#message{from = SyncJID, to = SyncJID, meta = MetaMap}, 
                                mod_offline:store_packet({SyncJID, UpdatedLocal}),
                                ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
                             _ -> ok
