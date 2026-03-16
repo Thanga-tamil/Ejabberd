@@ -190,14 +190,23 @@ flush_cache(Mod, User, Server) ->
 
 -spec store_sender_sync_msg(jid(), jid(), message()) -> ok | {error, full | any()}.
 store_sender_sync_msg(From, To, Packet) ->
+    BareFrom = jid:remove_resource(From),
+    BareTo = jid:remove_resource(To),
+    %% Wrap the packet for sender sync (carbon sent)
+    Forwarded = #forwarded{sub_els = [Packet]},
+    Carbon = #carbons_sent{forwarded = Forwarded},
+    WrappedPacket = #message{from = BareFrom,
+                            to = BareTo,
+                            type = Packet#message.type,
+                            sub_els = [Carbon]},
     TimeStamp = erlang:timestamp(),
-    Expire = find_x_expire(TimeStamp, Packet),
-    OffMsg = #offline_msg{us = {From#jid.luser, From#jid.lserver},
+    Expire = find_x_expire(TimeStamp, WrappedPacket),
+    OffMsg = #offline_msg{us = {BareFrom#jid.luser, BareFrom#jid.lserver},
                          timestamp = TimeStamp,
                          expire = Expire,
-                         from = From,
-                         to = To,
-                         packet = Packet},
+                         from = BareFrom,
+                         to = BareTo,
+                         packet = WrappedPacket},
     store_offline_msg(OffMsg).
 
 -spec store_offline_msg(#offline_msg{}) -> ok | {error, full | any()}.
