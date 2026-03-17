@@ -191,18 +191,23 @@ flush_cache(Mod, User, Server) ->
 -spec store_sender_sync_msg(jid(), jid(), message()) -> ok | {error, full | any()}.
 store_sender_sync_msg(From, To, Packet) ->
     BareFrom = jid:remove_resource(From),
-    InnerId = xmpp:get_id(Packet),
+    LServer = BareFrom#jid.lserver,
+    InnerId = case xmpp:get_id(Packet) of
+                  <<>> -> fly_mod_utils:get_iq_message_id(16);
+                  Id -> Id
+              end,
     %% Wrap the packet for sender sync (carbon sent)
     Forwarded = #forwarded{sub_els = [Packet]},
     Carbon = #carbons_sent{forwarded = Forwarded},
-    WrappedPacket = #message{from = BareFrom,
-                            to = BareFrom,
-                            id = InnerId,
-                            type = Packet#message.type,
-                            sub_els = [Carbon]},
+    WrappedPacket0 = #message{from = BareFrom,
+                             to = BareFrom,
+                             id = InnerId,
+                             type = Packet#message.type,
+                             sub_els = [Carbon]},
     TimeStamp = erlang:timestamp(),
+    WrappedPacket = add_delay_info(WrappedPacket0, LServer, TimeStamp),
     Expire = find_x_expire(TimeStamp, WrappedPacket),
-    OffMsg = #offline_msg{us = {BareFrom#jid.luser, BareFrom#jid.lserver},
+    OffMsg = #offline_msg{us = {BareFrom#jid.luser, LServer},
                          timestamp = TimeStamp,
                          expire = Expire,
                          from = BareFrom,
@@ -1402,7 +1407,7 @@ add_delay_info(Packet, LServer, TS) ->
 	    end,
     Packet1 = xmpp:put_meta(Packet, from_offline, true),
     misc:add_delay_info(Packet1, jid:make(LServer), NewTS,
-			<<"Offline storage">>).
+			<<"Offline Storage">>).
 
 -spec get_priority_from_presence(presence()) -> integer().
 get_priority_from_presence(#presence{priority = Prio}) ->
