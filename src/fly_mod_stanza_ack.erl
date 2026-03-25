@@ -156,6 +156,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             true ->
               {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,MentionList, DisappearAt , _} = ContentAcknowledge
           end,
+           ?INFO_MSG("on_user_send_packet ~p",[EditMsgid]),
           case catch fly_mod_utils:check_blockeduser(FServer, FUser, TUser) of
             {selected, _, []} ->
               BlockUser = <<"0">>;
