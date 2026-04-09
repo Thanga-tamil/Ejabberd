@@ -64,149 +64,299 @@ sql_schemas() ->
                            #sql_index{
                               columns = [<<"created_at">>]}]}]}].
 
+
+
 store_message(#offline_msg{us = {LUser, LServer}} = M) ->
-	From = M#offline_msg.from,
-	To = M#offline_msg.to,
+    From     = M#offline_msg.from,
+    To       = M#offline_msg.to,
+    Packet   = xmpp:set_from_to(M#offline_msg.packet, From, To),
+    NewPacket = misc:add_delay_info(Packet, jid:make(LServer),
+                                    M#offline_msg.timestamp, <<"Offline Storage">>),
+    XML      = fxml:element_to_binary(xmpp:encode(NewPacket)),
+    ChatType = erlang:atom_to_binary(xmpp:get_type(M#offline_msg.packet), utf8),
 
-	ChatType = erlang:atom_to_binary(xmpp:get_type(M#offline_msg.packet), utf8),
-	Packet = xmpp:set_from_to(M#offline_msg.packet, From, To),
-	NewPacket = misc:add_delay_info(
-		Packet, jid:make(LServer),
-		M#offline_msg.timestamp,
-		<<"Offline Storage">>),
-	XML = fxml:element_to_binary(xmpp:encode(NewPacket)),
-if ChatType =:= <<"normal">> ->
-		Stanza = xmpp:encode(NewPacket),
-		#jid{user = TUser, lserver = _TServer, lresource = FResource} =  From,
-		Mid = xmpp:get_id(M#offline_msg.packet),
-		case fxml:get_subtag(Stanza, <<"mix">>) of
-			false -> MessageId = Mid;
-			Mix ->
-				case fxml:get_subtag(Stanza, <<"body">>) of
-					false -> MessageId = Mid;
-					_Body ->
-						case fxml:get_subtag(Mix, <<"submission-id">>) of
-							false -> MessageId = Mid;
-							SubmissionID ->
-								GroupMsgId = fxml:get_tag_cdata(SubmissionID),
-							MessageId = GroupMsgId
-						end
-				end
-		end;
-	true ->
-		#jid{user = _FUser, lserver = _FServer, lresource = FResource} =  From,
-	  case mod_carboncopy:is_carbon_copy(Packet) of
-			false ->
-				#jid{user = TUser, lserver = _TServer} =  To,
-				MessageId = xmpp:get_id(M#offline_msg.packet);
+    {MessageId, TUser, FResource} =
+        get_message_id_and_user(M#offline_msg.packet, NewPacket, From, To, ChatType),
 
-			true->
-				CarbonPacket =  misc:unwrap_carbon(xmpp:encode(NewPacket)),
-				case fxml:get_subtag(CarbonPacket, <<"sent">>) of
-					false ->
-						#jid{user = TUser, lserver = _TServer} =  To,
-						MessageId = <<"">>;
-					Sentpacket ->
-						case fxml:get_subtag(Sentpacket, <<"forwarded">>) of
-							false ->
-								#jid{user = TUser, lserver = _TServer} =  To,
-								MessageId = <<"">>;
-							Forwardedpacket->
-								case fxml:get_subtag(Forwardedpacket, <<"message">>) of
-									false ->
-										#jid{user = TUser, lserver = _TServer} =  To,
-										MessageId = <<"">>;
-									Messagepacket->
-										Mtype = fxml:get_attr_s(<<"type">>,Messagepacket#xmlel.attrs),
-												if Mtype =:=  <<"normal">> ->
-													case fxml:get_subtag(Messagepacket, <<"mix">>) of
-													false -> MessageId = fxml:get_attr_s(<<"id">>,Messagepacket#xmlel.attrs);
-													Mix ->
-
-													case fxml:get_subtag(Mix, <<"submission-id">>) of
-														false -> MessageId = fxml:get_attr_s(<<"id">>,Messagepacket#xmlel.attrs);
-														SubmissionID ->
-															MessageId = fxml:get_tag_cdata(SubmissionID)
-
-													end
-
-												end,
-												FromUser =  #jid{} = jid:from_string(fxml:get_attr_s(<<"from">>,Messagepacket#xmlel.attrs)),
-												#jid{user = TUser, lserver = _TServer} =  FromUser;
-												true ->
-												MessageId = fxml:get_attr_s(<<"id">>,Messagepacket#xmlel.attrs),
-												FromUser = #jid{} = jid:from_string(fxml:get_attr_s(<<"to">>,Messagepacket#xmlel.attrs)),
-												#jid{user = TUser, lserver = _TServer} =  FromUser
-												end
-
-								end
-					    end
-			    end
-
-			    end
+    do_insert_for_resources(LUser, LServer, FResource,
+                            MessageId, ChatType, TUser, XML).
 
 
-	 end,
-	Message = fxml:element_to_binary(
-		xmpp:encode(M#offline_msg.packet)),
-if FResource =:= <<"">> ->
-case catch fly_mod_utils:get_user_resources(LUser, LServer) of
-        {selected, _, []} ->
-        ok;
-        {selected, _, Result} ->
-			lists:map(fun(G) ->
-              [UResources] = G,
-				ejabberd_sql:sql_query(
-				LServer,
-				?SQL_INSERT(
-					"spool",
-					["username=%(LUser)s",
-						"server_host=%(LServer)s",
-						"message_id=%(MessageId)s",
-						"chat_type=%(ChatType)s",
-						"to_user=%(TUser)s",
-						"device_id=%(UResources)s",
-						% "message=%(Message)s",
-						"xml=%(XML)s"]))
+%% ------------------------------------------------------------------
+%% Resolve MessageId + TUser + FResource from various message types
+%% ------------------------------------------------------------------
 
-			  end, Result),
-			  ok;
-         _ ->
-        ok
- end;
-true ->
-	Substring = string:str(binary_to_list(FResource), "Mobile"),
-    if Substring =:= 1  ->
-	Resource = re:replace(binary_to_list(FResource),"Mobile-", ""),
-	UResource = iolist_to_binary(Resource);
-    true ->
-	UResource = FResource
-    end,
-	case catch fly_mod_utils:get_user_resource(LUser, LServer, UResource) of
-        {selected, _, []} ->
-        ok;
-        {selected, _, Result} ->
-			lists:map(fun(G) ->
-              [UResources] = G,
-				ejabberd_sql:sql_query(
-				LServer,
-				?SQL_INSERT(
-					"spool",
-					["username=%(LUser)s",
-						"server_host=%(LServer)s",
-						"message_id=%(MessageId)s",
-						"chat_type=%(ChatType)s",
-						"to_user=%(TUser)s",
-						"device_id=%(UResources)s",
-						% "message=%(Message)s",
-						"xml=%(XML)s"]))
+get_message_id_and_user(RawPacket, NewPacket, From, To, <<"normal">>) ->
+    #jid{user = TUser, lresource = FResource} = From,
+    Stanza   = xmpp:encode(NewPacket),
+    MessageId = extract_message_id_normal(Stanza, xmpp:get_id(RawPacket)),
+    {MessageId, TUser, FResource};
 
-			  end, Result),
-			  ok;
-         _ ->
-        ok
- end
-end.
+get_message_id_and_user(RawPacket, NewPacket, From, To, _ChatType) ->
+    #jid{lresource = FResource} = From,
+    case mod_carboncopy:is_carbon_copy(xmpp:set_from_to(RawPacket, From, To)) of
+        false ->
+            #jid{user = TUser} = To,
+            MessageId = xmpp:get_id(RawPacket),
+            {MessageId, TUser, FResource};
+        true ->
+            {MessageId, TUser} =
+                extract_carbon_message_id_and_user(xmpp:encode(NewPacket)),
+            {MessageId, TUser, FResource}
+    end.
+
+
+%% ------------------------------------------------------------------
+%% Extract MessageId for a normal (non-carbon) message, honouring MIX
+%% ------------------------------------------------------------------
+
+extract_message_id_normal(Stanza, DefaultId) ->
+    case fxml:get_subtag(Stanza, <<"mix">>) of
+        false -> DefaultId;
+        Mix   ->
+            case fxml:get_subtag(Stanza, <<"body">>) of
+                false -> DefaultId;
+                _Body -> extract_submission_id(Mix, DefaultId)
+            end
+    end.
+
+
+%% ------------------------------------------------------------------
+%% Extract MessageId + TUser from a carbon-copy wrapped message
+%% ------------------------------------------------------------------
+
+extract_carbon_message_id_and_user(EncodedPacket) ->
+    CarbonPacket = misc:unwrap_carbon(EncodedPacket),
+    case fxml:get_subtag(CarbonPacket, <<"sent">>) of
+        false -> {<<"">>, extract_user_from_to(CarbonPacket)};
+        Sent  ->
+            case fxml:get_subtag(Sent, <<"forwarded">>) of
+                false     -> {<<"">>, extract_user_from_to(CarbonPacket)};
+                Forwarded ->
+                    case fxml:get_subtag(Forwarded, <<"message">>) of
+                        false   -> {<<"">>, extract_user_from_to(CarbonPacket)};
+                        MsgEl   -> extract_from_forwarded_message(MsgEl)
+                    end
+            end
+    end.
+
+extract_from_forwarded_message(MsgEl) ->
+    Attrs = MsgEl#xmlel.attrs,
+    MsgId = fxml:get_attr_s(<<"id">>, Attrs),
+    case fxml:get_attr_s(<<"type">>, Attrs) of
+        <<"normal">> ->
+            FinalId = case fxml:get_subtag(MsgEl, <<"mix">>) of
+                false -> MsgId;
+                Mix   -> extract_submission_id(Mix, MsgId)
+            end,
+            FromUser = jid:from_string(fxml:get_attr_s(<<"from">>, Attrs)),
+            #jid{user = TUser} = FromUser,
+            {FinalId, TUser};
+        _ ->
+            ToUser = jid:from_string(fxml:get_attr_s(<<"to">>, Attrs)),
+            #jid{user = TUser} = ToUser,
+            {MsgId, TUser}
+    end.
+
+extract_user_from_to(Packet) ->
+    ToAttr = fxml:get_attr_s(<<"to">>, Packet#xmlel.attrs),
+    #jid{user = TUser} = jid:from_string(ToAttr),
+    TUser.
+
+extract_submission_id(Mix, DefaultId) ->
+    case fxml:get_subtag(Mix, <<"submission-id">>) of
+        false        -> DefaultId;
+        SubmissionID -> fxml:get_tag_cdata(SubmissionID)
+    end.
+
+
+%% ------------------------------------------------------------------
+%% Determine target resource(s) and fire SQL inserts
+%% ------------------------------------------------------------------
+
+do_insert_for_resources(LUser, LServer, <<>>,
+                        MessageId, ChatType, TUser, XML) ->
+    case catch fly_mod_utils:get_user_resources(LUser, LServer) of
+        {selected, _, [_|_] = Rows} ->
+            insert_spool(LUser, LServer, MessageId, ChatType, TUser, XML, Rows);
+        _ -> ok
+    end;
+
+do_insert_for_resources(LUser, LServer, FResource,
+                        MessageId, ChatType, TUser, XML) ->
+    UResource = strip_mobile_prefix(FResource),
+    case catch fly_mod_utils:get_user_resource(LUser, LServer, UResource) of
+        {selected, _, [_|_] = Rows} ->
+            insert_spool(LUser, LServer, MessageId, ChatType, TUser, XML, Rows);
+        _ -> ok
+    end.
+
+strip_mobile_prefix(Resource) ->
+    case binary:match(Resource, <<"Mobile-">>) of
+        {0, _} ->
+            binary:part(Resource, 7, byte_size(Resource) - 7);
+        _ ->
+            Resource
+    end.
+
+insert_spool(LUser, LServer, MessageId, ChatType, TUser, XML, Rows) ->
+    lists:foreach(fun([UResources]) ->
+        ejabberd_sql:sql_query(
+            LServer,
+            ?SQL_INSERT("spool",
+                ["username=%(LUser)s",
+                 "server_host=%(LServer)s",
+                 "message_id=%(MessageId)s",
+                 "chat_type=%(ChatType)s",
+                 "to_user=%(TUser)s",
+                 "device_id=%(UResources)s",
+                 "xml=%(XML)s"]))
+    end, Rows).
+
+
+% store_message(#offline_msg{us = {LUser, LServer}} = M) ->
+% 	From = M#offline_msg.from,
+% 	To = M#offline_msg.to,
+
+% 	ChatType = erlang:atom_to_binary(xmpp:get_type(M#offline_msg.packet), utf8),
+% 	Packet = xmpp:set_from_to(M#offline_msg.packet, From, To),
+% 	NewPacket = misc:add_delay_info(
+% 		Packet, jid:make(LServer),
+% 		M#offline_msg.timestamp,
+% 		<<"Offline Storage">>),
+% 	XML = fxml:element_to_binary(xmpp:encode(NewPacket)),
+% if ChatType =:= <<"normal">> ->
+% 		Stanza = xmpp:encode(NewPacket),
+% 		#jid{user = TUser, lserver = _TServer, lresource = FResource} =  From,
+% 		Mid = xmpp:get_id(M#offline_msg.packet),
+% 		case fxml:get_subtag(Stanza, <<"mix">>) of
+% 			false -> MessageId = Mid;
+% 			Mix ->
+% 				case fxml:get_subtag(Stanza, <<"body">>) of
+% 					false -> MessageId = Mid;
+% 					_Body ->
+% 						case fxml:get_subtag(Mix, <<"submission-id">>) of
+% 							false -> MessageId = Mid;
+% 							SubmissionID ->
+% 								GroupMsgId = fxml:get_tag_cdata(SubmissionID),
+% 							MessageId = GroupMsgId
+% 						end
+% 				end
+% 		end;
+% 	true ->
+% 		#jid{user = _FUser, lserver = _FServer, lresource = FResource} =  From,
+% 	  case mod_carboncopy:is_carbon_copy(Packet) of
+% 			false ->
+% 				#jid{user = TUser, lserver = _TServer} =  To,
+% 				MessageId = xmpp:get_id(M#offline_msg.packet);
+
+% 			true->
+% 				CarbonPacket =  misc:unwrap_carbon(xmpp:encode(NewPacket)),
+% 				case fxml:get_subtag(CarbonPacket, <<"sent">>) of
+% 					false ->
+% 						#jid{user = TUser, lserver = _TServer} =  To,
+% 						MessageId = <<"">>;
+% 					Sentpacket ->
+% 						case fxml:get_subtag(Sentpacket, <<"forwarded">>) of
+% 							false ->
+% 								#jid{user = TUser, lserver = _TServer} =  To,
+% 								MessageId = <<"">>;
+% 							Forwardedpacket->
+% 								case fxml:get_subtag(Forwardedpacket, <<"message">>) of
+% 									false ->
+% 										#jid{user = TUser, lserver = _TServer} =  To,
+% 										MessageId = <<"">>;
+% 									Messagepacket->
+% 										Mtype = fxml:get_attr_s(<<"type">>,Messagepacket#xmlel.attrs),
+% 												if Mtype =:=  <<"normal">> ->
+% 													case fxml:get_subtag(Messagepacket, <<"mix">>) of
+% 													false -> MessageId = fxml:get_attr_s(<<"id">>,Messagepacket#xmlel.attrs);
+% 													Mix ->
+
+% 													case fxml:get_subtag(Mix, <<"submission-id">>) of
+% 														false -> MessageId = fxml:get_attr_s(<<"id">>,Messagepacket#xmlel.attrs);
+% 														SubmissionID ->
+% 															MessageId = fxml:get_tag_cdata(SubmissionID)
+
+% 													end
+
+% 												end,
+% 												FromUser =  #jid{} = jid:from_string(fxml:get_attr_s(<<"from">>,Messagepacket#xmlel.attrs)),
+% 												#jid{user = TUser, lserver = _TServer} =  FromUser;
+% 												true ->
+% 												MessageId = fxml:get_attr_s(<<"id">>,Messagepacket#xmlel.attrs),
+% 												FromUser = #jid{} = jid:from_string(fxml:get_attr_s(<<"to">>,Messagepacket#xmlel.attrs)),
+% 												#jid{user = TUser, lserver = _TServer} =  FromUser
+% 												end
+
+% 								end
+% 					    end
+% 			    end
+
+% 			    end
+
+
+% 	 end,
+% 	Message = fxml:element_to_binary(
+% 		xmpp:encode(M#offline_msg.packet)),
+% if FResource =:= <<"">> ->
+% case catch fly_mod_utils:get_user_resources(LUser, LServer) of
+%         {selected, _, []} ->
+%         ok;
+%         {selected, _, Result} ->
+% 			lists:map(fun(G) ->
+%               [UResources] = G,
+% 				ejabberd_sql:sql_query(
+% 				LServer,
+% 				?SQL_INSERT(
+% 					"spool",
+% 					["username=%(LUser)s",
+% 						"server_host=%(LServer)s",
+% 						"message_id=%(MessageId)s",
+% 						"chat_type=%(ChatType)s",
+% 						"to_user=%(TUser)s",
+% 						"device_id=%(UResources)s",
+% 						% "message=%(Message)s",
+% 						"xml=%(XML)s"]))
+
+% 			  end, Result),
+% 			  ok;
+%          _ ->
+%         ok
+%  end;
+% true ->
+% 	Substring = string:str(binary_to_list(FResource), "Mobile"),
+%     if Substring =:= 1  ->
+% 	Resource = re:replace(binary_to_list(FResource),"Mobile-", ""),
+% 	UResource = iolist_to_binary(Resource);
+%     true ->
+% 	UResource = FResource
+%     end,
+% 	case catch fly_mod_utils:get_user_resource(LUser, LServer, UResource) of
+%         {selected, _, []} ->
+%         ok;
+%         {selected, _, Result} ->
+% 			lists:map(fun(G) ->
+%               [UResources] = G,
+% 				ejabberd_sql:sql_query(
+% 				LServer,
+% 				?SQL_INSERT(
+% 					"spool",
+% 					["username=%(LUser)s",
+% 						"server_host=%(LServer)s",
+% 						"message_id=%(MessageId)s",
+% 						"chat_type=%(ChatType)s",
+% 						"to_user=%(TUser)s",
+% 						"device_id=%(UResources)s",
+% 						% "message=%(Message)s",
+% 						"xml=%(XML)s"]))
+
+% 			  end, Result),
+% 			  ok;
+%          _ ->
+%         ok
+%  end
+% end.
 
 pop_messages(LUser, LServer,LResource) ->
 case get_and_del_spool_msg_t(LServer, LUser,LResource) of
