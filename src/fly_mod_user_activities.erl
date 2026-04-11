@@ -1357,16 +1357,6 @@ push_to_rosters_and_recent_admin_block(To, From,BlockStatus,ToUserJid) ->
       error
   end.
 
-% push_to_email_contacts(From, Packet) ->
-%   case catch fly_mod_utils:get_email_contacts(From) of
-%     {selected, _, []} ->
-%       ok;
-%     {selected, _, EmailContacts} ->
-%       push_all_packets(EmailContacts, Packet, From);
-%     _ ->
-%       error
-%   end.
-
 push_to_rosters_and_recent_user_deleted(From, Packet) ->
   case catch fly_mod_utils:get_roster_from_recent_jid(From) of
     {selected, _, []} ->
@@ -1418,32 +1408,10 @@ push_all_packets_with_offline_delete(Rosters,_Packet,From) ->
       attrs = [{<<"xmlns">>, ?NS_USER_ACTIVITIES}, {<<"user">>,jid:to_string(From)}],
       children = []}]},
       ejabberd_router:route(From,Tojid, XmlBody),
-      % case get_user_resource_offline(User, Server) of
-      %   true ->
-          mod_offline:store_packet({From, xmpp:decode(XmlBody)})
-      %   false ->
-      %     ok
-      % end
+      mod_offline:store_packet({From, xmpp:decode(XmlBody)})
   end, Rosters).
 
-%%push_all_packets(Rosters, BlockedUsers, Packet,From) ->
-%%  lists:foreach(fun([RosterJid]) ->
-%%    ?INFO_MSG("Lict check: ~p",[RosterJid]),
-%%    ?INFO_MSG("Lict check: ~p",[lists:member(RosterJid, BlockedUsers)]),
-%%    case lists:member(RosterJid, BlockedUsers) of
-%%      true ->
-%%        ok;
-%%      false ->
-%%        #jid{user = User, server = Server} = jid:from_string(RosterJid),
-%%        lists:foreach(fun(Resource) ->
-%%          ejabberd_router:route(From, jid:make(User, Server, Resource), Packet)
-%%                      end, ejabberd_sm:get_user_resources(User, Server))
-%%    end
-%%        end, Rosters).
-
 %% push user registered notification presence to the rosters
-%%
-%%
 %% @param record From
 %% @param binary RequestType
 %% @param binary IQ
