@@ -2613,6 +2613,7 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
                         MsgWithMeta = Msg#message{meta = MetaMap},
                          case TypeBin of
                             <<"chat">> -> 
+                               fly_mod_offline_push:send_own_offline_message(FromJID, ToJID, Msg),
                                mod_offline:store_sender_sync_msg(JID, Msg#message.from, MsgWithMeta),
                                ejabberd_hooks:run_fold(user_send_packet, JID#jid.lserver, {MsgWithMeta, State}, []);
                             _ -> ok
