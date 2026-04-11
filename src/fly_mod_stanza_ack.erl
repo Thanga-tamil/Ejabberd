@@ -212,10 +212,10 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
        case xmpp:get_meta(NewPacket) of
         #{from_broadcast := true} -> ok;
         _ ->
-          store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, MetaData,BlockUser, EditMsgid, FlatTimeStamp),
+          store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, Metadata,BlockUser, EditMsgid, FlatTimeStamp),
           fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid,DisappearAt)
-       end
-    
+       end;
+      
         S when (S == false) ->
           BlockUser = <<"0">>,
           ok
