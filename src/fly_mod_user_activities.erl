@@ -736,7 +736,7 @@ message_delivery(_From, RequestType, SubEl, IQ) ->
                     %% ── Auto-reply busy message (1:1 only) ─────────────────
                     BusyMsg = fly_mod_utils:get_userbusy_message(FServer, TUser, FUser),
 
-                    if BusyMsg =/= <<"">> andalso GroupId =:= <<"">>;  ->
+                    if BusyMsg =/= <<"">> andalso GroupId =:= <<"">>  ->
                         BodyString  = fly_mod_security:aes_encrpyt_license(MsgId, <<"ddc0f15cc2c90fca">>, BusyMsg),
                         ReceivedTimestamps     = now_to_microseconds(erlang:now()),
                         ReceivedFlatTimeStamps = lists:flatten(io_lib:format("~p", [ReceivedTimestamps])),
