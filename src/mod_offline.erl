@@ -815,7 +815,7 @@ end.
 route_total_count(#{jid := U} = State, Msgs) ->
 
         C = length(Msgs),
-        ?LOG_INFO("routing [~p] offline records for jid: ~p", [C, U]),
+        % ?LOG_INFO("routing [~p] offline records for jid: ~p", [C, U]),
         Packet =
         #xmlel{
                 name = <<"message">>,
