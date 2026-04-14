@@ -294,10 +294,75 @@ set_vcard(LUser, LServer, VCARD,
     History1 = Pick(History, 29),
     MobileNumber1 = Pick(MobileNumber, 30),
     LMobileNumber1 = Pick(LMobileNumber, 31),
-    MsgDisappear1 = Pick(MsgDisappear, 32),
+    MsgDisappear1Raw = Pick(MsgDisappear, 32),
     UpdatedBy1 = Pick(UpdatedBy, 33),
-    DispUpdatedAt1 = Pick(DispUpdatedAt, 34), 
+    DispUpdatedAt1 = Pick(DispUpdatedAt, 34),
     Description1 = Pick(Description, 35), 
+
+    %% ==========================================================
+    %% GROUP ADMIN GUARD: Only allow msg_disappear update for groups
+    %% if the requester (UpdatedBy) is an admin (affiliation != 'n').
+    %% ==========================================================
+    %% Detection logic:
+    %%  - MsgDisappear (from XML) is non-empty (caller is trying to set it)
+    %%  - LUser exists in mix_channel (confirming it is a group)
+    %%  - UpdatedBy1 is non-empty (we know who is requesting)
+    %%  - If user is NOT an admin .. revert to old value (no update)
+    %% ==========================================================
+    MsgDisappear1 =
+        if
+            MsgDisappear1Raw == <<>> ->
+                %% No new value supplied for msg_disappear; nothing to guard.
+                %% Keeping whatever Pick decided (the existing value).
+                MsgDisappear1Raw;
+            true ->
+                %% A new msg_disappear value was supplied. Check if group.
+                IsGroup = case catch ejabberd_sql:sql_query(
+                    LServer,
+                    [<<"select count(*) from mix_channel where channel = '">>,
+                     LUser, <<"';">>]
+                ) of
+                    {selected, _, [[<<"0">>]]} -> false;
+                    {selected, _, [[0]]}       -> false;
+                    {selected, _, [[_Cnt]]}    -> true;
+                    _                          -> false
+                end,
+                case IsGroup of
+                    false ->
+                        %% Not a group chat vCard - allow update as-is
+                        MsgDisappear1Raw;
+                    true ->
+                        %% It is a group: check requester's admin status
+                        case UpdatedBy1 of
+                            <<>> ->
+                                %% No updatedBy info; cannot validate; keep existing value
+                                ?WARNING_MSG(
+                                    "Group msg_disappear update DENIED: "
+                                    "no updatedBy provided for group=~p; "
+                                    "keeping old value",
+                                    [LUser]),
+                                SafeNth(32, ExistingRow);
+                            _ ->
+                                IsAdmin = fly_mod_utils:is_group_admin(
+                                    LServer, LUser, UpdatedBy1),
+                                case IsAdmin of
+                                    true ->
+                                        ?INFO_MSG(
+                                            "Group msg_disappear update ALLOWED: "
+                                            "user=~p is admin of group=~p",
+                                            [UpdatedBy1, LUser]),
+                                        MsgDisappear1Raw;
+                                    false ->
+                                        ?WARNING_MSG(
+                                            "Group msg_disappear update DENIED: "
+                                            "user=~p is NOT admin of group=~p; "
+                                            "keeping old value",
+                                            [UpdatedBy1, LUser]),
+                                        SafeNth(32, ExistingRow)
+                                end
+                        end
+                end
+        end,
 
     ?INFO_MSG(
         "Final picked vcard values:~n"
