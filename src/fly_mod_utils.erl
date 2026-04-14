@@ -2389,7 +2389,7 @@ add_userin_roster_asunknown(LServer, ToUser, FUser,Subscription) ->
     [<<"SELECT username FROM rosterusers WHERE username = '">>, FUser ,<<"' and jid_username = '">>, ToUser ,<<"' ;">>]) of
     {selected, _, []} ->
       Jid1 = make_jid_s(ToUser, LServer),
-      ejabberd_sql:sql_query(LServer,[<<"INSERT INTO rosterusers(username, nickname, jid, jid_username, subscription, ask, server, type, relation) values ('">>,FUser, <<"',">>,FUser, <<"','">>, Jid1,<<"','">>,ToUser,<<"','">>,Subscription,<<"','N','N','item', 'U');">>]);
+      ejabberd_sql:sql_query(LServer,[<<"INSERT INTO rosterusers(username, nickname, jid, jid_username, subscription, ask, server, type, relation) values ('">>,FUser, <<"','">>,FUser, <<"','">>, Jid1,<<"','">>,ToUser,<<"','">>,Subscription,<<"','N','N','item', 'U');">>]);
     _ ->
       ok
   end.
