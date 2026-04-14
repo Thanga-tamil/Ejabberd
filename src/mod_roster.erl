@@ -428,6 +428,8 @@ del_roster(LUser, LServer, LJID) ->
       end).
 
 
+to_binary(null) ->
+    <<"">>;
 to_binary(Value) when is_binary(Value) ->
     Value;
 to_binary(Value) when is_integer(Value) ->
@@ -441,17 +443,17 @@ to_binary(_) ->
 
 -spec encode_item(#roster{}) -> roster_item().
 encode_item(Item) ->
-	VCard = [#roster_vcard{roster_nickname=[#roster_nickname{roster_nickname = Item#roster.name}],
-	roster_name = [#roster_name{roster_name = Item#roster.nickname}],
-	roster_image = [#roster_image{roster_image=Item#roster.image}],
-	roster_mobilenumber = [#roster_mobilenumber{roster_mobilenumber=Item#roster.mobile}],
-	roster_thumbimage = [#roster_thumbimage{roster_thumbimage=Item#roster.thumbimage}],
-	roster_status = [#roster_status{roster_status=Item#roster.status}],
-	roster_is_admin_blocked = [#roster_is_admin_blocked{roster_is_admin_blocked=Item#roster.is_admin_blocked}],
-	roster_msg_disappear = [#roster_msg_disappear{msgDisappear=to_binary(Item#roster.msg_disappear)}],
-	roster_email= [#roster_email{roster_email=Item#roster.email}]}],
+	VCard = [#roster_vcard{roster_nickname=[#roster_nickname{roster_nickname = to_binary(Item#roster.name)}],
+	roster_name = [#roster_name{roster_name = to_binary(Item#roster.nickname)}],
+	roster_image = [#roster_image{roster_image = to_binary(Item#roster.image)}],
+	roster_mobilenumber = [#roster_mobilenumber{roster_mobilenumber = to_binary(Item#roster.mobile)}],
+	roster_thumbimage = [#roster_thumbimage{roster_thumbimage = to_binary(Item#roster.thumbimage)}],
+	roster_status = [#roster_status{roster_status = to_binary(Item#roster.status)}],
+	roster_is_admin_blocked = [#roster_is_admin_blocked{roster_is_admin_blocked = to_binary(Item#roster.is_admin_blocked)}],
+	roster_msg_disappear = [#roster_msg_disappear{msgDisappear = to_binary(Item#roster.msg_disappear)}],
+	roster_email = [#roster_email{roster_email = to_binary(Item#roster.email)}]}],
     #roster_item{jid = jid:make(Item#roster.jid),
-		 name = Item#roster.name,
+		 name = to_binary(Item#roster.name),
 		 subscription = Item#roster.subscription,
 		 ask = case ask_to_pending(Item#roster.ask) of
 			   out -> subscribe;
