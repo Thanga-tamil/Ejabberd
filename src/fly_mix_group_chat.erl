@@ -739,10 +739,6 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
   _RequestType = <<"set_group_info">>,
   Profile = fxml:get_subtag(SubEl, <<"profile">>),
   VCard = fxml:get_subtag(Profile, <<"vCard">>),
-  % VCardRaw = fxml:get_subtag(Profile, <<"vCard">>),
-  % #jid{user = FUser} = From,
-  % %% Inject updatedBy into VCard so mod_vcard_sql can perform admin validation for msg_disappear
-  % VCard = fxml:append_subtags(VCardRaw, [#xmlel{name = <<"updatedBy">>, attrs = [], children = [{xmlcdata, FUser}]}]),
   #jid{user = LUser} = To,
   #jid{lserver = FServer} = From,
   Status = <<"group_profile_updated">>,
@@ -884,10 +880,6 @@ process_set_group_info_web(From, To, SubEl, IQ) ->
   _RequestType = <<"set_group_info_web">>,
   Profile = fxml:get_subtag(SubEl, <<"profile">>),
   VCard = fxml:get_subtag(Profile, <<"vCard">>),
-  % VCardRaw = fxml:get_subtag(Profile, <<"vCard">>),
-  % #jid{user = FUser} = From,
-  % %% Inject updatedBy into VCard so mod_vcard_sql can perform admin validation for msg_disappear
-  % VCard = fxml:append_subtags(VCardRaw, [#xmlel{name = <<"updatedBy">>, attrs = [], children = [{xmlcdata, FUser}]}]),
   #jid{user = LUser} = To,
   #jid{lserver = FServer} = From,
   Status = <<"group_profile_updated">>,
