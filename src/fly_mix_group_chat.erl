@@ -742,7 +742,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
   #jid{user = LUser} = To,
   #jid{lserver = FServer} = From,
   Status = <<"group_profile_updated">>,
-
+  ?INFO_MSG("process_set_group_info -> NewStatus: ~p, From: ~p, To: ~p", [NewStatus, From, To]),
   ?INFO_MSG("VCard : ~p", [VCard]), 
   
   IncomingNickName = fxml:get_path_s(VCard, [{elem, <<"nickName">>}, cdata]),
@@ -752,7 +752,8 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
   ?INFO_MSG("IncomingDescription : ~p", [IncomingDescription]),
   
   IncomingImage = fxml:get_path_s(VCard, [{elem, <<"image">>}, cdata]),
-  ?INFO_MSG("IncomingImage : ~p", [VCard]),
+  ?INFO_MSG("IncomingImage : ~p", [IncomingImage]),
+
   
   if NewStatus =:= <<"new">> ->
     mod_vcard:set_vcard(LUser, FServer, VCard),
@@ -760,10 +761,13 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
   true ->
     case catch fly_mod_utils:get_group_users(FServer, LUser) of
       {selected, _, []} ->
+        ?INFO_MSG("Group does not exist or has no members for ~p", [LUser]),
         fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Group does not exists">>});
       {selected, _, GroupMembers} ->
+        ?INFO_MSG("GroupMembers found: ~p", [GroupMembers]),
         
         GroupInfo = fly_mod_utils:get_existing_group_info(FServer, LUser),
+        ?INFO_MSG("Existing GroupInfo fetch result: ~p", [GroupInfo]),
 
         case GroupInfo of
           {selected, _, [[Nickname, Description, Image]]} ->
@@ -774,13 +778,17 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
         
         JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
         SetVcard = mod_vcard:set_vcard(LUser, FServer, VCard),
+        ?INFO_MSG("SetVcard result for ~p: ~p", [LUser, SetVcard]),
         MixParticipant = fly_mod_utils:update_mix_participant(FServer, LUser, IncomingNickName),
         ?LOG_INFO("MixParticipant update result: ~p", [MixParticipant]),
+
         case SetVcard of
           ok ->
             case catch fly_mod_utils:check_group_exists(FServer, LUser) of
               {selected, _, []} ->
+                ?INFO_MSG("Group existence check failed during update for ~p", [LUser]),
                 update_group_info_to_members(From, To, Status, VCard, JIDs, <<"1">>, SubEl, <<"">>);
+
               _ ->
                 ?INFO_MSG("devinprogress -> FServer : ~p LUser : ~p", [FServer, LUser]),
 
@@ -834,7 +842,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                         % Then handle the notifications based on what changed
                         case length(FinalChanges) of
                             0 -> 
-                                ok;
+                                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"4">>, SubEl, <<"">>);
                             1 -> % Single field changed - use specific notification codes
                                 [Change] = FinalChanges,
                                 case Change of
@@ -857,7 +865,10 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                                             _ -> % Updating existing image
                                                 ?INFO_MSG("Image updated update_group_info_to_members 13 ~p", [OldImage]),
                                                 update_group_info_to_members(From, To, Status, VCard, JIDs, <<"13">>, SubEl, <<"">>)
-                                        end
+                                        end;
+                                     _  ->
+                                      update_group_info_to_members(From, To, Status, VCard, JIDs, <<"4">>, SubEl, <<"">>)
+
                                 end;
                             _ -> % Multiple fields changed - use generic update code
                                 update_group_info_to_members(From, To, Status, VCard, JIDs, <<"4">>, SubEl, <<"">>)

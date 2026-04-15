@@ -214,7 +214,7 @@
   update_block_status_user/3,update_block_status_group/3,get_contact_permission/1,update_vcard_date/2,get_user_resources/2,
   get_user_resources/3,get_mobile_user_message/2,get_mobile_user_resource/2,get_push_type/1,get_meta_chat_web/4,poll_vote_update/8,
   remove_poll_offline/3,get_existing_group_info/2,get_users_devices_detail/3,set_seen_receipt/3,set_hide_profile/3,update_msg_seen_receipt/3,
-  get_hide_profile_privacy/2, update_mix_participant/3, batch_remove_spool/4, is_session_exists/2, get_spool_seq/4]).
+  get_hide_profile_privacy/2, update_mix_participant/3, batch_remove_spool/4, is_session_exists/2,is_group_admin/3, get_spool_seq/4]).
 
 -include("logger.hrl").
 
@@ -1251,7 +1251,7 @@ update_last_recent_message(#jid{luser = FUser,lserver = FServer},#jid{luser = To
 get_last_messages(#jid{luser = FUser,lserver = FServer},#jid{luser = ToUser}, _BroadcastId) ->
   ejabberd_sql:sql_query(
     FServer,
-    [<<"select from_user, to_user, message_id,message_type,chat_type,status, recall_status, message_time, from_notification,to_notification,message_notification,created_at,topic_id,IFNULL(json_unquote(meta_data),'') as meta from message_status USE INDEX (from_user,to_user) WHERE ((from_user = '">>, FUser, <<"' AND to_user = '">>, ToUser, <<"') OR (from_user = '">>, ToUser, <<"' AND to_user = '">>, FUser, <<"'))  and deleted_by!='">>, FUser, <<"' and deleted_status!=2 order by id DESC LIMIT 1;">>]).
+    [<<"select from_user, to_user, message_id,message_type,chat_type,status, recall_status, message_time, from_notification,to_notification,message_notification,created_at,topic_id,IFNULL(json_unquote(meta_data),'') as meta from message_status WHERE ((from_user = '">>, FUser, <<"' AND to_user = '">>, ToUser, <<"') OR (from_user = '">>, ToUser, <<"' AND to_user = '">>, FUser, <<"'))  and deleted_by!='">>, FUser, <<"' and deleted_status!=2 order by id DESC LIMIT 1;">>]).
 
 %% Get user alternate resource
 %%
@@ -1283,23 +1283,17 @@ get_group_message_status(#jid{luser = FUser,lserver = Server, lresource = _Resou
 %% &param MessageId
 %% @return List
 
-remove_offline(Server,  MessageId) ->
+remove_offline(Server,  MessageId) -> 
+ ejabberd_sql:sql_query(Server,[<<"DELETE from spool where message_id='">>,MessageId,<<"';">>]).
 
-  ejabberd_sql:sql_query(
-    Server,
-    [<<"DELETE from spool where message_id='">>,MessageId,<<"';">>]).
+remove_offline(Server, MessageId, LResource) -> 
+ ejabberd_sql:sql_query(Server,[<<"DELETE from spool where message_id='">>,MessageId,<<"' and (device_id = '">>,LResource,<<"' or device_id = '') ;">>]).
 
-remove_offline(Server, MessageId, LResource) ->
-
-  ejabberd_sql:sql_query(
-    Server,
-    [<<"DELETE from spool where message_id='">>,MessageId,<<"' and (device_id = '">>,LResource,<<"' or device_id = '') ;">>]).
-
+ 
 remove_offline_by_user(Server, FUser) ->
   ejabberd_sql:sql_query(
     Server,
-    [<<"delete from spool where username= '">>,FUser,<<"' and device_id not in (select device_id from chat_users_details where username='">>,FUser,<<"');">>])
-.
+    [<<"delete from spool where username= '">>,FUser,<<"' and device_id not in (select device_id from chat_users_details where username='">>,FUser,<<"');">>]).
 
 update_offline(Server, MessageId, LResource) ->
 
@@ -1635,11 +1629,11 @@ get_meta_chat_web(#jid{luser = FUser, lserver = FServer}, Topicid, RowId, Limit)
   if RowId =:= <<"">> ->
   ejabberd_sql:sql_query(
     FServer,
-    [<<"SELECT * FROM (SELECT message_status.id, message_status.from_user, message_statusto_user, message_type, coalesce(msg,txt), message_status.message_id, message_status.edit_message_id, status, recall_status, message_time, IFNULL(json_unquote(message_status.meta_data),'') as meta from message_status USE INDEX (id, from_user, to_user) left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''  where (message_status.from_user = '">>, FUser, <<"' or message_status.to_user = '">>, FUser, <<"') and deleted_status != '2' AND blocked != '">>, FUser, <<"' and topic_id = '">>, Topicid, <<"' group by from_user,to_user order by message_status.id desc) tmp limit 0,">>,Limit,<<";">>]);
+    [<<"SELECT * FROM (SELECT message_status.id, message_status.from_user, message_statusto_user, message_type, coalesce(msg,txt), message_status.message_id, message_status.edit_message_id, status, recall_status, message_time, IFNULL(json_unquote(message_status.meta_data),'') as meta from message_status left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''  where (message_status.from_user = '">>, FUser, <<"' or message_status.to_user = '">>, FUser, <<"') and deleted_status != '2' AND blocked != '">>, FUser, <<"' and topic_id = '">>, Topicid, <<"' group by from_user,to_user order by message_status.id desc) tmp limit 0,">>,Limit,<<";">>]);
   true ->
     ejabberd_sql:sql_query(
   FServer,
-  [<<"SELECT * FROM (SELECT message_status.id, message_status.from_user, message_status.to_user, message_type, coalesce(msg,txt),  message_status.message_id, message_status.edit_message_id, status, recall_status, message_time, IFNULL(json_unquote(message_status.meta_data),'') as meta from message_status USE INDEX (id, from_user, to_user) left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''  where  message_status.id >= ">>, RowId, <<"  and  (message_status.from_user = '">>, FUser, <<"' or  message_status.to_user = '">>, FUser, <<"')  and deleted_status != '2' AND blocked != '">>, FUser, <<"'  and topic_id = '">>, Topicid, <<"' group by from_user,to_user order by message_status.id desc) tmp limit 0,">>,Limit,<<";">>])
+  [<<"SELECT * FROM (SELECT message_status.id, message_status.from_user, message_status.to_user, message_type, coalesce(msg,txt),  message_status.message_id, message_status.edit_message_id, status, recall_status, message_time, IFNULL(json_unquote(message_status.meta_data),'') as meta from message_status left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''  where  message_status.id >= ">>, RowId, <<"  and  (message_status.from_user = '">>, FUser, <<"' or  message_status.to_user = '">>, FUser, <<"')  and deleted_status != '2' AND blocked != '">>, FUser, <<"'  and topic_id = '">>, Topicid, <<"' group by from_user,to_user order by message_status.id desc) tmp limit 0,">>,Limit,<<";">>])
 end.
 
 get_single_chat_messages(#jid{luser = FUser, lserver = FServer}, TUser, Position, _MsgId, Limit, RowId, SendSeen, Topicid) ->
@@ -1653,7 +1647,7 @@ get_single_chat_messages(#jid{luser = FUser, lserver = FServer}, TUser, Position
   if Topicid =:= <<"">> ->
   if RowId =:= <<"">> ->
     ejabberd_sql:sql_query(FServer,
-      [<<"SELECT message_status.id, message_status.from_user, message_type, coalesce(msg,txt) as content, message_status.created_at, message_status.message_id, message_status.edit_message_id,  status, recall_status, favourite_status, favourite_by, message_time, topic_id, edit_status, disappear_at, IFNULL(json_unquote(message_status.meta_data),'') as meta FROM message_status USE INDEX (from_user,to_user) left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''  WHERE (((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and ( deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND blocked != '">>, FUser, <<"') ) ORDER BY id DESC LIMIT 0,">>,Limit,<<";">>]);
+      [<<"SELECT message_status.id, message_status.from_user, message_type, coalesce(msg,txt) as content, message_status.created_at, message_status.message_id, message_status.edit_message_id,  status, recall_status, favourite_status, favourite_by, message_time, topic_id, edit_status, disappear_at, IFNULL(json_unquote(message_status.meta_data),'') as meta FROM message_status left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''  WHERE (((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and ( deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND blocked != '">>, FUser, <<"') ) ORDER BY id DESC LIMIT 0,">>,Limit,<<";">>]);
     true->
       if Position =:= <<"up">> ->
         ejabberd_sql:sql_query(FServer,
@@ -1669,7 +1663,7 @@ get_single_chat_messages(#jid{luser = FUser, lserver = FServer}, TUser, Position
   true ->
   if RowId =:= <<"">> ->
     ejabberd_sql:sql_query(FServer,
-      [<<"SELECT message_status.id, message_status.from_user, message_type, coalesce(msg,txt), message_status.created_at, message_status.message_id, message_status.edit_message_id, status, recall_status, favourite_status, favourite_by, message_time,  topic_id,edit_status, disappear_at, IFNULL(json_unquote(message_status.meta_data),'') as meta FROM message_status USE INDEX (from_user,to_user) left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''  WHERE (((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and (deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND blocked != '">>, FUser, <<"' and topic_id = '">>, Topicid, <<"')) ORDER BY id DESC LIMIT 0,">>,Limit,<<";">>]);
+      [<<"SELECT message_status.id, message_status.from_user, message_type, coalesce(msg,txt), message_status.created_at, message_status.message_id, message_status.edit_message_id, status, recall_status, favourite_status, favourite_by, message_time,  topic_id,edit_status, disappear_at, IFNULL(json_unquote(message_status.meta_data),'') as meta FROM message_status left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''  WHERE (((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and (deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND blocked != '">>, FUser, <<"' and topic_id = '">>, Topicid, <<"')) ORDER BY id DESC LIMIT 0,">>,Limit,<<";">>]);
     true->
       if Position =:= <<"up">> ->
         ejabberd_sql:sql_query(FServer,
@@ -1688,14 +1682,14 @@ get_single_chat_media_messages(#jid{luser = FUser, lserver = FServer}, TUser, Ms
 if Topicid =:= <<"">> ->
   if MsgId =:= <<"">> ->
     ejabberd_sql:sql_query(FServer,
-      [<<"SELECT coalesce(msg,txt), message_status.message_id, message_status.edit_message_id, message_time,  topic_id,IFNULL(json_unquote(message_status.meta_data),'') as meta  FROM  message_status USE INDEX (from_user,to_user) left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''   WHERE ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and message_type !='text' AND message_status.chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND recall_status =0 AND blocked != '">>, FUser, <<"' GROUP BY message_id ORDER BY message_status.created_at DESC LIMIT 0,3;">>]);
+      [<<"SELECT coalesce(msg,txt), message_status.message_id, message_status.edit_message_id, message_time,  topic_id,IFNULL(json_unquote(message_status.meta_data),'') as meta  FROM  message_status left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''   WHERE ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and message_type !='text' AND message_status.chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND recall_status =0 AND blocked != '">>, FUser, <<"' GROUP BY message_id ORDER BY message_status.created_at DESC LIMIT 0,3;">>]);
     true->
       case catch get_id(FServer, MsgId) of
         {selected, _, []} ->
           ok;
         {selected, _, [[Id]]} ->
           ejabberd_sql:sql_query(FServer,
-        [<<"SELECT coalesce(msg,txt), message_status.message_id, message_status.edit_message_id,  message_time, topic_id, IFNULL(json_unquote(message_status.meta_data),'') as meta  FROM  message_status  USE INDEX (from_user,to_user)left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''   WHERE  message_status.id < '">>, Id, <<"' and ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) AND message_type !='text' AND message_status.chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2'  AND recall_status =0 AND blocked != '">>, FUser, <<"'   GROUP BY message_id ORDER BY message_status.created_at DESC LIMIT 0,10;">>]);
+        [<<"SELECT coalesce(msg,txt), message_status.message_id, message_status.edit_message_id,  message_time, topic_id, IFNULL(json_unquote(message_status.meta_data),'') as meta  FROM  message_status left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''   WHERE  message_status.id < '">>, Id, <<"' and ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) AND message_type !='text' AND message_status.chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2'  AND recall_status =0 AND blocked != '">>, FUser, <<"'   GROUP BY message_id ORDER BY message_status.created_at DESC LIMIT 0,10;">>]);
         _ ->
         ok
       end
@@ -1703,14 +1697,14 @@ if Topicid =:= <<"">> ->
 true ->
   if MsgId =:= <<"">> ->
     ejabberd_sql:sql_query(FServer,
-      [<<"SELECT txt, message_status.message_id, message_status.edit_message_id, message_time,  topic_id,IFNULL(json_unquote(message_status.meta_data),'') as meta  FROM  message_status USE INDEX (from_user,to_user)  left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''  WHERE ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and message_type !='text' AND message_status.chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND recall_status =0 AND blocked != '">>, FUser, <<"' and topic_id = '">>, Topicid, <<"' GROUP BY message_id ORDER BY message_status.created_at DESC LIMIT 0,3;">>]);
+      [<<"SELECT txt, message_status.message_id, message_status.edit_message_id, message_time,  topic_id,IFNULL(json_unquote(message_status.meta_data),'') as meta  FROM  message_status left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''  WHERE ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and message_type !='text' AND message_status.chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND recall_status =0 AND blocked != '">>, FUser, <<"' and topic_id = '">>, Topicid, <<"' GROUP BY message_id ORDER BY message_status.created_at DESC LIMIT 0,3;">>]);
     true->
       case catch get_id(FServer, MsgId) of
         {selected, _, []} ->
           ok;
         {selected, _, [[Id]]} ->
           ejabberd_sql:sql_query(FServer,
-        [<<"SELECT txt, message_status.message_id, message_status.edit_message_id,  message_time, topic_id, IFNULL(json_unquote(message_status.meta_data),'') as meta  FROM  message_status  USE INDEX (from_user,to_user) left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''  WHERE message_status.id < '">>, Id, <<"' and ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) AND message_type !='text' AND message_status.chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2'  AND recall_status =0 AND blocked != '">>, FUser, <<"'and topic_id = '">>, Topicid, <<"'  GROUP BY message_id ORDER BY message_status.created_at DESC LIMIT 0,10;">>]);
+        [<<"SELECT txt, message_status.message_id, message_status.edit_message_id,  message_time, topic_id, IFNULL(json_unquote(message_status.meta_data),'') as meta  FROM  message_status left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> ''  WHERE message_status.id < '">>, Id, <<"' and ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) AND message_type !='text' AND message_status.chat_type = 'chat' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2'  AND recall_status =0 AND blocked != '">>, FUser, <<"'and topic_id = '">>, Topicid, <<"'  GROUP BY message_id ORDER BY message_status.created_at DESC LIMIT 0,10;">>]);
         _ ->
         ok
       end
@@ -1731,7 +1725,7 @@ get_group_chat_messages(#jid{luser = FUser, lserver = FServer}, TUser,  Position
 
   if RowId =:= <<"">> ->
     ejabberd_sql:sql_query(FServer,
-      [<<"SELECT message_status.id, message_status.from_user, coalesce(msg,txt), message_status.created_at as time,message_status.message_id, message_status.edit_message_id, status, from_notification, message_type, recall_status, favourite_status, favourite_by, to_notification, message_notification, message_time, edit_status, IFNULL(json_unquote(message_status.meta_data),'') as meta FROM message_status USE INDEX (from_user,to_user) left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> '' WHERE message_status.from_user = '">>, TUser, <<"' and message_status.to_user='">>, FUser, <<"' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' ORDER BY id DESC  LIMIT 0, ">>,Limit,<<";">>]);
+      [<<"SELECT message_status.id, message_status.from_user, coalesce(msg,txt), message_status.created_at as time,message_status.message_id, message_status.edit_message_id, status, from_notification, message_type, recall_status, favourite_status, favourite_by, to_notification, message_notification, message_time, edit_status, IFNULL(json_unquote(message_status.meta_data),'') as meta FROM message_status left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> '' WHERE message_status.from_user = '">>, TUser, <<"' and message_status.to_user='">>, FUser, <<"' AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' ORDER BY id DESC  LIMIT 0, ">>,Limit,<<";">>]);
     true->
       if Position =:= <<"up">> ->
         ejabberd_sql:sql_query(FServer,
@@ -1748,7 +1742,7 @@ get_group_chat_messages(#jid{luser = FUser, lserver = FServer}, TUser,  Position
 get_group_chat_media_messages(#jid{luser = FUser, lserver = FServer},_GroupJidFull, GroupJid, MsgId) ->
   if MsgId =:= <<"">> ->
     ejabberd_sql:sql_query(FServer,
-      [<<"SELECT  coalesce(msg,txt), message_status.message_id, message_status.edit_message_id, message_time  FROM  message_status USE INDEX (from_user,to_user) left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> '' WHERE message_status.from_user='">>, GroupJid, <<"' and message_status.to_user = '">>, FUser, <<"' AND (message_type ='image' OR message_type ='video' OR message_type ='file' OR message_type ='audio') AND deleted_by != '">>, FUser, <<"'  and deleted_status != '2' AND recall_status=0 GROUP BY message_id   ORDER BY message_status.created_at DESC  LIMIT 0,3;">>]);
+      [<<"SELECT  coalesce(msg,txt), message_status.message_id, message_status.edit_message_id, message_time  FROM  message_status left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> '' WHERE message_status.from_user='">>, GroupJid, <<"' and message_status.to_user = '">>, FUser, <<"' AND (message_type ='image' OR message_type ='video' OR message_type ='file' OR message_type ='audio') AND deleted_by != '">>, FUser, <<"'  and deleted_status != '2' AND recall_status=0 GROUP BY message_id   ORDER BY message_status.created_at DESC  LIMIT 0,3;">>]);
     true->
       ejabberd_sql:sql_query(FServer,
         [<<"SELECT  coalesce(msg,txt), message_status.message_id,message_status.edit_message_id,  message_time FROM  message_status  left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> '' WHERE  message_status.from_user='">>, GroupJid, <<"' and message_status.to_user = '">>, FUser, <<"' AND (message_type ='image' OR message_type ='video' OR message_type ='file' OR message_type ='audio')  AND deleted_by != '">>, FUser, <<"'  and deleted_status != '2'  AND recall_status=0 AND message_status.id < (select id from message_status where to_user = '">>,FUser,<<"' and  message_id='">>, MsgId, <<"') GROUP BY message_id   ORDER BY message_status.created_at DESC  LIMIT 0,10;">>])
@@ -1758,7 +1752,7 @@ get_group_chat_media_messages(#jid{luser = FUser, lserver = FServer},_GroupJidFu
 get_single_chat_fullmedia_messages(#jid{luser = FUser, lserver = FServer}, TUser, MsgId, Position) ->
   if Position =:= <<"">> ->
     ejabberd_sql:sql_query(FServer,
-      [<<"SELECT coalesce(msg,txt), message_status.message_id, message_status.edit_message_id, message_time FROM  message_status USE INDEX (from_user,to_user) left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> '' WHERE ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and (message_type ='image' OR message_type ='video' OR message_type ='file' OR message_type ='audio') AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND  recall_status =0 AND blocked != '">>, FUser, <<"'  and message_status.id >= (select id from message_status where message_id ='">>, MsgId, <<"')) GROUP BY message_id ORDER BY message_status.created_at ASC LIMIT 0,10;">>]);
+      [<<"SELECT coalesce(msg,txt), message_status.message_id, message_status.edit_message_id, message_time FROM  message_status left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> '' WHERE ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and (message_type ='image' OR message_type ='video' OR message_type ='file' OR message_type ='audio') AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND  recall_status =0 AND blocked != '">>, FUser, <<"'  and message_status.id >= (select id from message_status where message_id ='">>, MsgId, <<"')) GROUP BY message_id ORDER BY message_status.created_at ASC LIMIT 0,10;">>]);
     true->
       ejabberd_sql:sql_query(FServer,
       [<<"SELECT coalesce(msg,txt), message_status.message_id, message_status.edit_message_id, message_time FROM  message_status  left join chat_message_edit_history on message_status.edit_message_id=chat_message_edit_history.edit_message_id and  message_status.edit_message_id IS NOT NULL AND message_status.edit_message_id <> '' WHERE ((message_status.from_user = '">>, FUser, <<"' AND message_status.to_user = '">>, TUser, <<"') OR (message_status.from_user = '">>, TUser, <<"' AND message_status.to_user = '">>, FUser, <<"')) and (message_type ='image' OR message_type ='video' OR message_type ='file' OR message_type ='audio') AND deleted_by != '">>, FUser, <<"' and deleted_status != '2' AND  recall_status =0 AND blocked != '">>, FUser, <<"'  and message_status.id <= (select id from message_status where message_id ='">>, MsgId, <<"')) GROUP BY message_id ORDER BY message_status.created_at ASC LIMIT 0,10;">>])
@@ -1780,7 +1774,8 @@ get_message_status(#jid{lserver = FServer}, Msgid) ->
 
 get_groupmessage_status(#jid{luser = FUser, lserver = FServer}, Msgid) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT status  FROM message_status WHERE to_user != '">>,FUser,<<"' and  message_id = '">>,Msgid,<<"'  order by status asc limit 1;">>]).
+    iolist_to_binary([<<"SELECT status FROM message_status WHERE to_user != '">>,FUser,<<"' and message_id = '">>,Msgid,<<"' order by status asc limit 1;">>])).
+
 
 get_message_time(FServer , Msgid) ->
   ejabberd_sql:sql_query(FServer,
@@ -1788,11 +1783,13 @@ get_message_time(FServer , Msgid) ->
 
 message_status(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT status  FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id = '">>,Msgid,<<"' order by status asc limit 1;">>]).
+    iolist_to_binary([<<"SELECT status FROM message_status WHERE to_user != '">>,Fuser,<<"' and message_id = '">>,Msgid,<<"' order by status asc limit 1;">>])).
+
 
 message_status_new(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT status, id FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id = '">>,Msgid,<<"' order by status asc limit 1;">>]).
+    iolist_to_binary([<<"SELECT status, id FROM message_status WHERE to_user != '">>,Fuser,<<"' and message_id = '">>,Msgid,<<"' order by status asc limit 1;">>])).
+
 
 check_group_exists(FServer, GroupId) ->
   ejabberd_sql:sql_query(FServer,
@@ -2389,6 +2386,15 @@ add_userin_roster_asunknown(LServer, ToUser, FUser,Subscription) ->
       ejabberd_sql:sql_query(LServer,[<<"INSERT INTO rosterusers(username, jid, jid_username, subscription, ask, server, type, relation) values ('">>,ToUser, <<"','">>, Jid,<<"','">>,FUser,<<"','">>,Subscription,<<"','N','N','item', 'U');">>]);
     _ ->
       ok
+  end,
+  case catch ejabberd_sql:sql_query(
+    LServer,
+    [<<"SELECT username FROM rosterusers WHERE username = '">>, FUser ,<<"' and jid_username = '">>, ToUser ,<<"' ;">>]) of
+    {selected, _, []} ->
+      Jid1 = make_jid_s(ToUser, LServer),
+      ejabberd_sql:sql_query(LServer,[<<"INSERT INTO rosterusers(username, nickname, jid, jid_username, subscription, ask, server, type, relation) values ('">>,FUser, <<"','">>,FUser, <<"','">>, Jid1,<<"','">>,ToUser,<<"','">>,Subscription,<<"','N','N','item', 'U');">>]);
+    _ ->
+      ok
   end.
 
 days_from_value(<<"0">>) -> 0;
@@ -2426,6 +2432,31 @@ update_rosters_on_vcard_change(LServer, LUser) ->
            and msg_disappear = 0">>,
         [LUser, LUser]
     ).
+
+
+%% Check whether a user is a group admin (affiliation != 'n') in mix_pam.
+%%
+%% @param LServer   the XMPP server host
+%% @param GroupId   the channel/group id (LUser of the group vCard)
+%% @param Username  the user whose admin status is checked
+%% @return true | false
+is_group_admin(LServer, GroupId, Username) ->
+    case catch ejabberd_sql:sql_query(
+        LServer,
+        [<<"select count(*) from mix_pam where channel = '">>, GroupId,
+         <<"' and username = '">>, Username,
+         <<"' and affiliation != 'n';">>
+        ]) of
+        {selected, _, [[Count]]} ->
+            case Count of
+                <<"0">> -> false;
+                0       -> false;
+                _       -> true
+            end;
+        _ ->
+            false
+    end.
+
 
 get_recently_updated_disappearance(ToServer, User) ->
     ejabberd_sql:sql_query(
