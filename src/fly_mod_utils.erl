@@ -1774,7 +1774,8 @@ get_message_status(#jid{lserver = FServer}, Msgid) ->
 
 get_groupmessage_status(#jid{luser = FUser, lserver = FServer}, Msgid) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT status  FROM message_status WHERE to_user != '">>,FUser,<<"' and  message_id = '">>,Msgid,<<"'  order by status asc limit 1;">>]).
+    iolist_to_binary([<<"SELECT status FROM message_status WHERE to_user != '">>,FUser,<<"' and message_id = '">>,Msgid,<<"' order by status asc limit 1;">>])).
+
 
 get_message_time(FServer , Msgid) ->
   ejabberd_sql:sql_query(FServer,
@@ -1782,11 +1783,13 @@ get_message_time(FServer , Msgid) ->
 
 message_status(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT status  FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id = '">>,Msgid,<<"' order by status asc limit 1;">>]).
+    iolist_to_binary([<<"SELECT status FROM message_status WHERE to_user != '">>,Fuser,<<"' and message_id = '">>,Msgid,<<"' order by status asc limit 1;">>])).
+
 
 message_status_new(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"SELECT status, id FROM message_status WHERE to_user != '">>,Fuser,<<"' and  message_id = '">>,Msgid,<<"' order by status asc limit 1;">>]).
+    iolist_to_binary([<<"SELECT status, id FROM message_status WHERE to_user != '">>,Fuser,<<"' and message_id = '">>,Msgid,<<"' order by status asc limit 1;">>])).
+
 
 check_group_exists(FServer, GroupId) ->
   ejabberd_sql:sql_query(FServer,
@@ -2389,7 +2392,7 @@ add_userin_roster_asunknown(LServer, ToUser, FUser,Subscription) ->
     [<<"SELECT username FROM rosterusers WHERE username = '">>, FUser ,<<"' and jid_username = '">>, ToUser ,<<"' ;">>]) of
     {selected, _, []} ->
       Jid1 = make_jid_s(ToUser, LServer),
-      ejabberd_sql:sql_query(LServer,[<<"INSERT INTO rosterusers(username, nickname, jid, jid_username, subscription, ask, server, type, relation) values ('">>,FUser, <<"',">>,FUser, <<"','">>, Jid1,<<"','">>,ToUser,<<"','">>,Subscription,<<"','N','N','item', 'U');">>]);
+      ejabberd_sql:sql_query(LServer,[<<"INSERT INTO rosterusers(username, nickname, jid, jid_username, subscription, ask, server, type, relation) values ('">>,FUser, <<"','">>,FUser, <<"','">>, Jid1,<<"','">>,ToUser,<<"','">>,Subscription,<<"','N','N','item', 'U');">>]);
     _ ->
       ok
   end.
