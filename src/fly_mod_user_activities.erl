@@ -2836,42 +2836,51 @@ process_user_bulk_messages_batch(From, BatchSize) ->
     end.
 
 notify_disappear_message(From, RequestType, SubEl, IQ) ->
-  MessageId = fxml:get_path_s(SubEl, [{attr, <<"message_id">>}]),
-  ToUserJid = fxml:get_path_s(SubEl, [{attr, <<"to_user">>}]),
-  MessageDisappear = fxml:get_path_s(SubEl, [{attr, <<"msg_disappear">>}]),
-  Messageid = <<(get_string())/binary>>,
-  #jid{user = FUser, lserver = FServer} = From,
-  [ToUser | _S] = string:tokens(binary_to_list(ToUserJid), "@"),
+    #jid{lserver = Server} = From,
+    MessageId = fxml:get_path_s(SubEl, [{attr, <<"message_id">>}]),
+    ToUserJid = fxml:get_path_s(SubEl, [{attr, <<"to_user">>}]),
+    MessageDisappear = fxml:get_path_s(SubEl, [{attr, <<"msg_disappear">>}]),
+    [ToUser | _] = binary:split(ToUserJid, <<"@">>),
+    To = jid:make({ToUser, Server, <<>>}),
 
-  #jid{luser = User, lserver = Server, lresource = Resource} = From,
- 
-  To = jid:make({list_to_binary(ToUser), Server, <<>>}),
+    XmlBody = #xmlel{
+        name = <<"message">>,
+        attrs = [
+            {<<"from">>, jid:to_string(From)},
+            {<<"to">>, jid:to_string(To)},
+            {<<"type">>, <<"chat">>},
+            {<<"id">>, MessageId}
+        ],
+        children = [
+            #xmlel{
+                name = <<"msg_disappear">>,
+                attrs = [
+                    {<<"xmlns">>, <<"urn:xmpp:receipts">>},
+                    {<<"msg_disappear">>, MessageDisappear},
+                    {<<"id">>, MessageId}
+                ],
+                children = []
+            }
+        ]
+    },
 
-  XmlBody = #xmlel{name = <<"message">>,
-                   attrs = [{<<"from">>, jid:to_string(From)},
-                            {<<"to">>, jid:to_string(To)},
-                            {<<"type">>, <<"chat">>},
-                            {<<"id">>, Messageid}],
-                   children = [#xmlel{name = <<"msg_disappear">>,
-                                      attrs = [{<<"xmlns">>, <<"urn:xmpp:receipts">>},
-                                               {<<"msg_disappear">>, MessageDisappear},
-                                               {<<"id">>, MessageId}],
-                                      children = []}]},
-  ReceivedTimestamp = now_to_microseconds(erlang:now()),
-  ReceivedFlatTimeStamp = lists:flatten(io_lib:format("~p", [ReceivedTimestamp])),
-  ReceivedXMLTag = #xmlel{name = <<"timestamp">>,
-                          attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>},
-                                   {<<"time">>, list_to_binary(ReceivedFlatTimeStamp)}],
-                          children = []},
-  XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
-  ejabberd_router:route(From, To, XmlBody1),
-  case fly_mod_utils:get_mobile_user_message(ToUser, FServer) of
-    true ->
-      mod_offline:store_packet({From, xmpp:decode(XmlBody1)});
-    false ->
-      ok
-  end,
-  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>}).
+    Timestamp = now_to_microseconds(erlang:now()),
+    FlatTimestamp = lists:flatten(io_lib:format("~p", [Timestamp])),
+    TimeTag = #xmlel{
+        name = <<"timestamp">>,
+        attrs = [
+            {<<"xmlns">>, <<"urn:xmpp:messagetime">>},
+            {<<"time">>, list_to_binary(FlatTimestamp)}
+        ],
+        children = []
+    },
+
+    XmlWithTime = fxml:append_subtags(XmlBody, [TimeTag]),
+    ejabberd_router:route(From, To, XmlWithTime),
+    fly_mod_utils:generate_subel(IQ, #user_activities{
+        type = RequestType,
+        result_type = <<"Send successfully">>
+    }).
 
 
 
