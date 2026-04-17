@@ -213,7 +213,7 @@ end.
 %% store_message optimization -start
 %% ─────────────────────────────────────────────────────────────────────────────
 
-store_message(#offline_msg{us = {LUser, LServer}} = M) ->
+store_message_v1(#offline_msg{us = {LUser, LServer}} = M) ->
   From      = M#offline_msg.from,
   To        = M#offline_msg.to,
   ChatType  = erlang:atom_to_binary(xmpp:get_type(M#offline_msg.packet), utf8),
