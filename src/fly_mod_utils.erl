@@ -2352,7 +2352,7 @@ is_session_exists(FServer, User) ->
 
 get_bulk_message_details(#jid{lserver=Server}, TeamId, Offset, Limit) ->
   Query = [
-    <<"SELECT user_id, message_id, message_content FROM bulk_notification ">>,
+    <<"SELECT user_id, message_id, message_content, disappear_at FROM bulk_notification ">>,
     <<"WHERE team_id = '">>, TeamId, <<"' ">>,
     <<"ORDER BY user_id ">>,
     <<"LIMIT ">>, integer_to_binary(Limit), 
@@ -2366,7 +2366,7 @@ remove_bulk_notification(#jid{lserver=Server}, TeamId)->
 
 get_pending_bulk_messages_for_user(LServer, LUser, Limit) ->
   UserID = <<LUser/binary, "@", LServer/binary>>,
-  ejabberd_sql:sql_query(LServer, [<<"SELECT message_from, message_type, chat_type, message_id, message_content, group_id FROM bulk_notification WHERE is_broadcast = 0 and user_id = '">>, UserID, <<"' LIMIT ">>, integer_to_binary(Limit), <<";">>]).
+  ejabberd_sql:sql_query(LServer, [<<"SELECT message_from, message_type, chat_type, message_id, message_content, group_id, disappear_at FROM bulk_notification WHERE is_broadcast = 0 and user_id = '">>, UserID, <<"' LIMIT ">>, integer_to_binary(Limit), <<";">>]).
 
 delete_bulk_message_row(LServer, MessageId, LUser) ->
   UserID = <<LUser/binary, "@", LServer/binary>>,
