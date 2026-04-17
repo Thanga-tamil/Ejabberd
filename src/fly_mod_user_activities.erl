@@ -2686,6 +2686,7 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
                            end,
 
                 DisappearAt = maps:get(disappear_at, MetaMap, <<"">>),
+                ?INFO_MSG("DisappearAt =??????????????? ~p", [DisappearAt]),
                 XML = #xmlel{
                     name = <<"message">>,
                     attrs = [
@@ -2791,7 +2792,7 @@ process_bulk_chunks(From, TeamId, MessageFrom, MessageType, ChunkSize, Offset, I
             end;
         {selected, _, Rosters} ->
             lists:foreach(fun ([UserId, MessageIdFromDb, MessageContent, DisappearAt]) ->
-                 ?INFO_MSG("send_bulk_message: ~p =>>>>>>>>>>> ~p ", [MessageFrom, UserId]),
+                 ?INFO_MSG("send_bulk_message: ~p =>>>>>>>>>>> ~p =>>>>>>>>>>. DisappearAt ~p", [MessageFrom, UserId, DisappearAt]),
                  send_message(ChatType, MessageFrom, UserId, MessageType, MessageContent, MessageIdFromDb, #{ from_broadcast => true, disappear_at => DisappearAt })
             end, Rosters),
              case length(Rosters) of
