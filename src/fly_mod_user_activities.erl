@@ -683,96 +683,212 @@ user_logout_by_admin(From, RequestType, SubEl, IQ) ->
 
 
 
-message_delivery(_From, RequestType, SubEl,IQ) ->
-  
-  MessageFrom     = fxml:get_path_s(SubEl, [{attr, <<"message_from">>}]),
-  MessageTo       = fxml:get_path_s(SubEl, [{attr, <<"message_to">>}]),
-  OldMessageId    = fxml:get_path_s(SubEl, [{attr, <<"message_id">>}]),
-  GroupId         = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
-  LResource       = fxml:get_path_s(SubEl, [{attr, <<"device_id">>}]),
-  MessageId       = fly_mod_utils:get_iq_message_id(16),
-  MsgId           = fly_mod_utils:get_iq_message_id(16),
-  FromJid         = jid:from_string(MessageFrom),
+message_delivery(_From, RequestType, SubEl, IQ) ->
 
-  #jid{user = FUser, lserver = FServer} = FromJid,
-  
-  if (MessageTo =:= <<"">>) or (MessageTo =:= <<>>) ->
-      case catch fly_mod_utils:get_message_from(FServer,  OldMessageId) of
-            {seleced, _, []} ->
-              ToJid = #jid{user = TUser, lserver = TServer} = FromJid;
-            {selected, _, [[MsgFrom]]} ->
-              ToJid = jid:from_string(MsgFrom),
-              #jid{user = TUser, lserver = TServer} = ToJid
-      end;
-    true ->
-      ToJid = jid:from_string(MessageTo),
-      #jid{user = TUser, lserver = TServer} = ToJid
-  end,
-  
-  Substring = string:str(binary_to_list(LResource),binary_to_list(<<"Mobile-">>)),
-  if Substring =:= 1 ->
-    MResource = fly_mod_utils:get_device_from_resource(LResource);
-  true ->
-    MResource = LResource
-  end,
+    MessageFrom  = fxml:get_path_s(SubEl, [{attr, <<"message_from">>}]),
+    MessageTo    = fxml:get_path_s(SubEl, [{attr, <<"message_to">>}]),
+    OldMessageId = fxml:get_path_s(SubEl, [{attr, <<"message_id">>}]),
+    GroupId      = fxml:get_path_s(SubEl, [{attr, <<"group_id">>}]),
+    LResource    = fxml:get_path_s(SubEl, [{attr, <<"device_id">>}]),
+    ?LOG_INFO("message_delivery: From=~p, To=~p, OldId=~p, GroupId=~p, LResource=~p",
+              [MessageFrom, MessageTo, OldMessageId, GroupId, LResource]),
+    MessageId    = fly_mod_utils:get_iq_message_id(16),
+    MsgId        = fly_mod_utils:get_iq_message_id(16),
+    FromJid      = jid:from_string(MessageFrom),
 
-  fly_mod_utils:update_offline(FServer, OldMessageId,MResource),
-  fly_mod_utils:update_delivery(FromJid, TUser, OldMessageId, GroupId),
-  
-  BusyMsg = fly_mod_utils:get_userbusy_message(FServer, TUser, FUser),
+    case FromJid of
+        #jid{user = FUser, lserver = FServer} ->
 
-  if BusyMsg =/= <<"">> andalso GroupId =:= <<"">> ->
-    BodyString = fly_mod_security:aes_encrpyt_license(MsgId, <<"ddc0f15cc2c90fca">>, BusyMsg),
-    MsgBody3 = XML = #xmlel{name = <<"message">>, attrs = [{<<"xmlns">>, <<"jabber:client">>},{<<"from">>, MessageFrom}, {<<"to">>, MessageTo},
-      {<<"type">>, <<"chat">>},{<<"id">>, MsgId}],
-    children = [
-      #xmlel{name = <<"chatcontent">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:content">>},{<<"message_type">>, <<"auto_text">>},{<<"edit_msg_id">>, MsgId},{<<"mention_list">>, <<"">>},
-        {<<"block_user">>, <<"0">>}],children = []},
-      #xmlel{name = <<"body">>, attrs = [{<<"message_type">>, <<"auto_text">>}], children = [{xmlcdata, BodyString}]}]},
-    ReceivedTimestamps = now_to_microseconds(erlang:now()),
-    ReceivedFlatTimeStamps = lists:flatten(io_lib:format("~p", [ReceivedTimestamps])),
-    ReceivedMsgTags = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(ReceivedFlatTimeStamps)}], children = []},
-    MsgBody2 = fxml:append_subtags(MsgBody3, [ReceivedMsgTags]),
-      ejabberd_router:route(FromJid, ToJid, MsgBody2),
-      store_offline_user_send(MsgBody2,FromJid,ToJid),
-      TResources = ejabberd_sm:get_user_resources(TUser, TServer),
-      if length(TResources) =:= 0 ->
-        mod_offline:store_packet({FromJid, xmpp:decode(MsgBody2)});
-      true ->
-        ok
-      end,
-      fly_mod_stanza_ack:store_in_table(FServer,FUser,TUser,MsgId,BodyString,<<"chat">>,<<"auto_text">>,<<"">>,  <<"{}">> ,<<"0">>,<<"">>, ReceivedFlatTimeStamps),
-      fly_mod_utils:insert_status(FromJid, ToJid, MsgId,<<"auto_text">>,<<"">>, <<"{}">>, <<"chat">>,<<"">>,<<"0">>,BodyString,ReceivedFlatTimeStamps,MsgId);
-  true ->
-    ok
-  end,
+            %% ── Resolve ToJid ──────────────────────────────────────────────
+            if
+                (MessageTo =:= <<"">>) orelse (MessageTo =:= <<>>) ->
+                    case catch fly_mod_utils:get_message_from(FServer, OldMessageId) of
+                        {selected, _, []} ->
+                            ToJid = #jid{user = TUser, lserver = TServer} = FromJid;
 
-  case catch fly_mod_utils:message_status(FServer, OldMessageId, TUser) of
-                                    {selected, _, []} ->
-                                      GStatus = <<"0">>;
-                                    {selected, _, [[GroupStatus]]} ->
-                                      GStatus = GroupStatus;
-                                    _ ->
-                                      GStatus = <<"0">>
-  end,
-  XmlBody = #xmlel{name = <<"message">>, attrs = [{<<"from">>, MessageFrom}, {<<"to">>, MessageTo}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
-  children = [#xmlel{name = <<"delivered">>, attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"id">>, OldMessageId},{<<"message_status">>, GStatus}, {<<"group_id">>, GroupId}], children = []}]},
-  ReceivedTimestamp = now_to_microseconds(erlang:now()),
-  ReceivedFlatTimeStamp = lists:flatten(io_lib:format("~p", [ReceivedTimestamp])),
-  ReceivedXMLTag = #xmlel{name = <<"timestamp">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>}, {<<"time">>, list_to_binary(ReceivedFlatTimeStamp)}], children = []},
-  XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
-  ejabberd_router:route(FromJid, ToJid, XmlBody1),
-  fly_mod_stanza_ack:send_ack_response(FromJid, ToJid, OldMessageId, <<"delivered">>),
-  TResource = ejabberd_sm:get_user_resources(TUser, TServer),
-      if length(TResource) =/= 0 ->
-        ReceivedTimeStampedPacket = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
-        mod_offline:store_packet({FromJid, xmpp:decode(ReceivedTimeStampedPacket)});
-      true ->
-        ok
-      end,
-  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>}).
+                        {selected, _, [[MsgFrom]]} ->
+                            ToJid = jid:from_string(MsgFrom),
+                            case ToJid of
+                                #jid{user = TUser, lserver = TServer} -> ok;
+                                _ -> ToJid = #jid{user = TUser, lserver = TServer} = FromJid
+                            end;
 
+                        _ ->
+                            ToJid = #jid{user = TUser, lserver = TServer} = FromJid
+                    end;
 
+                true ->
+                    ToJid = jid:from_string(MessageTo),
+                    case ToJid of
+                        #jid{user = TUser, lserver = TServer} -> ok;
+                        _ -> TUser = <<>>, TServer = FServer
+                    end
+            end,
+
+            case ToJid of
+                #jid{user = TUser, lserver = TServer} ->
+
+                    %% ── Resolve MResource ──────────────────────────────────
+                    Substring = string:str(
+                        binary_to_list(LResource),
+                        binary_to_list(<<"Mobile-">>)
+                    ),
+                    MResource =
+                        if Substring =:= 1 ->
+                            fly_mod_utils:get_device_from_resource(LResource);
+                        true ->
+                            LResource
+                        end,
+
+                    %% ── Update delivery state ──────────────────────────────
+                    fly_mod_utils:update_offline(FServer, OldMessageId, MResource),
+                    fly_mod_utils:update_delivery(FromJid, TUser, OldMessageId, GroupId),
+
+                    %% ── Auto-reply busy message (1:1 only) ─────────────────
+                    BusyMsg = fly_mod_utils:get_userbusy_message(FServer, TUser, FUser),
+
+                    if BusyMsg =/= <<"">> andalso GroupId =:= <<"">>  ->
+                        BodyString  = fly_mod_security:aes_encrpyt_license(MsgId, <<"ddc0f15cc2c90fca">>, BusyMsg),
+                        ReceivedTimestamps     = now_to_microseconds(erlang:now()),
+                        ReceivedFlatTimeStamps = lists:flatten(io_lib:format("~p", [ReceivedTimestamps])),
+
+                        MsgBody3 = #xmlel{
+                            name  = <<"message">>,
+                            attrs = [
+                                {<<"xmlns">>, <<"jabber:client">>},
+                                {<<"from">>,  MessageFrom},
+                                {<<"to">>,    MessageTo},
+                                {<<"type">>,  <<"chat">>},
+                                {<<"id">>,    MsgId}
+                            ],
+                            children = [
+                                #xmlel{
+                                    name  = <<"chatcontent">>,
+                                    attrs = [
+                                        {<<"xmlns">>,        <<"urn:xmpp:content">>},
+                                        {<<"message_type">>, <<"auto_text">>},
+                                        {<<"edit_msg_id">>,  MsgId},
+                                        {<<"mention_list">>, <<"">>},
+                                        {<<"block_user">>,   <<"0">>}
+                                    ],
+                                    children = []
+                                },
+                                #xmlel{
+                                    name     = <<"body">>,
+                                    attrs    = [{<<"message_type">>, <<"auto_text">>}],
+                                    children = [{xmlcdata, BodyString}]
+                                }
+                            ]
+                        },
+
+                        TimestampTag = #xmlel{
+                            name  = <<"timestamp">>,
+                            attrs = [
+                                {<<"xmlns">>, <<"urn:xmpp:messagetime">>},
+                                {<<"time">>,  list_to_binary(ReceivedFlatTimeStamps)}
+                            ],
+                            children = []
+                        },
+                        MsgBody2 = fxml:append_subtags(MsgBody3, [TimestampTag]),
+
+                        ejabberd_router:route(FromJid, ToJid, MsgBody2),
+                        store_offline_user_send(MsgBody2, FromJid, ToJid),
+
+                        TResources = ejabberd_sm:get_user_resources(TUser, TServer),
+                        if length(TResources) =:= 0 ->
+                            mod_offline:store_packet({FromJid, xmpp:decode(MsgBody2)});
+                        true ->
+                            ok
+                        end,
+
+                        fly_mod_stanza_ack:store_in_table(
+                            FServer, FUser, TUser, MsgId, BodyString,
+                            <<"chat">>, <<"auto_text">>, <<"">>, <<"{}">> , <<"0">>, <<"">>,
+                            ReceivedFlatTimeStamps
+                        ),
+                        fly_mod_utils:insert_status(
+                            FromJid, ToJid, MsgId, <<"auto_text">>, <<"">>,
+                            <<"{}">>, <<"chat">>, <<"">>, <<"0">>, BodyString,
+                            ReceivedFlatTimeStamps, MsgId, <<"">>
+                        );
+
+                    true ->
+                        ok
+                    end,
+
+                    %% ── Fetch group/message status ─────────────────────────
+                    GStatus =
+                        case catch fly_mod_utils:message_status(FServer, OldMessageId, TUser) of
+                            {selected, _, []}            -> <<"0">>;
+                            {selected, _, [[GroupStatus]]} -> GroupStatus;
+                            _                            -> <<"0">>
+                        end,
+
+                    %% ── Build and route delivery receipt ───────────────────
+                    ReceivedTimestamp     = now_to_microseconds(erlang:now()),
+                    ReceivedFlatTimeStamp = lists:flatten(io_lib:format("~p", [ReceivedTimestamp])),
+
+                    XmlBody = #xmlel{
+                        name  = <<"message">>,
+                        attrs = [
+                            {<<"from">>, MessageFrom},
+                            {<<"to">>,   MessageTo},
+                            {<<"type">>, <<"chat">>},
+                            {<<"id">>,   MessageId}
+                        ],
+                        children = [
+                            #xmlel{
+                                name  = <<"delivered">>,
+                                attrs = [
+                                    {<<"xmlns">>,          ?NS_RECEIPTS},
+                                    {<<"id">>,             OldMessageId},
+                                    {<<"message_status">>, GStatus},
+                                    {<<"group_id">>,       GroupId}
+                                ],
+                                children = []
+                            }
+                        ]
+                    },
+
+                    ReceivedXMLTag = #xmlel{
+                        name  = <<"timestamp">>,
+                        attrs = [
+                            {<<"xmlns">>, <<"urn:xmpp:messagetime">>},
+                            {<<"time">>,  list_to_binary(ReceivedFlatTimeStamp)}
+                        ],
+                        children = []
+                    },
+                    XmlBody1 = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
+
+                    ejabberd_router:route(FromJid, ToJid, XmlBody1),
+                    fly_mod_stanza_ack:send_ack_response(FromJid, ToJid, OldMessageId, <<"delivered">>),
+
+                    TResource = ejabberd_sm:get_user_resources(TUser, TServer),
+                    if length(TResource) =/= 0 ->
+                        ReceivedTimeStampedPacket = fxml:append_subtags(XmlBody, [ReceivedXMLTag]),
+                        mod_offline:store_packet({FromJid, xmpp:decode(ReceivedTimeStampedPacket)});
+                    true ->
+                        ok
+                    end,
+
+                    fly_mod_utils:generate_subel(
+                        IQ,
+                        #user_activities{type = RequestType, result_type = <<"Send successfully">>}
+                    );
+
+                _ ->
+                    fly_mod_utils:generate_subel(
+                        IQ,
+                        #user_activities{type = RequestType, result_type = <<"error">>}
+                    )
+            end;
+
+        _ ->
+            fly_mod_utils:generate_subel(
+                IQ,
+                #user_activities{type = RequestType, result_type = <<"error">>}
+            )
+    end.
   
 send_seen_message(_From, RequestType, SubEl,IQ) ->
   MessageFrom = fxml:get_path_s(SubEl, [{attr, <<"send_to">>}]),
