@@ -2678,7 +2678,7 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
                             _ -> []
                            end,
 
-                DisappearAt = maps:get(disappear_at, MetaMap, <<"">>),
+                DisappearAt = null_to_empty(maps:get(disappear_at, MetaMap, <<"">>)),
                 ?INFO_MSG("DisappearAt =??????????????? ~p", [DisappearAt]),
                 XML = #xmlel{
                     name = <<"message">>,
