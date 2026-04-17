@@ -2677,6 +2677,7 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
                             _ -> []
                            end,
 
+                DisappearAt = maps:get(disappear_at, MetaMap, <<"">>),
                 XML = #xmlel{
                     name = <<"message">>,
                     attrs = [
@@ -2698,7 +2699,8 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
                               {<<"message_type">>, Messagetype},
                               {<<"broadcast_id">>, <<"">>},
                               {<<"broadcast_msgid">>, <<"">>},
-                              {<<"block_user">>, <<"0">>}
+                              {<<"block_user">>, <<"0">>},
+                              {<<"disappear_at">>, DisappearAt}
                           ],
                           children = ChatContentChildren
                         },
@@ -2750,9 +2752,9 @@ send_message(Type, From, To, Messagetype, BodyString, MessageId, MetaMap ) ->
     end.
 
 send_bulk_message(From, RequestType, SubEl, IQ) ->
-    Attributes = [<<"message_from">>, <<"message_to">>, <<"message_type">>, <<"message_id">>, <<"message">>, <<"group_id">>, <<"chat_type">>,<<"to_user">>],
+    Attributes = [<<"message_from">>, <<"message_to">>, <<"message_type">>, <<"message_id">>, <<"message">>, <<"group_id">>, <<"chat_type">>,<<"to_user">>, <<"disappear_at">>],
     Results = lists:map(fun(Attr) -> fxml:get_path_s(SubEl, [{attr, Attr}]) end, Attributes),
-    [MessageFrom, MessageTo, MessageType, MessageId, MessageTag, GroupId, ChatType, TeamId] = Results,
+    [MessageFrom, MessageTo, MessageType, MessageId, MessageTag, GroupId, ChatType, TeamId, DisappearAt] = Results,
     FromServer = From#jid.lserver,
     case ChatType of
         <<"chat">> -> 
@@ -2762,7 +2764,7 @@ send_bulk_message(From, RequestType, SubEl, IQ) ->
                 IQ, RequestType, ChatType
             );
         <<"normal">> -> 
-            send_message(ChatType, MessageFrom, GroupId, MessageType, MessageTag, MessageId, #{ from_broadcast => true }),
+            send_message(ChatType, MessageFrom, GroupId, MessageType, MessageTag, MessageId, #{ from_broadcast => true, disappear_at => DisappearAt }),
             fly_mod_utils:remove_bulk_notification(From, TeamId),
             ?INFO_MSG("send_message: ~p ", [TeamId]),
             fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>});
@@ -2780,9 +2782,9 @@ process_bulk_chunks(From, TeamId, MessageFrom, MessageType, ChunkSize, Offset, I
                 fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>})
             end;
         {selected, _, Rosters} ->
-            lists:foreach(fun ([UserId, MessageIdFromDb, MessageContent]) ->
+            lists:foreach(fun ([UserId, MessageIdFromDb, MessageContent, DisappearAt]) ->
                  ?INFO_MSG("send_bulk_message: ~p =>>>>>>>>>>> ~p ", [MessageFrom, UserId]),
-                 send_message(ChatType, MessageFrom, UserId, MessageType, MessageContent, MessageIdFromDb, #{ from_broadcast => true })
+                 send_message(ChatType, MessageFrom, UserId, MessageType, MessageContent, MessageIdFromDb, #{ from_broadcast => true, disappear_at => DisappearAt })
             end, Rosters),
              case length(Rosters) of
                 ChunkSize ->
@@ -2808,15 +2810,15 @@ process_user_bulk_messages_batch(From, BatchSize) ->
     #jid{luser = LUser, lserver = LServer} = From,
     case catch fly_mod_utils:get_pending_bulk_messages_for_user(LServer, LUser, BatchSize) of
         {selected, _, Rows} ->
-             lists:foreach(fun([MessageFrom, MessageType, ChatType, MessageId, MessageContent, GroupId]) ->
+             lists:foreach(fun([MessageFrom, MessageType, ChatType, MessageId, MessageContent, GroupId, DisappearAt]) ->
                    ToUser = case ChatType of
                       <<"chat">> -> <<LUser/binary, "@", LServer/binary>>;
                       <<"normal">> -> GroupId;
                       _ -> undefined
                   end,
-                  send_message(ChatType, MessageFrom, ToUser, MessageType, MessageContent, MessageId, #{ from_broadcast => true })
+                  send_message(ChatType, MessageFrom, ToUser, MessageType, MessageContent, MessageId, #{ from_broadcast => true, disappear_at => DisappearAt })
              end, Rows),
-             MessageIds = [MsgId || [_, _, _, MsgId, _, _] <- Rows],
+             MessageIds = [MsgId || [_, _, _, MsgId | _] <- Rows],
              fly_mod_utils:delete_bulk_messages(LServer, MessageIds, LUser),
              if length(Rows) == BatchSize ->
                  process_user_bulk_messages_batch(From, BatchSize);
