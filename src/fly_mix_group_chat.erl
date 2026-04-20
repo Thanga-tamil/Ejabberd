@@ -754,6 +754,9 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
   IncomingImage = fxml:get_path_s(VCard, [{elem, <<"image">>}, cdata]),
   ?INFO_MSG("IncomingImage : ~p", [IncomingImage]),
 
+  IncomingMsgDisappear = fxml:get_path_s(VCard, [{elem, <<"msgDisappear">>}, cdata]),
+  ?INFO_MSG("IncomingMsgDisappear : ~p", [IncomingMsgDisappear]),
+
   
   if NewStatus =:= <<"new">> ->
     mod_vcard:set_vcard(LUser, FServer, VCard),
@@ -770,8 +773,8 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
         ?INFO_MSG("Existing GroupInfo fetch result: ~p", [GroupInfo]),
 
         case GroupInfo of
-          {selected, _, [[Nickname, Description, Image]]} ->
-            ?INFO_MSG("Existing Group Info - Nickname: ~p, Description: ~p, Image: ~p", [Nickname, Description, Image]);
+          {selected, _, [[Nickname, Description, Image, OldMsgDisappear]]} ->
+            ?INFO_MSG("Existing Group Info - Nickname: ~p, Description: ~p, Image: ~p, MsgDisappear: ~p", [Nickname, Description, Image, OldMsgDisappear]);
           _ ->
             ?LOG_INFO("No existing group info found for ~p", [LUser])
         end,
@@ -793,7 +796,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                 ?INFO_MSG("devinprogress -> FServer : ~p LUser : ~p", [FServer, LUser]),
 
                 case catch GroupInfo of
-                    {selected, _, [[OldNick, OldDesc, OldImage]]} ->
+                    {selected, _, [[OldNick, OldDesc, OldImage, OldMsgDisp]]} ->
                         % Track changes
                         Changes = [],
                         
@@ -824,7 +827,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                         end,
 
                         % Finally handle image changes - similar to description: first add or update
-                        FinalChanges = case {OldImage, IncomingImage} of
+                        ThirdChanges = case {OldImage, IncomingImage} of
                             {<<>>, <<>>} ->
                                 NewChanges2;
                             {<<>>, NewImage} when NewImage =/= <<>> ->
@@ -837,6 +840,15 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                                 [image | NewChanges2];
                             _ ->
                                 NewChanges2
+                        end,
+
+                         % Handle msg_disappear changes
+                        FinalChanges = case {OldMsgDisp, IncomingMsgDisappear} of
+                            {OldMsgDisp, NewMsgDis} when OldMsgDisp =:= NewMsgDis ->
+                                ThirdChanges;
+                            {OldMsgDisp, NewMsgDis} ->
+                                ?INFO_MSG("MsgDisappear updated for group ~p from ~p to ~p", [LUser, OldMsgDisp, NewMsgDis]),
+                                [msg_disappear | ThirdChanges]
                         end,
 
                         % Then handle the notifications based on what changed
@@ -866,6 +878,13 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                                                 ?INFO_MSG("Image updated update_group_info_to_members 13 ~p", [OldImage]),
                                                 update_group_info_to_members(From, To, Status, VCard, JIDs, <<"13">>, SubEl, <<"">>)
                                         end;
+                                    msg_disappear ->
+                                        NotifyId = if
+                                            IncomingMsgDisappear =:= <<"0">> -> <<"23">>; % OFF
+                                            OldMsgDisp =:= <<"0">> orelse OldMsgDisp =:= <<>> -> <<"21">>; % SET
+                                            true -> <<"22">> % UPDATED
+                                        end,
+                                        update_group_info_to_members(From, To, Status, VCard, JIDs, NotifyId, SubEl, <<"">>);
                                      _  ->
                                       update_group_info_to_members(From, To, Status, VCard, JIDs, <<"4">>, SubEl, <<"">>)
 
