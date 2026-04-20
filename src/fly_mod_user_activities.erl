@@ -2874,15 +2874,34 @@ notify_disappear_message(From, RequestType, SubEl, IQ) ->
 
 set_message_disappear(From, SubEl, IQ) ->
 
-    #jid{luser = FUser, lserver = FServer, lresource = LResource} = From,
+    #jid{luser = FUser, lserver = FServer, lresource = _LResource} = From,
     MsgDisappear  = fxml:get_path_s(SubEl, [{attr, <<"msg_disappear">>}]),
     Type          = fxml:get_path_s(SubEl, [{attr, <<"type">>}]),
     if Type =:= <<"chat">> ->
             Recipient = fxml:get_path_s(SubEl, [{attr, <<"to_user">>}]),
             ToJid = jid:from_string(Recipient),        
             #jid{luser = ToUser, lserver = ToServer} = ToJid,
+            
+            % Fetch old value for notification logic
+            OldMsgDisappear = fly_mod_utils:get_msg_disappear_single_chat(FServer, FUser, ToUser),
+            
             fly_mod_utils:add_userin_roster_asunknown(ToServer, ToUser, FUser, <<"B">>),
-            fly_mod_utils:set_message_disappear_single_chat(ToServer, FUser, MsgDisappear, ToUser);
+            fly_mod_utils:set_message_disappear_single_chat(ToServer, FUser, MsgDisappear, ToUser),
+            
+            % Determine Notification ID
+            NotifyId = if
+                MsgDisappear =:= <<"0">> -> <<"23">>; % OFF
+                OldMsgDisappear =:= <<"0">> -> <<"21">>; % SET
+                OldMsgDisappear =/= MsgDisappear -> <<"22">>; % UPDATED
+                true -> <<"">>
+            end,
+            
+            if NotifyId =/= <<"">> ->
+                MessageId = list_to_binary(fly_mod_utils:generate_uuid_v4()),
+                fly_mod_utils:single_notify_message(From, ToJid, NotifyId, MessageId, <<"">>, <<"">>);
+            true ->
+                ok
+            end;
         true ->
             ok
     end,

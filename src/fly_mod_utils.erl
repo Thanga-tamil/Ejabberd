@@ -106,6 +106,8 @@
   get_group_chat_messages/7,
   get_message_status/2,
   get_groupmessage_status/2,
+  get_msg_disappear_single_chat/3,
+  single_notify_message/6,
   group_notify_message/9,
   get_blockedlist/2,
   check_group_exists/2,
@@ -2396,6 +2398,67 @@ add_userin_roster_asunknown(LServer, ToUser, FUser,Subscription) ->
     _ ->
       ok
   end.
+
+get_msg_disappear_single_chat(LServer, LUser, ToUser) ->
+  case catch ejabberd_sql:sql_query(LServer, [<<"SELECT msg_disappear FROM rosterusers WHERE username = '">>, LUser, <<"' AND jid_username = '">>, ToUser, <<"' ;">>]) of
+    {selected, _, [[Val]]} ->
+      if is_integer(Val) -> integer_to_binary(Val);
+         is_binary(Val) -> Val;
+         true -> <<"0">>
+      end;
+    _ -> <<"0">>
+  end.
+
+single_notify_message(#jid{luser = AUser, lserver = AServer}, #jid{luser = TUser, lserver = TServer}, NotifyId, Msgid, TimeStamp, Txt) ->
+  Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
+  FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
+
+  if TimeStamp =:= <<"">> ->
+    Currenttime = list_to_binary(FlatTimeStamp);
+  true ->
+    Currenttime = TimeStamp
+  end,
+
+  FromNotification = <<AUser/binary, "@", AServer/binary>>,
+  ToNotification = <<TUser/binary, "@", TServer/binary>>,
+
+  % Insert for recipient (B see A changed)
+  ejabberd_sql:sql_query(
+    AServer,
+    [<<"insert into message_status (from_notification,to_notification,from_user,to_user,message_id, edit_message_id, message_notification,chat_type, message_time,txt,received_at,seen_at,meta_data) values
+     ('">>, FromNotification, <<"','">>, ToNotification, <<"','">>, AUser, <<"','">>, TUser, <<"','">>, Msgid, <<"','">>, Msgid, <<"','">>, NotifyId, <<"','chat','">>, Currenttime, <<"','">>, Txt, <<"','0000-00-00 00:00:00','0000-00-00 00:00:00','{}') ON DUPLICATE KEY UPDATE to_user = '">>, TUser, <<"',message_id = '">>, Msgid, <<"' ;">>]),
+
+  % Update recent chat for sender
+  case catch update_recent_chat(AServer, AUser, TUser, Msgid, AUser, Txt, <<"chat">>, <<"notification">>, <<"">>, <<"{}">>, <<"0">>, Msgid, Currenttime) of
+     {updated, 1} -> ok;
+     _ -> insert_recent_chat(AServer, AUser, TUser, Msgid, AUser, Txt, <<"chat">>, <<"notification">>, <<"">>, <<"{}">>, ToNotification, <<"0">>, Currenttime)
+  end,
+
+  % Update recent chat for recipient
+  case catch update_recent_chat(TServer, TUser, AUser, Msgid, AUser, Txt, <<"chat">>, <<"notification">>, <<"">>, <<"{}">>, <<"1">>, Msgid, Currenttime) of
+     {updated, 1} -> ok;
+     _ -> insert_recent_chat(TServer, TUser, AUser, Msgid, AUser, Txt, <<"chat">>, <<"notification">>, <<"">>, <<"{}">>, FromNotification, <<"1">>, Currenttime)
+  end,
+
+  % Send real-time message to recipient
+  XmlBody = #xmlel{name = <<"message">>,
+                   attrs = [{<<"from">>, FromNotification},
+                            {<<"to">>, ToNotification},
+                            {<<"type">>, <<"chat">>},
+                            {<<"id">>, Msgid}],
+                   children = [#xmlel{name = <<"notification">>,
+                                      attrs = [{<<"xmlns">>, <<"urn:xmpp:receipts">>},
+                                               {<<"type">>, <<"message_disappear">>},
+                                               {<<"notification_id">>, NotifyId}],
+                                      children = []},
+                               #xmlel{name = <<"timestamp">>,
+                                      attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>},
+                                               {<<"time">>, Currenttime}],
+                                      children = []}]},
+  ejabberd_router:route(jid:make(AUser, AServer, <<>>), jid:make(TUser, TServer, <<>>), XmlBody),
+
+  % Handle carbons for sender (local resources)
+  fly_mix_group_chat:carboncall_message(AUser, AServer, XmlBody, jid:make(AUser, AServer, <<>>)).
 
 days_from_value(<<"0">>) -> 0;
 days_from_value(Val) when is_binary(Val) ->
