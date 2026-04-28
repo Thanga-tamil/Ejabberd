@@ -242,6 +242,12 @@ process_iq_set(From, _To, RequestType, IQ) ->
       privacy_setting(From, RequestType, SubEl, IQ);
     <<"message_reaction">> -> 
       message_reaction(IQ, SubEl, From, RequestType);
+    <<"post_story">> ->
+      post_story(From, RequestType, SubEl, IQ);
+    <<"story_seen">> ->
+      story_seen(From, RequestType, SubEl, IQ);
+    <<"story_like">> ->
+      story_like(From, RequestType, SubEl, IQ);
     no_such_subtag ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"no_such_subtag">>, result_type = <<"unknown request">>});
     empty_value ->
@@ -3159,3 +3165,103 @@ mod_opt_type(_) -> [db_type, iqdisc, client_key,client_api_url,client_name].
 
 mod_options(_Host) ->
   [{client_key, undefined},{client_api_url, undefined},{client_name, undefined}].
+
+post_story(From, RequestType, SubEl, IQ) ->
+  UsersElement = fxml:get_subtag(SubEl, <<"users">>),
+  UsersList = if UsersElement =/= false ->
+      #xmlel{children = ChildrenElements} = UsersElement,
+      lists:filtermap(fun(Elem) ->
+          case Elem of
+              #xmlel{name = <<"user">>, children = [{xmlcdata, JidStr}]} -> {true, JidStr};
+              _ -> false
+          end
+      end, ChildrenElements);
+    true -> []
+  end,
+  
+  StoryId = fxml:get_attr_s(<<"story_id">>, SubEl#xmlel.attrs),
+  Username = fxml:get_attr_s(<<"username">>, SubEl#xmlel.attrs),
+  StoryType = fxml:get_attr_s(<<"story_type">>, SubEl#xmlel.attrs),
+  MediaUrl = fxml:get_attr_s(<<"media_url">>, SubEl#xmlel.attrs),
+  ThumbUrl = fxml:get_attr_s(<<"thumb_url">>, SubEl#xmlel.attrs),
+  Caption = fxml:get_attr_s(<<"caption">>, SubEl#xmlel.attrs),
+  MessageId = fly_mod_utils:get_iq_message_id(16),
+  
+  lists:foreach(fun(TargetUser) ->
+    ToUserJid = jid:from_string(TargetUser),
+    #jid{luser = TUser, lserver = TServer} = ToUserJid,
+    
+    XmlBody = #xmlel{name = <<"message">>,
+      attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, TargetUser}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
+      children = [#xmlel{name = <<"story">>,
+        attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"status">>, <<"story_posted">>}, {<<"story_id">>, StoryId}, {<<"username">>, Username}, {<<"story_type">>, StoryType}, {<<"media_url">>, MediaUrl}, {<<"thumb_url">>, ThumbUrl}, {<<"caption">>, Caption}],
+        children = []}]},
+        
+    ejabberd_router:route(From, ToUserJid, XmlBody),
+    TResources = ejabberd_sm:get_user_resources(TUser, TServer),
+    if length(TResources) =:= 0 ->
+        mod_offline:store_packet({From, xmpp:decode(XmlBody)});
+    true ->
+        ok
+    end
+  end, UsersList),
+  
+  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"posted story routed">>}).
+
+story_seen(From, RequestType, SubEl, IQ) ->
+  #jid{lserver = Server, luser = ViewerUsername} = From,
+  StoryId = fxml:get_attr_s(<<"story_id">>, SubEl#xmlel.attrs),
+  OwnerJidStr = fxml:get_attr_s(<<"story_owner">>, SubEl#xmlel.attrs),
+  
+  case StoryId =/= <<"">> of
+    true -> fly_mod_utils:update_story_view(Server, StoryId, ViewerUsername);
+    false -> ok
+  end,
+  
+  OwnerJid = jid:from_string(OwnerJidStr),
+  #jid{luser = OUser, lserver = OServer} = OwnerJid,
+  MessageId = fly_mod_utils:get_iq_message_id(16),
+  XmlBody = #xmlel{name = <<"message">>,
+      attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, OwnerJidStr}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
+      children = [#xmlel{name = <<"story">>,
+        attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"status">>, <<"story_seen">>}, {<<"story_id">>, StoryId}],
+        children = []}]},
+        
+  ejabberd_router:route(From, OwnerJid, XmlBody),
+  TResources = ejabberd_sm:get_user_resources(OUser, OServer),
+  if length(TResources) =:= 0 ->
+      mod_offline:store_packet({From, xmpp:decode(XmlBody)});
+  true ->
+      ok
+  end,
+  
+  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"story seen recorded">>}).
+
+story_like(From, RequestType, SubEl, IQ) ->
+  #jid{lserver = Server, luser = LikerUsername} = From,
+  StoryId = fxml:get_attr_s(<<"story_id">>, SubEl#xmlel.attrs),
+  OwnerJidStr = fxml:get_attr_s(<<"story_owner">>, SubEl#xmlel.attrs),
+  
+  case StoryId =/= <<"">> of
+    true -> fly_mod_utils:update_story_like(Server, StoryId, LikerUsername);
+    false -> ok
+  end,
+  
+  OwnerJid = jid:from_string(OwnerJidStr),
+  #jid{luser = OUser, lserver = OServer} = OwnerJid,
+  MessageId = fly_mod_utils:get_iq_message_id(16),
+  XmlBody = #xmlel{name = <<"message">>,
+      attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, OwnerJidStr}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
+      children = [#xmlel{name = <<"story">>,
+        attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"status">>, <<"story_like">>}, {<<"story_id">>, StoryId}],
+        children = []}]},
+        
+  ejabberd_router:route(From, OwnerJid, XmlBody),
+  TResources = ejabberd_sm:get_user_resources(OUser, OServer),
+  if length(TResources) =:= 0 ->
+      mod_offline:store_packet({From, xmpp:decode(XmlBody)});
+  true ->
+      ok
+  end,
+  
+  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"story like recorded">>}).
