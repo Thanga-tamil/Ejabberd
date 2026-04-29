@@ -248,6 +248,8 @@ process_iq_set(From, _To, RequestType, IQ) ->
       story_seen(From, RequestType, SubEl, IQ);
     <<"story_like">> ->
       story_like(From, RequestType, SubEl, IQ);
+    <<"delete_story">> ->
+      delete_story(From, RequestType, SubEl, IQ);
     no_such_subtag ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"no_such_subtag">>, result_type = <<"unknown request">>});
     empty_value ->
@@ -3263,5 +3265,26 @@ story_like(From, RequestType, SubEl, IQ) ->
   true ->
       ok
   end,
-  
-  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"story like recorded">>}).
+  fly_mod_utils:update_story_like(StoryId, FromU, FromD),
+  fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"story_like">>, result_type = <<"success">>, story_id = StoryId}).
+
+delete_story(From, _RequestType, SubEl, IQ) ->
+    {_FromU, FromD, _} = From,
+    StoryId = fxml:get_tag_attr_s(<<"story_id">>, SubEl),
+    TargetUsers = fly_mod_utils:get_users_from_subel(SubEl),
+    
+    %% Create a deletion query element to broadcast inside a message
+    MsgEl = #xmlel{name = <<"query">>,
+                  attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>},
+                           {<<"status">>, <<"story_deleted">>},
+                           {<<"story_id">>, StoryId},
+                           {<<"username">>, jid:encode(jid:remove_resource(From))}],
+                  children = []},
+    
+    %% Route to target users
+    lists:foreach(fun(User) ->
+        To = jid:make(User, FromD, <<>>),
+        ejabberd_router:route(xmpp:set_from_to(#message{sub_els = [MsgEl]}, From, To))
+    end, TargetUsers),
+
+    fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"delete_story">>, result_type = <<"success">>, story_id = StoryId}).
