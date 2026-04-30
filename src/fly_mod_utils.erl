@@ -542,7 +542,7 @@ get_roster_and_recent_jid(#jid{luser = User,lserver = Server})->
   ejabberd_sql:sql_query(Server,[<<" select from_user as jid from chat_recent where to_user = '">>,User,<<"' and chat_type = 'chat';" >>]).
 
 get_roster_from_recent_jid(#jid{luser = User,lserver = Server})->
-  ejabberd_sql:sql_query(Server,[<<"select to_user as jid from chat_recent where from_user = '">>,User,<<"' and chat_type = 'chat' union select username from rosterusers  where jid_username = '">>,User,<<"' and username != '">>,User,<<"';" >>]).
+  ejabberd_sql:sql_query(Server,[<<"select to_user as jid from chat_recent where from_user = '">>,User,<<"' and chat_type = 'chat' union select username from rosterusers  where jid_username = '">>,User,<<"' and username != '">>,User,<<"' union SELECT cp2.user_id FROM call_participants cp2 JOIN ( SELECT DISTINCT room_id FROM call_participants WHERE user_id = '">>,User,<<"' AND created_at >= NOW() - INTERVAL 10 HOUR ) cp1 ON cp1.room_id = cp2.room_id WHERE cp2.user_id != '">>,User,<<"';" >>]).
 
 get_email_contacts(#jid{luser = User, lserver = Server})->
   ejabberd_sql:sql_query(Server,[<<"select username as jid from contus_chat_users contus_chat_users where username not in (select jid from rosterusers  where username = '">>,User,<<"' union select CONCAT(from_user,'@','">>,Server,<<"') as jid from chat_recent where to_user = '">>,User,<<"' and chat_type = 'chat') GROUP BY jid;" >>]).
