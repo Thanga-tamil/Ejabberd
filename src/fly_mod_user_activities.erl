@@ -243,12 +243,16 @@ process_iq_set(From, _To, RequestType, IQ) ->
     <<"message_reaction">> -> 
       message_reaction(IQ, SubEl, From, RequestType);
     <<"post_story">> ->
+      {FromU, FromD, _} = From,
       post_story(From, RequestType, SubEl, IQ);
     <<"story_seen">> ->
+      {FromU, FromD, _} = From,
       story_seen(From, RequestType, SubEl, IQ);
     <<"story_like">> ->
+      {FromU, FromD, _} = From,
       story_like(From, RequestType, SubEl, IQ);
     <<"delete_story">> ->
+      {FromU, FromD, _} = From,
       delete_story(From, RequestType, SubEl, IQ);
     no_such_subtag ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"no_such_subtag">>, result_type = <<"unknown request">>});
@@ -3237,7 +3241,7 @@ story_seen(From, RequestType, SubEl, IQ) ->
       ok
   end,
   
-  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"story seen recorded">>}).
+  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"story seen recorded">>, story_id = StoryId}).
 
 story_like(From, RequestType, SubEl, IQ) ->
   #jid{lserver = Server, luser = LikerUsername} = From,
@@ -3251,6 +3255,7 @@ story_like(From, RequestType, SubEl, IQ) ->
   
   OwnerJid = jid:from_string(OwnerJidStr),
   #jid{luser = OUser, lserver = OServer} = OwnerJid,
+  FromU = jid:encode(jid:remove_resource(From)),
   MessageId = fly_mod_utils:get_iq_message_id(16),
   XmlBody = #xmlel{name = <<"message">>,
       attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, OwnerJidStr}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
@@ -3265,7 +3270,6 @@ story_like(From, RequestType, SubEl, IQ) ->
   true ->
       ok
   end,
-  fly_mod_utils:update_story_like(StoryId, FromU, FromD),
   fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"story_like">>, result_type = <<"success">>, story_id = StoryId}).
 
 delete_story(From, _RequestType, SubEl, IQ) ->
