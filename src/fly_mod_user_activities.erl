@@ -3167,7 +3167,25 @@ mod_options(_Host) ->
   [{client_key, undefined},{client_api_url, undefined},{client_name, undefined}].
 
 post_story(From, RequestType, SubEl, IQ) ->
-  %% ... (UsersList extraction logic remains same) ...
+  #jid{luser = FromUser, lserver = FromServer} = From,
+  UsersTag = fxml:get_subtag(SubEl, <<"users">>),
+  UsersFromTag = case UsersTag of
+    false ->
+      [];
+    #xmlel{} = UTag ->
+      [fxml:get_tag_cdata(UserEl) || UserEl <- UTag#xmlel.children, is_record(UserEl, xmlel), fxml:get_tag_cdata(UserEl) =/= <<>>]
+  end,
+  ToUserAttr = fxml:get_attr_s(<<"to_user">>, SubEl#xmlel.attrs),
+  UsersFromAttr = case ToUserAttr of
+    <<>> ->
+      [];
+    _ ->
+      [list_to_binary(string:trim(binary_to_list(U))) || U <- binary:split(ToUserAttr, <<",">>, [global]), U =/= <<>>]
+  end,
+  UsersList = case UsersFromTag of
+    [] -> UsersFromAttr;
+    _ -> UsersFromTag
+  end,
   
   %% 1. Extract ALL attributes including timestamps
   StoryId      = fxml:get_attr_s(<<"story_id">>, SubEl#xmlel.attrs),
@@ -3189,6 +3207,8 @@ post_story(From, RequestType, SubEl, IQ) ->
   ExpiresAt    = fxml:get_attr_s(<<"expires_at">>, SubEl#xmlel.attrs),
   
   MessageId = fly_mod_utils:get_iq_message_id(16),
+  ?INFO_MSG("post_story request from=~ts@~ts story_id=~ts targets=~p created_at=~ts expires_at=~ts",
+            [FromUser, FromServer, StoryId, UsersList, CreatedAt, ExpiresAt]),
   
   lists:foreach(fun(TargetUser) ->
     ToUserJid = jid:from_string(TargetUser),
@@ -3223,7 +3243,15 @@ post_story(From, RequestType, SubEl, IQ) ->
         ],
         children = []}]},
         
-    ejabberd_router:route(From, ToUserJid, XmlBody)
+    ?INFO_MSG("post_story routing story_id=~ts to=~ts msg_id=~ts", [StoryId, TargetUser, MessageId]),
+    try
+      ejabberd_router:route(From, ToUserJid, XmlBody),
+      ?INFO_MSG("post_story routed story_id=~ts to=~ts", [StoryId, TargetUser])
+    catch
+      Class:Reason:Stacktrace ->
+        ?INFO_MSG("post_story route failed story_id=~ts to=~ts class=~p reason=~p stack=~p",
+                  [StoryId, TargetUser, Class, Reason, Stacktrace])
+    end
     %% ... (offline storage logic remains same) ...
   end, UsersList),
   
