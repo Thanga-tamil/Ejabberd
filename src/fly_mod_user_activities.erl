@@ -3237,7 +3237,6 @@ post_story(From, RequestType, SubEl, IQ) ->
             {<<"width">>, Width},
             {<<"height">>, Height},
             {<<"blur_hash">>, BlurHash},
-            %% NEW: Route them to target users
             {<<"created_at">>, CreatedAt},
             {<<"expires_at">>, ExpiresAt}
         ],

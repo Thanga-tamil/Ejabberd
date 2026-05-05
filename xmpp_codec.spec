@@ -264,7 +264,7 @@
                               #attr{name = <<"blur_hash">>,default = <<"">>},
                               #attr{name = <<"created_at">>,default = <<"">>},
                               #attr{name = <<"expires_at">>,default = <<"">>},
-                              #attr{name = <<"duration_seconds">>,default = <<"">>},],
+                              #attr{name = <<"duration_seconds">>,default = <<"">>}],
                        cdata = #cdata{default = <<"">>, label = '$result_type'}}).
 
 -xml(del_message_activities,
