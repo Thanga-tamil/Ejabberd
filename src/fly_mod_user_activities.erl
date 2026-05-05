@@ -1396,26 +1396,6 @@ send_push(From, RequestType, SubEl, IQ) ->
   ToJid = jid:from_string(MessageTo),
   #jid{lserver = FServer} = From,
   #jid{user = TUser} = ToJid,
-  % case catch fly_mod_utils:get_offline_message(FServer, TUser) of
-  %   {selected, _, []} ->
-  %     ok;
-  %   {selected, _, Messages} ->
-  %       lists:map(fun(G) ->
-  %       [ChatType, Packet] = G,
-  %       El = #xmlel{} = fxml_stream:parse_element(Packet),
-  %       FromUser = #jid{} = jid:from_string(
-  %         fxml:get_attr_s(<<"from">>, El#xmlel.attrs)),
-  %       ToUser = #jid{} = jid:from_string(
-  %         fxml:get_attr_s(<<"to">>, El#xmlel.attrs)),
-  %       if ChatType =:= <<"chat">> ->
-  %         mod_offline_push:send_offline_message(FromUser, ToUser, El);
-  %         ChatType =:= <<"normal">> ->
-  %           mod_offline_push:send_offline_message(FromUser, ToUser, El);
-  %         true ->
-  %           ok
-  %       end
-  %                         end, Messages)
-  % end,
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>}).
 
 now_to_microseconds({Mega, Sec, Micro}) ->
@@ -1473,6 +1453,7 @@ push_to_rosters_and_recent(From, Packet) ->
     {selected, _, []} ->
       [];
     {selected, _, Rosters} ->
+      ?LOG_INFO("push_to_rosters_and_recent ~p", [Rosters]),
       push_all_packets(Rosters, Packet, From);
     _ ->
       error
