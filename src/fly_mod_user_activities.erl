@@ -243,16 +243,12 @@ process_iq_set(From, _To, RequestType, IQ) ->
     <<"message_reaction">> -> 
       message_reaction(IQ, SubEl, From, RequestType);
     <<"post_story">> ->
-      {FromU, FromD, _} = From,
       post_story(From, RequestType, SubEl, IQ);
     <<"story_seen">> ->
-      {FromU, FromD, _} = From,
       story_seen(From, RequestType, SubEl, IQ);
     <<"story_like">> ->
-      {FromU, FromD, _} = From,
       story_like(From, RequestType, SubEl, IQ);
     <<"delete_story">> ->
-      {FromU, FromD, _} = From,
       delete_story(From, RequestType, SubEl, IQ);
     no_such_subtag ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"no_such_subtag">>, result_type = <<"unknown request">>});
