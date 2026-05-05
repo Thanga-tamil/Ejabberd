@@ -544,7 +544,7 @@ get_roster_and_recent_jid(#jid{luser = User,lserver = Server})->
   ejabberd_sql:sql_query(Server,[<<" select from_user as jid from chat_recent where to_user = '">>,User,<<"' and chat_type = 'chat';" >>]).
 
 get_roster_from_recent_jid(#jid{luser = User,lserver = Server})->
-  ejabberd_sql:sql_query(Server,[<<"select to_user as jid from chat_recent where from_user = '">>,User,<<"' and chat_type = 'chat' union select username from rosterusers  where jid_username = '">>,User,<<"' and username != '">>,User,<<"' union SELECT cp2.user_id FROM call_participants cp2 JOIN ( SELECT DISTINCT room_id FROM call_participants WHERE user_id = '">>,User,<<"' AND created_at >= NOW() - INTERVAL 10 HOUR ) cp1 ON cp1.room_id = cp2.room_id WHERE cp2.user_id != '">>,User,<<"';" >>]).
+  ejabberd_sql:sql_query(Server,[<<"select to_user as jid from chat_recent where from_user = '">>,User,<<"' and chat_type = 'chat' union select username from rosterusers  where jid_username = '">>,User,<<"' and username != '">>,User,<<"' union SELECT cp2.user_id FROM call_participants cp2 JOIN ( SELECT DISTINCT room_id FROM call_participants WHERE user_id = '">>,User,<<"' AND created_at >= NOW() - INTERVAL 24 HOUR ) cp1 ON cp1.room_id = cp2.room_id WHERE cp2.user_id != '">>,User,<<"';" >>]).
 
 get_email_contacts(#jid{luser = User, lserver = Server})->
   ejabberd_sql:sql_query(Server,[<<"select username as jid from contus_chat_users contus_chat_users where username not in (select jid from rosterusers  where username = '">>,User,<<"' union select CONCAT(from_user,'@','">>,Server,<<"') as jid from chat_recent where to_user = '">>,User,<<"' and chat_type = 'chat') GROUP BY jid;" >>]).
@@ -2886,3 +2886,27 @@ get_mix_channel_service(Server, Channel) ->
     _ ->
       <<"">>
   end.
+
+%   -- Disable foreign key checks to ensure smooth conversion
+% SET FOREIGN_KEY_CHECKS = 0;
+
+% -- Unify collation for the main tables reported in the errors
+% ALTER TABLE rosterusers CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+% ALTER TABLE vcard_search CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+% ALTER TABLE vcard CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+% ALTER TABLE chat_recent CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+% -- Also convert other related tables to ensure system-wide consistency
+% ALTER TABLE call_participants CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+% ALTER TABLE mix_pam CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+% ALTER TABLE mix_participant CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+% ALTER TABLE privacy_list CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+% ALTER TABLE privacy_list_data CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+% ALTER TABLE message_status CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+% ALTER TABLE message_favourite CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+% ALTER TABLE chat_message_edit_history CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+% ALTER TABLE chat_media_files CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+% ALTER TABLE channel_settings CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+% -- Re-enable foreign key checks
+% SET FOREIGN_KEY_CHECKS = 1;
