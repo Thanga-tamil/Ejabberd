@@ -3207,12 +3207,13 @@ post_story(From, RequestType, SubEl, IQ) ->
             [FromUser, FromServer, StoryId, UsersList, CreatedAt, ExpiresAt]),
   
   lists:foreach(fun(TargetUser) ->
-    ToUserJid = jid:from_string(TargetUser),
+    ToUserJid = jid:make(TargetUser, FromServer, <<>>),
+    ToUserStr = jid:to_string(ToUserJid),
     
     XmlBody = #xmlel{name = <<"message">>,
       attrs = [
         {<<"from">>, jid:to_string(From)}, 
-        {<<"to">>, TargetUser}, 
+        {<<"to">>, ToUserStr}, 
         {<<"type">>, <<"chat">>}, 
         {<<"id">>, MessageId}
       ],
@@ -3238,14 +3239,14 @@ post_story(From, RequestType, SubEl, IQ) ->
         ],
         children = []}]},
         
-    ?INFO_MSG("post_story routing story_id=~ts to=~ts msg_id=~ts", [StoryId, TargetUser, MessageId]),
+    ?INFO_MSG("post_story routing story_id=~ts to=~ts msg_id=~ts", [StoryId, ToUserStr, MessageId]),
     try
       ejabberd_router:route(From, ToUserJid, XmlBody),
-      ?INFO_MSG("post_story routed story_id=~ts to=~ts", [StoryId, TargetUser])
+      ?INFO_MSG("post_story routed story_id=~ts to=~ts", [StoryId, ToUserStr])
     catch
       Class:Reason:Stacktrace ->
         ?INFO_MSG("post_story route failed story_id=~ts to=~ts class=~p reason=~p stack=~p",
-                  [StoryId, TargetUser, Class, Reason, Stacktrace])
+                  [StoryId, ToUserStr, Class, Reason, Stacktrace])
     end
     %% ... (offline storage logic remains same) ...
   end, UsersList),
