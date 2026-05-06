@@ -3263,11 +3263,15 @@ story_seen(From, RequestType, SubEl, IQ) ->
     false -> ok
   end,
   
-  OwnerJid = jid:from_string(OwnerJidStr),
+  OwnerJid = case binary:match(OwnerJidStr, <<"@">>) of
+    nomatch -> jid:make(OwnerJidStr, Server, <<>>);
+    _ -> jid:from_string(OwnerJidStr)
+  end,
+  OwnerJidStr1 = jid:to_string(OwnerJid),
   #jid{luser = OUser, lserver = OServer} = OwnerJid,
   MessageId = fly_mod_utils:get_iq_message_id(16),
   XmlBody = #xmlel{name = <<"message">>,
-      attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, OwnerJidStr}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
+      attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, OwnerJidStr1}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
       children = [#xmlel{name = <<"story">>,
         attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"status">>, <<"story_seen">>}, {<<"story_id">>, StoryId}],
         children = []}]},
@@ -3292,12 +3296,16 @@ story_like(From, RequestType, SubEl, IQ) ->
     false -> ok
   end,
   
-  OwnerJid = jid:from_string(OwnerJidStr),
+  OwnerJid = case binary:match(OwnerJidStr, <<"@">>) of
+    nomatch -> jid:make(OwnerJidStr, Server, <<>>);
+    _ -> jid:from_string(OwnerJidStr)
+  end,
+  OwnerJidStr1 = jid:to_string(OwnerJid),
   #jid{luser = OUser, lserver = OServer} = OwnerJid,
   FromU = jid:encode(jid:remove_resource(From)),
   MessageId = fly_mod_utils:get_iq_message_id(16),
   XmlBody = #xmlel{name = <<"message">>,
-      attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, OwnerJidStr}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
+      attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, OwnerJidStr1}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
       children = [#xmlel{name = <<"story">>,
         attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"status">>, <<"story_like">>}, {<<"story_id">>, StoryId}],
         children = []}]},
