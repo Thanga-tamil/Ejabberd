@@ -3319,23 +3319,60 @@ story_like(From, RequestType, SubEl, IQ) ->
   end,
   fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"story_like">>, result_type = <<"success">>, story_id = StoryId}).
 
-delete_story(From, _RequestType, SubEl, IQ) ->
-    {_FromU, FromD, _} = From,
-    StoryId = fxml:get_tag_attr_s(<<"story_id">>, SubEl),
-    TargetUsers = fly_mod_utils:get_users_from_subel(SubEl),
-    
-    %% Create a deletion query element to broadcast inside a message
-    MsgEl = #xmlel{name = <<"query">>,
-                  attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>},
-                           {<<"status">>, <<"story_deleted">>},
-                           {<<"story_id">>, StoryId},
-                           {<<"username">>, jid:encode(jid:remove_resource(From))}],
-                  children = []},
-    
-    %% Route to target users
-    lists:foreach(fun(User) ->
-        To = jid:make(User, FromD, <<>>),
-        ejabberd_router:route(xmpp:set_from_to(#message{sub_els = [MsgEl]}, From, To))
-    end, TargetUsers),
+delete_story(From, RequestType, SubEl, IQ) ->
+    #jid{lserver = FromServer} = From,
 
-    fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"delete_story">>, result_type = <<"success">>, story_id = StoryId}).
+    %% 1. Extract Target Users (Same logic as post_story)
+    UsersTag = fxml:get_subtag(SubEl, <<"users">>),
+    UsersList = case UsersTag of
+        false -> [];
+        #xmlel{} = UTag ->
+            [fxml:get_tag_cdata(UserEl) || UserEl <- UTag#xmlel.children, 
+             is_record(UserEl, xmlel), fxml:get_tag_cdata(UserEl) =/= <<>>]
+    end,
+
+    %% 2. Extract Attributes
+    StoryId  = fxml:get_attr_s(<<"story_id">>, SubEl#xmlel.attrs),
+    Username = fxml:get_attr_s(<<"username">>, SubEl#xmlel.attrs),
+    MessageId = fly_mod_utils:get_iq_message_id(16),
+
+    ?INFO_MSG("delete_story request from=~ts story_id=~ts targets=~p", 
+              [jid:to_string(From), StoryId, UsersList]),
+
+    %% 3. Route Deletion to each target user
+    lists:foreach(fun(TargetUser) ->
+        ToUserJid = jid:make(TargetUser, FromServer, <<>>),
+        ToUserStr = jid:to_string(ToUserJid),
+
+        XmlBody = #xmlel{name = <<"message">>,
+            attrs = [
+                {<<"from">>, jid:to_string(From)}, 
+                {<<"to">>, ToUserStr}, 
+                {<<"type">>, <<"chat">>}, 
+                {<<"id">>, MessageId}
+            ],
+            children = [#xmlel{name = <<"story">>,
+                attrs = [
+                    {<<"xmlns">>, ?NS_RECEIPTS}, 
+                    {<<"status">>, <<"story_deleted">>}, 
+                    {<<"story_id">>, StoryId}, 
+                    {<<"username">>, Username}
+                ],
+                children = []}]},
+
+        try
+            ejabberd_router:route(From, ToUserJid, XmlBody),
+            ?INFO_MSG("delete_story routed story_id=~ts to=~ts", [StoryId, ToUserStr])
+        catch
+            Class:Reason ->
+                ?ERROR_MSG("delete_story failed story_id=~ts to=~ts: ~p:~p", 
+                           [StoryId, ToUserStr, Class, Reason])
+        end
+    end, UsersList),
+
+    %% 4. Return IQ Result back to the sender
+    fly_mod_utils:generate_subel(IQ, #user_activities{
+        type = RequestType, 
+        result_type = <<"success">>, 
+        story_id = StoryId
+    }).
