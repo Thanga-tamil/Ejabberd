@@ -3220,7 +3220,7 @@ post_story(From, RequestType, SubEl, IQ) ->
       children = [#xmlel{name = <<"story">>,
         attrs = [
             {<<"xmlns">>, ?NS_RECEIPTS}, 
-            {<<"status">>, <<"story_posted">>}, 
+            {<<"status">>, <<"posted">>}, 
             {<<"story_id">>, StoryId}, 
             {<<"username">>, Username}, 
             {<<"story_type">>, StoryType},
@@ -3228,12 +3228,8 @@ post_story(From, RequestType, SubEl, IQ) ->
             {<<"background_color">>, BgColor},
             {<<"font_style">>, FontStyle},
             {<<"duration">>, Duration},
-            {<<"duration_seconds">>, DurationSec},
             {<<"media_url">>, MediaUrl},
             {<<"thumbnail_url">>, ThumbUrl},
-            {<<"width">>, Width},
-            {<<"height">>, Height},
-            {<<"blur_hash">>, BlurHash},
             {<<"created_at">>, CreatedAt},
             {<<"expires_at">>, ExpiresAt}
         ],
@@ -3354,7 +3350,7 @@ delete_story(From, RequestType, SubEl, IQ) ->
             children = [#xmlel{name = <<"story">>,
                 attrs = [
                     {<<"xmlns">>, ?NS_RECEIPTS}, 
-                    {<<"status">>, <<"story_deleted">>}, 
+                    {<<"status">>, <<"deleted">>}, 
                     {<<"story_id">>, StoryId}, 
                     {<<"username">>, Username}
                 ],
