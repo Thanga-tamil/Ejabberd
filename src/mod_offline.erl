@@ -63,7 +63,8 @@
 	 webadmin_user/4,
 	 webadmin_user_parse_query/5,
 	 route_offline_messages/1,
-	 c2s_handle_bind2_inline/1]).
+	 c2s_handle_bind2_inline/1,
+	 store_sender_sync_msg/3]).
 
 -export([mod_opt_type/1, mod_options/1, mod_doc/0, depends/2]).
 
@@ -186,6 +187,33 @@ flush_cache(Mod, User, Server) ->
 	false ->
 	    ok
     end.
+
+-spec store_sender_sync_msg(jid(), jid(), message()) -> ok | {error, full | any()}.
+store_sender_sync_msg(From, To, Packet) ->
+    BareFrom = jid:remove_resource(From),
+    LServer = BareFrom#jid.lserver,
+    InnerId = case xmpp:get_id(Packet) of
+                  <<>> -> fly_mod_utils:get_iq_message_id(16);
+                  Id -> Id
+              end,
+    %% Wrap the packet for sender sync (carbon sent)
+    Forwarded = #forwarded{sub_els = [Packet]},
+    Carbon = #carbons_sent{forwarded = Forwarded},
+    WrappedPacket0 = #message{from = BareFrom,
+                             to = BareFrom,
+                             id = InnerId,
+                             type = Packet#message.type,
+                             sub_els = [Carbon]},
+    TimeStamp = erlang:timestamp(),
+    WrappedPacket = add_delay_info(WrappedPacket0, LServer, TimeStamp),
+    Expire = find_x_expire(TimeStamp, WrappedPacket),
+    OffMsg = #offline_msg{us = {BareFrom#jid.luser, LServer},
+                         timestamp = TimeStamp,
+                         expire = Expire,
+                         from = BareFrom,
+                         to = To,
+                         packet = WrappedPacket},
+    store_offline_msg(OffMsg).
 
 -spec store_offline_msg(#offline_msg{}) -> ok | {error, full | any()}.
 store_offline_msg(#offline_msg{us = {User, Server}, packet = Pkt} = Msg) ->
@@ -787,7 +815,7 @@ end.
 route_total_count(#{jid := U} = State, Msgs) ->
 
         C = length(Msgs),
-        ?LOG_INFO("routing [~p] offline records for jid: ~p", [C, U]),
+        % ?LOG_INFO("routing [~p] offline records for jid: ~p", [C, U]),
         Packet =
         #xmlel{
                 name = <<"message">>,
@@ -1379,7 +1407,7 @@ add_delay_info(Packet, LServer, TS) ->
 	    end,
     Packet1 = xmpp:put_meta(Packet, from_offline, true),
     misc:add_delay_info(Packet1, jid:make(LServer), NewTS,
-			<<"Offline storage">>).
+			<<"Offline Storage">>).
 
 -spec get_priority_from_presence(presence()) -> integer().
 get_priority_from_presence(#presence{priority = Prio}) ->

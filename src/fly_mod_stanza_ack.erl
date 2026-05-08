@@ -156,6 +156,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             true ->
               {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,MentionList, DisappearAt , _} = ContentAcknowledge
           end,
+           ?INFO_MSG("on_user_send_packet ~p",[EditMsgid]),
           case catch fly_mod_utils:check_blockeduser(FServer, FUser, TUser) of
             {selected, _, []} ->
               BlockUser = <<"0">>;
@@ -182,8 +183,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
               {_, _, FlatTimeStamp} = GetTimestamp,
               TimeStampedPacket = NewPacket
           end,
-          store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, MetaData,BlockUser, EditMsgid, FlatTimeStamp),
-
+       
         if BlockUser == <<"0">> ->
           case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
             true ->
@@ -209,7 +209,13 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             Metadata = MetaData
         end,
 
-        fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid,DisappearAt);
+       case xmpp:get_meta(NewPacket) of
+        #{from_broadcast := true} -> ok;
+        _ ->
+          store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, Metadata,BlockUser, EditMsgid, FlatTimeStamp),
+          fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid,DisappearAt)
+       end;
+      
         S when (S == false) ->
           BlockUser = <<"0">>,
           ok
