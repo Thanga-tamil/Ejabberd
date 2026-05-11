@@ -1448,7 +1448,15 @@ insert_status(#jid{luser = User}, #jid{luser = ToUser,lserver = ToServer}, Messa
     EditMsgId = EditmsgId
 end,
 
-  ?INFO_MSG("Insert message is DisappearAt ~p", [DisappearAt]), 
+DisappearAtValue =
+    case DisappearAt of
+        <<"">> ->
+            <<"NULL">>;
+        _ ->
+            [<<"'">>, DisappearAt, <<"'">>]
+    end,
+
+  ?INFO_MSG("Insert message is DisappearAt ~p", [DisappearAtValue]), 
   if EditMsgId =:= MessageId ->
     if Topicid =:= <<"">> ->
       ejabberd_sql:sql_query( ToServer, [<<"insert into message_status (from_user,to_user,status, recent,message_id, edit_message_id, message_type,  topic_id, meta_data, txt,chat_type,from_notification,blocked,message_time,to_notification,message_notification,received_at,seen_at) values
@@ -1463,7 +1471,7 @@ end,
   %ejabberd_sql:sql_query(ToServer, [<<"delete from spool where username = '">>,ToUser, <<"' and message_id ='">>,MessageId, <<"';">>]), % commented to retain recalled message on edit in offline storage 
   ejabberd_sql:sql_query( ToServer, [<<"update  message_status set edit_status = 1, status = 0,  edit_message_id = '">>, EditMsgId , <<"' where message_id = '">>, MessageId, <<"' ;">>])
   end,
-  ejabberd_sql:sql_query( ToServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg, meta_data, disappear_at) values ('">>, User, <<"', '">>, ToUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'chat', '">>, Msg, <<"', '">>, MetaData, <<"', '">>,DisappearAt,<<"' );">>]).
+  ejabberd_sql:sql_query(ToServer, [<<"insert into chat_message_edit_history (from_user,to_user,message_id,edit_message_id,chat_type,msg,meta_data,disappear_at) values ('">>, User, <<"','">>, ToUser, <<"','">>, MessageId, <<"','">>, EditMsgId, <<"','chat','">>, Msg, <<"','">>, MetaData, <<"', ">>, DisappearAtValue, <<" );">>]).
 
 mute_status(Lserver, Luser, Tuser)->
   ejabberd_sql:sql_query(Lserver,
