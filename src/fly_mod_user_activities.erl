@@ -2746,6 +2746,9 @@ send_bulk_message(From, RequestType, SubEl, IQ) ->
     Attributes = [<<"message_from">>, <<"message_to">>, <<"message_type">>, <<"message_id">>, <<"message">>, <<"group_id">>, <<"chat_type">>,<<"to_user">>, <<"disappear_at">>],
     Results = lists:map(fun(Attr) -> fxml:get_path_s(SubEl, [{attr, Attr}]) end, Attributes),
     [MessageFrom, MessageTo, MessageType, MessageId, MessageTag, GroupId, ChatType, TeamId, DisappearAt] = Results,
+    
+    Result = fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>}),
+
     spawn(fun() ->
         case ChatType of
             <<"chat">> -> 
@@ -2758,13 +2761,13 @@ send_bulk_message(From, RequestType, SubEl, IQ) ->
                 ok
         end
     end),
-    fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>}).
+    Result.
 
 process_bulk_chunks(From, TeamId, MessageFrom, MessageType, ChunkSize, Offset, IQ, RequestType, ChatType) ->
     case catch fly_mod_utils:get_bulk_message_details(From, TeamId, Offset, ChunkSize) of
         {selected, _, []} ->
             if Offset == 0 ->
-                fly_mod_utils:generate_subel(IQ, #query{type = RequestType, result_type = <<"Members not found">>});
+                fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Members not found">>});
             true ->
                 fly_mod_utils:remove_bulk_notification(From, TeamId),
                 fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>})
