@@ -2760,7 +2760,7 @@ send_bulk_message(From, RequestType, SubEl, IQ) ->
                 ok
         end
     end),
-    ?INFO_MSG("send_bulk_message: ~p ", [TeamId]);
+    ?INFO_MSG("send_bulk_message: ~p ", [TeamId]),
     Result.
 
 process_bulk_chunks(From, TeamId, MessageFrom, MessageType, ChunkSize, Offset, IQ, RequestType, ChatType) ->
