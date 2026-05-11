@@ -218,6 +218,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
                     {MetaDataJson} = jiffy:decode(Metadata),
                     ScheduledAt = proplists:get_value(<<"meet_schedule_at">>, MetaDataJson),
                     ReminderBeforeMinute = proplists:get_value(<<"reminder_before_minute">>, MetaDataJson),
+                    RoomId = proplists:get_value(<<"room_id">>, MetaDataJson),
                     JSONMessageId = proplists:get_value(<<"message_id">>, MetaDataJson),
                     FinalMessageId = if (JSONMessageId =:= <<>>) or (JSONMessageId =:= <<"">>) or (JSONMessageId =:= undefined) ->
                                         MessageId;
@@ -226,17 +227,16 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
                                      end,
                     ScheduledAtVal = if is_binary(ScheduledAt) -> binary_to_integer(ScheduledAt); true -> ScheduledAt end,
                     ReminderVal = if is_binary(ReminderBeforeMinute) -> binary_to_integer(ReminderBeforeMinute); true -> ReminderBeforeMinute end,
-                    ?INFO_MSG("Meet extracted values: FinalMessageId=~p, ScheduledAtVal=~p, ReminderVal=~p", [FinalMessageId, ScheduledAtVal, ReminderVal]),
-                    if (ScheduledAtVal =/= undefined) and (FinalMessageId =/= undefined) ->
+                    ?INFO_MSG("Meet extracted values: FinalMessageId=~p, ScheduledAtVal=~p, ReminderVal=~p, RoomId=~p", [FinalMessageId, ScheduledAtVal, ReminderVal, RoomId]),
+                    if (ScheduledAtVal =/= undefined) and (FinalMessageId =/= undefined) and (RoomId =/= undefined) ->
                         Res = ejabberd_sql:sql_query(FServer, [
-                            <<"INSERT INTO call_sessions (scheduled_at, message_id, reminder_before_minutes) VALUES (">>,
-                            integer_to_binary(ScheduledAtVal), <<", '">>, FinalMessageId, <<"', ">>, 
-                            integer_to_binary(if ReminderVal =:= undefined -> 0; true -> ReminderVal end), <<") ">>,
-                            <<"ON DUPLICATE KEY UPDATE scheduled_at = VALUES(scheduled_at), reminder_before_minutes = VALUES(reminder_before_minutes);">>
+                            <<"UPDATE call_sessions SET scheduled_at = ">>, integer_to_binary(ScheduledAtVal),
+                            <<", reminder_before_minutes = ">>, integer_to_binary(if ReminderVal =:= undefined -> 0; true -> ReminderVal end),
+                            <<" WHERE message_id = '">>, FinalMessageId, <<"' AND room_id = '">>, RoomId, <<"';">>
                         ]),
-                        ?INFO_MSG("call_sessions insert result: ~p", [Res]);
+                        ?INFO_MSG("call_sessions update result: ~p", [Res]);
                     true ->
-                        ?INFO_MSG("Skipping call_sessions insert: missing values ~p", []),
+                        ?INFO_MSG("Skipping call_sessions update: missing values ~p", []),
                         ok
                     end
                 catch
