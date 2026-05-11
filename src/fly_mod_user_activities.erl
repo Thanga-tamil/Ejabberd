@@ -2755,9 +2755,11 @@ send_bulk_message(From, RequestType, SubEl, IQ) ->
                 IQ, RequestType, ChatType
             );
         <<"normal">> -> 
-            send_message(ChatType, MessageFrom, GroupId, MessageType, MessageTag, MessageId, #{ from_broadcast => true, disappear_at => DisappearAt }),
-            fly_mod_utils:remove_bulk_notification(From, TeamId),
-            ?INFO_MSG("send_message: ~p ", [TeamId]),
+            spawn(fun() ->
+                send_message(ChatType, MessageFrom, GroupId, MessageType, MessageTag, MessageId, #{ from_broadcast => true, disappear_at => DisappearAt }),
+                fly_mod_utils:remove_bulk_notification(From, TeamId),
+                ?INFO_MSG("send_message: ~p ", [TeamId])
+            end),
             fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>});
         _ -> 
             undefined
