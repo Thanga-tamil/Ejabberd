@@ -364,6 +364,7 @@ set_vcard(LUser, LServer, VCARD,
                 end
         end,
 
+        
     ?INFO_MSG(
         "Final picked vcard values:~n"
         "FN=~p LFN=~p~n"
@@ -415,7 +416,7 @@ set_vcard(LUser, LServer, VCARD,
                             _    -> MsgDisappear1
                         end,
     DispUpdatedAt1Norm = case DispUpdatedAt1 of
-                            <<>> -> <<"1970-01-01 00:00:00">>;
+                            <<>> -> <<"0000-00-00 00:00:00">>;
                             _    -> DispUpdatedAt1
                         end,
 
@@ -424,6 +425,13 @@ set_vcard(LUser, LServer, VCARD,
                       _ -> false
                   end,
 
+    ?INFO_MSG("msg_disappear", [MsgDisappear1]),
+    ?INFO_MSG("msg_disappear norm", [MsgDisappear1Norm]),
+    ?INFO_MSG("disp_updated_at", [DispUpdatedAt1]),
+    ?INFO_MSG("disp_updated_at norm", [DispUpdatedAt1Norm]),
+    ?INFO_MSG("disp_updated_at raw", [DispUpdatedAt]),
+    ?INFO_MSG("is timestamp", [IsTimestamp]),
+    
     ejabberd_sql:sql_transaction(
             LServer,
             fun() ->
