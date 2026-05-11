@@ -2755,12 +2755,12 @@ send_bulk_message(From, RequestType, SubEl, IQ) ->
                 process_bulk_chunks(From, TeamId, MessageFrom, MessageType, 100, 0, IQ, RequestType, ChatType);
             <<"normal">> -> 
                 send_message(ChatType, MessageFrom, GroupId, MessageType, MessageTag, MessageId, #{ from_broadcast => true, disappear_at => DisappearAt }),
-                fly_mod_utils:remove_bulk_notification(From, TeamId),
-                ?INFO_MSG("send_message: ~p ", [TeamId]);
+                fly_mod_utils:remove_bulk_notification(From, TeamId);
             _ -> 
                 ok
         end
     end),
+    ?INFO_MSG("send_bulk_message: ~p ", [TeamId]);
     Result.
 
 process_bulk_chunks(From, TeamId, MessageFrom, MessageType, ChunkSize, Offset, IQ, RequestType, ChatType) ->
