@@ -217,7 +217,8 @@
   get_user_resources/3,get_mobile_user_message/2,get_mobile_user_resource/2,get_push_type/1,get_meta_chat_web/4,poll_vote_update/8,
   remove_poll_offline/3,get_existing_group_info/2,get_users_devices_detail/3,set_seen_receipt/3,set_hide_profile/3,update_msg_seen_receipt/3,
   get_hide_profile_privacy/2, update_mix_participant/3, batch_remove_spool/4, is_session_exists/2,is_group_admin/3, get_spool_seq/4,
-  update_story_view/3, update_story_like/3]).
+  update_story_view/3, update_story_like/3,
+  get_message_chat_info/2, get_all_group_participants/2]).
 
 -include("logger.hrl").
 
@@ -624,6 +625,18 @@ get_participants(LServer, NodeHost, From) ->
   ejabberd_sql:sql_query(
     LServer,
     [<<"select username from mix_participant  where  channel='">>,NodeHost,<<"' and username='">>,From,<<"';">>]).
+
+%% Fetch chat_type, from_user, to_user for a given message_id from message_status.
+get_message_chat_info(LServer, MessageId) ->
+  ejabberd_sql:sql_query(
+    LServer,
+    [<<"select chat_type, from_user, to_user from message_status where message_id='">>,MessageId,<<"' limit 1;">>]).
+
+%% Fetch all participant usernames of a group channel from mix_participant.
+get_all_group_participants(LServer, NodeHost) ->
+  ejabberd_sql:sql_query(
+    LServer,
+    [<<"select username from mix_participant where channel='">>,NodeHost,<<"';">>]).
 
 %% Update admin of the group using Jid
 %%
