@@ -3286,31 +3286,81 @@ post_story(From, RequestType, SubEl, IQ) ->
 
 
 story_seen(From, RequestType, SubEl, IQ) ->
-    ?INFO_MSG("story_seen IQ received From=~p", [From]),
+    ?INFO_MSG("process_iq_set story_seen", []),
 
-    #jid{lserver = Server, luser = ViewerUsername} = From,
+    %% Debug complete incoming structure
+    ?INFO_MSG("SubEl FULL = ~p", [SubEl]),
+    ?INFO_MSG("SubEl attrs = ~p", [SubEl#xmlel.attrs]),
+    ?INFO_MSG("SubEl children = ~p", [SubEl#xmlel.children]),
 
-    StoryId = fxml:get_attr_s(<<"story_id">>, SubEl#xmlel.attrs),
-    OwnerJidStr = fxml:get_attr_s(<<"story_owner">>, SubEl#xmlel.attrs),
+    #jid{
+        lserver = Server,
+        luser = ViewerUsername
+    } = From,
 
-    ?INFO_MSG("story_seen parsed StoryId=~p Owner=~p Viewer=~p",
-              [StoryId, OwnerJidStr, ViewerUsername]),
+    %% Extract attributes properly
+    StoryId =
+        fxml:get_tag_attr_s(<<"story_id">>, SubEl),
 
-    %% Store story view
-    case StoryId =/= <<"">> of
-        true ->
-            ?INFO_MSG("Updating story view StoryId=~p Viewer=~p",
-                      [StoryId, ViewerUsername]),
-            fly_mod_utils:update_story_view(Server, StoryId, ViewerUsername);
-        false ->
-            ?ERROR_MSG("story_seen missing story_id", [])
+    OwnerJidStr =
+        fxml:get_tag_attr_s(<<"story_owner">>, SubEl),
+
+    ?INFO_MSG(
+        "story_seen extracted StoryId=~p Owner=~p Viewer=~p",
+        [StoryId, OwnerJidStr, ViewerUsername]
+    ),
+
+    %% Validate story_id
+    case StoryId of
+        <<>> ->
+            ?ERROR_MSG("story_seen missing story_id", []),
+            fly_mod_utils:generate_subel(
+                IQ,
+                #user_activities{
+                    type = RequestType,
+                    result_type = <<"missing story_id">>
+                }
+            );
+
+        _ ->
+            ok
     end,
 
-    %% Build owner jid properly
+    %% Validate story_owner
+    case OwnerJidStr of
+        <<>> ->
+            ?ERROR_MSG("story_seen missing story_owner", []),
+            fly_mod_utils:generate_subel(
+                IQ,
+                #user_activities{
+                    type = RequestType,
+                    result_type = <<"missing story_owner">>,
+                    story_id = StoryId
+                }
+            );
+
+        _ ->
+            ok
+    end,
+
+    %% Update DB
+    ?INFO_MSG(
+        "Updating story view StoryId=~p Viewer=~p",
+        [StoryId, ViewerUsername]
+    ),
+
+    catch fly_mod_utils:update_story_view(
+        Server,
+        StoryId,
+        ViewerUsername
+    ),
+
+    %% Build owner JID
     OwnerJid =
         case binary:match(OwnerJidStr, <<"@">>) of
             nomatch ->
                 jid:make(OwnerJidStr, Server, <<>>);
+
             _ ->
                 jid:from_string(OwnerJidStr)
         end,
@@ -3319,8 +3369,10 @@ story_seen(From, RequestType, SubEl, IQ) ->
 
     OwnerJidStr1 = jid:to_string(OwnerJid),
 
-    MessageId = fly_mod_utils:get_iq_message_id(16),
+    MessageId =
+        fly_mod_utils:get_iq_message_id(16),
 
+    %% Build routed message
     XmlBody =
         #xmlel{
             name = <<"message">>,
@@ -3344,21 +3396,50 @@ story_seen(From, RequestType, SubEl, IQ) ->
             ]
         },
 
-    ?INFO_MSG("Routing story_seen packet XmlBody=~p", [XmlBody]),
+    ?INFO_MSG(
+        "Routing story_seen packet XmlBody=~p",
+        [XmlBody]
+    ),
 
-    %% Route packet
-    catch ejabberd_router:route(From, OwnerJid, XmlBody),
+    %% Route message
+    try
+        ejabberd_router:route(
+            From,
+            OwnerJid,
+            XmlBody
+        ),
 
-    ?INFO_MSG("story_seen packet routed successfully to ~p",
-              [OwnerJidStr1]),
+        ?INFO_MSG(
+            "story_seen routed successfully to=~p",
+            [OwnerJidStr1]
+        )
 
-    %% Check online resources
-    #jid{luser = OUser, lserver = OServer} = OwnerJid,
+    catch
+        Class:Reason:Stacktrace ->
+            ?ERROR_MSG(
+                "story_seen routing failed class=~p reason=~p stack=~p",
+                [Class, Reason, Stacktrace]
+            )
+    end,
 
-    TResources = ejabberd_sm:get_user_resources(OUser, OServer),
+    %% Check owner resources
+    #jid{
+        luser = OUser,
+        lserver = OServer
+    } = OwnerJid,
 
-    ?INFO_MSG("Owner resources=~p", [TResources]),
+    TResources =
+        ejabberd_sm:get_user_resources(
+            OUser,
+            OServer
+        ),
 
+    ?INFO_MSG(
+        "Owner resources=~p",
+        [TResources]
+    ),
+
+    %% Final response
     fly_mod_utils:generate_subel(
         IQ,
         #user_activities{
