@@ -801,8 +801,14 @@ get_offline_msg(LServer,LUser) ->
     [<<"select  chat_type, xml, message_id from spool where username = '">>,LUser, <<"' and (chat_type = 'chat' or chat_type = 'normal') and status = 0 ;">>]).
 
 update_story_view(FServer, StoryId, ViewerId) ->
-  ejabberd_sql:sql_query(FServer,
-    [<<"INSERT IGNORE INTO story_views (story_id, viewer_username, viewed_at) VALUES (">>, StoryId, <<", '">>, ViewerId, <<"', NOW());">>]).
+  ejabberd_sql:sql_query(
+    FServer,
+    [<<"INSERT IGNORE INTO story_views (story_id, viewer_username, viewed_at) VALUES ('">>,
+     StoryId,
+     <<"', '">>,
+     ViewerId,
+     <<"', NOW());">>]
+  ).
 
 update_story_like(FServer, StoryId, LikerId) ->
   ejabberd_sql:sql_query(FServer,
