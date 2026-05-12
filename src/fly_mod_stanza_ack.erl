@@ -212,6 +212,41 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
        case xmpp:get_meta(NewPacket) of
         #{from_broadcast := true} -> ok;
         _ ->
+            if MessageType =:= <<"meet">> ->
+                ?INFO_MSG("Processing meet message: Metadata=~p", [Metadata]),
+                try
+                    {MetaDataJson} = jiffy:decode(Metadata),
+                    ScheduledAt = proplists:get_value(<<"meet_schedule_at">>, MetaDataJson),
+                    ReminderBeforeMinute = proplists:get_value(<<"reminder_before_minute">>, MetaDataJson),
+                    JoinUri = proplists:get_value(<<"join_uri">>, MetaDataJson),
+                    JSONMessageId = proplists:get_value(<<"message_id">>, MetaDataJson),
+                    FinalMessageId = if (JSONMessageId =:= <<>>) or (JSONMessageId =:= <<"">>) or (JSONMessageId =:= undefined) ->
+                                        MessageId;
+                                     true ->
+                                        JSONMessageId
+                                     end,
+                    ScheduledAtVal = if is_binary(ScheduledAt) -> binary_to_integer(ScheduledAt); true -> ScheduledAt end,
+                    ReminderVal = if is_binary(ReminderBeforeMinute) -> binary_to_integer(ReminderBeforeMinute); true -> ReminderBeforeMinute end,
+                    ?INFO_MSG("Meet extracted values: FinalMessageId=~p, ScheduledAtVal=~p, ReminderVal=~p, JoinUri=~p", [FinalMessageId, ScheduledAtVal, ReminderVal, JoinUri]),
+                    if (ScheduledAtVal =/= undefined) and (FinalMessageId =/= undefined) and (JoinUri =/= undefined) ->
+                        Res = ejabberd_sql:sql_query(FServer, [
+                            <<"UPDATE call_sessions SET scheduled_at = ">>, integer_to_binary(ScheduledAtVal),
+                            <<", reminder_before_minutes = ">>, integer_to_binary(if ReminderVal =:= undefined -> 0; true -> ReminderVal end),
+                            <<" WHERE message_id = '">>, FinalMessageId, <<"' AND join_uri = '">>, JoinUri, <<"';">>
+                        ]),
+                        ?INFO_MSG("call_sessions update result: ~p", [Res]);
+                    true ->
+                        ?INFO_MSG("Skipping call_sessions update: missing values ~p", []),
+                        ok
+                    end
+                catch
+                    E:R -> 
+                        ?ERROR_MSG("Error parsing meet metadata or SQL: ~p ~p", [E, R]),
+                        ok
+                end;
+            true ->
+                ok
+            end,
           store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, Metadata,BlockUser, EditMsgid, FlatTimeStamp),
           fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid,DisappearAt)
        end;

@@ -250,6 +250,8 @@ process_iq_set(From, _To, RequestType, IQ) ->
       story_like(From, RequestType, SubEl, IQ);
     <<"delete_story">> ->
       delete_story(From, RequestType, SubEl, IQ);
+    <<"meeting_reminder">> ->
+      meeting_reminder(From, RequestType, SubEl, IQ);
     no_such_subtag ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"no_such_subtag">>, result_type = <<"unknown request">>});
     empty_value ->
@@ -2767,7 +2769,7 @@ process_bulk_chunks(From, TeamId, MessageFrom, MessageType, ChunkSize, Offset, I
     case catch fly_mod_utils:get_bulk_message_details(From, TeamId, Offset, ChunkSize) of
         {selected, _, []} ->
             if Offset == 0 ->
-                fly_mod_utils:generate_subel(IQ, #query{type = RequestType, result_type = <<"Members not found">>});
+                fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Members not found">>});
             true ->
                 fly_mod_utils:remove_bulk_notification(From, TeamId),
                 fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>})
@@ -3368,7 +3370,98 @@ delete_story(From, RequestType, SubEl, IQ) ->
 
     %% 4. Return IQ Result back to the sender
     fly_mod_utils:generate_subel(IQ, #user_activities{
-        type = RequestType, 
-        result_type = <<"success">>, 
+        type = RequestType,
+        result_type = <<"success">>,
         story_id = StoryId
+    }).
+
+meeting_reminder(From, RequestType, SubEl, IQ) ->
+    #jid{lserver = FromServer} = From,
+
+    %% 1. Extract attributes from the incoming IQ
+    SessionId     = fxml:get_attr_s(<<"session_id">>, SubEl#xmlel.attrs),
+    RoomId        = fxml:get_attr_s(<<"room_id">>, SubEl#xmlel.attrs),
+    ChatId        = fxml:get_attr_s(<<"chat_id">>, SubEl#xmlel.attrs),
+    CallMode      = fxml:get_attr_s(<<"call_mode">>, SubEl#xmlel.attrs),
+    CallType      = fxml:get_attr_s(<<"call_type">>, SubEl#xmlel.attrs),
+    ScheduledAt   = fxml:get_attr_s(<<"scheduled_at">>, SubEl#xmlel.attrs),
+    MessageIdAttr = fxml:get_attr_s(<<"message_id">>, SubEl#xmlel.attrs),
+    ReminderMins  = fxml:get_attr_s(<<"reminder_before_minutes">>, SubEl#xmlel.attrs),
+
+    ?INFO_MSG("meeting_reminder request from=~ts message_id=~ts session_id=~ts room_id=~ts",
+              [jid:to_string(From), MessageIdAttr, SessionId, RoomId]),
+
+    %% 2. Lookup message_status to determine chat_type, from_user, to_user
+    {ChatType, MsgFromUser, MsgToUser} =
+        case catch fly_mod_utils:get_message_chat_info(FromServer, MessageIdAttr) of
+            {selected, _Cols, [[CT, FU, TU] | _]} ->
+                {CT, FU, TU};
+            _ ->
+                {<<>>, <<>>, <<>>}
+        end,
+
+    ?INFO_MSG("meeting_reminder message_status chat_type=~ts from_user=~ts to_user=~ts",
+              [ChatType, MsgFromUser, MsgToUser]),
+
+    %% 3. Build the list of target users based on chat_type
+    TargetUsers =
+        case ChatType of
+            <<"normal">> ->
+                %% Group: from_user is the group id, fetch all participants
+                case catch fly_mod_utils:get_all_group_participants(FromServer, MsgFromUser) of
+                    {selected, _, Rows} ->
+                        [U || [U] <- Rows, U =/= <<>>];
+                    _ ->
+                        []
+                end;
+            _ ->
+                %% Single (one-to-one): notify only from_user and to_user
+                lists:usort([U || U <- [MsgFromUser, MsgToUser], U =/= <<>>])
+        end,
+
+    ?INFO_MSG("meeting_reminder targets=~p chat_type=~ts", [TargetUsers, ChatType]),
+
+    %% 4. Route the meeting_reminder notification to each target user
+    NotifyMessageId = fly_mod_utils:get_iq_message_id(16),
+    lists:foreach(fun(TargetUser) ->
+        ToUserJid = jid:make(TargetUser, FromServer, <<>>),
+        ToUserStr = jid:to_string(ToUserJid),
+
+        XmlBody = #xmlel{name = <<"message">>,
+            attrs = [
+                {<<"from">>, jid:to_string(From)},
+                {<<"to">>, ToUserStr},
+                {<<"type">>, <<"chat">>},
+                {<<"id">>, NotifyMessageId}
+            ],
+            children = [#xmlel{name = <<"meeting">>,
+                attrs = [
+                    {<<"xmlns">>, ?NS_RECEIPTS},
+                    {<<"status">>, <<"meeting_reminder">>},
+                    {<<"session_id">>, SessionId},
+                    {<<"room_id">>, RoomId},
+                    {<<"chat_id">>, ChatId},
+                    {<<"call_mode">>, CallMode},
+                    {<<"call_type">>, CallType},
+                    {<<"scheduled_at">>, ScheduledAt},
+                    {<<"message_id">>, MessageIdAttr},
+                    {<<"reminder_before_minutes">>, ReminderMins}
+                ],
+                children = []}]},
+
+        try
+            ejabberd_router:route(From, ToUserJid, XmlBody),
+            ?INFO_MSG("meeting_reminder routed message_id=~ts to=~ts", [MessageIdAttr, ToUserStr])
+        catch
+            Class:Reason ->
+                ?ERROR_MSG("meeting_reminder failed message_id=~ts to=~ts: ~p:~p",
+                           [MessageIdAttr, ToUserStr, Class, Reason])
+        end
+    end, TargetUsers),
+
+    %% 5. Return IQ result to the sender
+    fly_mod_utils:generate_subel(IQ, #user_activities{
+        type = RequestType,
+        result_type = <<"success">>,
+        message_id = MessageIdAttr
     }).
