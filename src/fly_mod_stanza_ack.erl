@@ -232,7 +232,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
                         Res = ejabberd_sql:sql_query(FServer, [
                             <<"UPDATE call_sessions SET scheduled_at = ">>, integer_to_binary(ScheduledAtVal),
                             <<", reminder_before_minutes = ">>, integer_to_binary(if ReminderVal =:= undefined -> 0; true -> ReminderVal end),
-                            <<" WHERE message_id = '">>, FinalMessageId, <<"' AND join_uri = '">>, JoinUri, <<"';">>
+                            <<" WHERE join_uri = '">>, JoinUri, <<"';">>
                         ]),
                         ?INFO_MSG("call_sessions update result: ~p", [Res]);
                     true ->
