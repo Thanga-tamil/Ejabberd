@@ -218,7 +218,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
                     {MetaDataJson} = jiffy:decode(Metadata),
                     ScheduledAt = proplists:get_value(<<"meet_schedule_at">>, MetaDataJson),
                     ReminderBeforeMinute = proplists:get_value(<<"reminder_before_minute">>, MetaDataJson),
-                    RoomId = proplists:get_value(<<"room_id">>, MetaDataJson),
+                    JoinUri = proplists:get_value(<<"join_uri">>, MetaDataJson),
                     JSONMessageId = proplists:get_value(<<"message_id">>, MetaDataJson),
                     FinalMessageId = if (JSONMessageId =:= <<>>) or (JSONMessageId =:= <<"">>) or (JSONMessageId =:= undefined) ->
                                         MessageId;
@@ -227,12 +227,13 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
                                      end,
                     ScheduledAtVal = if is_binary(ScheduledAt) -> binary_to_integer(ScheduledAt); true -> ScheduledAt end,
                     ReminderVal = if is_binary(ReminderBeforeMinute) -> binary_to_integer(ReminderBeforeMinute); true -> ReminderBeforeMinute end,
-                    ?INFO_MSG("Meet extracted values: FinalMessageId=~p, ScheduledAtVal=~p, ReminderVal=~p, RoomId=~p", [FinalMessageId, ScheduledAtVal, ReminderVal, RoomId]),
-                    if (ScheduledAtVal =/= undefined) and (FinalMessageId =/= undefined) and (RoomId =/= undefined) ->
+                    ?INFO_MSG("Meet extracted values: FinalMessageId=~p, ScheduledAtVal=~p, ReminderVal=~p, JoinUri=~p", [FinalMessageId, ScheduledAtVal, ReminderVal, JoinUri]),
+                    if (ScheduledAtVal =/= undefined) and (FinalMessageId =/= undefined) and (JoinUri =/= undefined) ->
                         Res = ejabberd_sql:sql_query(FServer, [
                             <<"UPDATE call_sessions SET scheduled_at = ">>, integer_to_binary(ScheduledAtVal),
                             <<", reminder_before_minutes = ">>, integer_to_binary(if ReminderVal =:= undefined -> 0; true -> ReminderVal end),
-                            <<" WHERE message_id = '">>, FinalMessageId, <<"' AND room_id = '">>, RoomId, <<"';">>
+                            <<", message_id = '">>, FinalMessageId, <<"'">>,
+                            <<" WHERE join_uri = '">>, JoinUri, <<"';">>
                         ]),
                         ?INFO_MSG("call_sessions update result: ~p", [Res]);
                     true ->

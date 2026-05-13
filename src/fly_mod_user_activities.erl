@@ -250,6 +250,8 @@ process_iq_set(From, _To, RequestType, IQ) ->
       story_like(From, RequestType, SubEl, IQ);
     <<"delete_story">> ->
       delete_story(From, RequestType, SubEl, IQ);
+    <<"meeting_reminder">> ->
+      meeting_reminder(From, RequestType, SubEl, IQ);
     no_such_subtag ->
       fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"no_such_subtag">>, result_type = <<"unknown request">>});
     empty_value ->
@@ -3249,71 +3251,335 @@ post_story(From, RequestType, SubEl, IQ) ->
   
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"posted story routed">>}).
 
-story_seen(From, RequestType, SubEl, IQ) ->
-  #jid{lserver = Server, luser = ViewerUsername} = From,
-  StoryId = fxml:get_attr_s(<<"story_id">>, SubEl#xmlel.attrs),
-  OwnerJidStr = fxml:get_attr_s(<<"story_owner">>, SubEl#xmlel.attrs),
+% story_seen(From, RequestType, SubEl, IQ) ->
+%   #jid{lserver = Server, luser = ViewerUsername} = From,
+%   StoryId = fxml:get_attr_s(<<"story_id">>, SubEl#xmlel.attrs),
+%   OwnerJidStr = fxml:get_attr_s(<<"story_owner">>, SubEl#xmlel.attrs),
   
-  case StoryId =/= <<"">> of
-    true -> fly_mod_utils:update_story_view(Server, StoryId, ViewerUsername);
-    false -> ok
-  end,
+%   case StoryId =/= <<"">> of
+%     true -> fly_mod_utils:update_story_view(Server, StoryId, ViewerUsername);
+%     false -> ok
+%   end,
   
-  OwnerJid = case binary:match(OwnerJidStr, <<"@">>) of
-    nomatch -> jid:make(OwnerJidStr, Server, <<>>);
-    _ -> jid:from_string(OwnerJidStr)
-  end,
-  OwnerJidStr1 = jid:to_string(OwnerJid),
-  #jid{luser = OUser, lserver = OServer} = OwnerJid,
-  MessageId = fly_mod_utils:get_iq_message_id(16),
-  XmlBody = #xmlel{name = <<"message">>,
-      attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, OwnerJidStr1}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
-      children = [#xmlel{name = <<"story">>,
-        attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"status">>, <<"story_seen">>}, {<<"story_id">>, StoryId}],
-        children = []}]},
+%   OwnerJid = case binary:match(OwnerJidStr, <<"@">>) of
+%     nomatch -> jid:make(OwnerJidStr, Server, <<>>);
+%     _ -> jid:from_string(OwnerJidStr)
+%   end,
+%   OwnerJidStr1 = jid:to_string(OwnerJid),
+%   #jid{luser = OUser, lserver = OServer} = OwnerJid,
+%   MessageId = fly_mod_utils:get_iq_message_id(16),
+%   XmlBody = #xmlel{name = <<"message">>,
+%       attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, OwnerJidStr1}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
+%       children = [#xmlel{name = <<"story">>,
+%         attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"status">>, <<"story_seen">>}, {<<"story_id">>, StoryId}],
+%         children = []}]},
         
-  ejabberd_router:route(From, OwnerJid, XmlBody),
-  TResources = ejabberd_sm:get_user_resources(OUser, OServer),
-  if length(TResources) =:= 0 ->
-      mod_offline:store_packet({From, xmpp:decode(XmlBody)});
-  true ->
-      ok
-  end,
+%   ejabberd_router:route(From, OwnerJid, XmlBody),
+%   TResources = ejabberd_sm:get_user_resources(OUser, OServer),
+%   if length(TResources) =:= 0 ->
+%       mod_offline:store_packet({From, xmpp:decode(XmlBody)});
+%   true ->
+%       ok
+%   end,
   
-  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"story seen recorded">>, story_id = StoryId}).
+%   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"story seen recorded">>, story_id = StoryId}).
+
+
+story_seen(From, RequestType, SubEl, IQ) ->
+    ?INFO_MSG("process_iq_set story_seen", []),
+
+    %% Debug complete incoming structure
+    ?INFO_MSG("SubEl FULL = ~p", [SubEl]),
+    ?INFO_MSG("SubEl attrs = ~p", [SubEl#xmlel.attrs]),
+    ?INFO_MSG("SubEl children = ~p", [SubEl#xmlel.children]),
+
+    #jid{
+        lserver = Server,
+        luser = ViewerUsername
+    } = From,
+
+    %% Extract attributes properly
+    StoryId =
+        fxml:get_tag_attr_s(<<"story_id">>, SubEl),
+
+    OwnerJidStr =
+        fxml:get_tag_attr_s(<<"story_owner">>, SubEl),
+
+    ?INFO_MSG(
+        "story_seen extracted StoryId=~p Owner=~p Viewer=~p",
+        [StoryId, OwnerJidStr, ViewerUsername]
+    ),
+
+    %% Validate story_id
+    case StoryId of
+        <<>> ->
+            ?ERROR_MSG("story_seen missing story_id", []),
+            fly_mod_utils:generate_subel(
+                IQ,
+                #user_activities{
+                    type = RequestType,
+                    result_type = <<"missing story_id">>
+                }
+            );
+
+        _ ->
+            ok
+    end,
+
+    %% Validate story_owner
+    case OwnerJidStr of
+        <<>> ->
+            ?ERROR_MSG("story_seen missing story_owner", []),
+            fly_mod_utils:generate_subel(
+                IQ,
+                #user_activities{
+                    type = RequestType,
+                    result_type = <<"missing story_owner">>,
+                    story_id = StoryId
+                }
+            );
+
+        _ ->
+            ok
+    end,
+
+    %% Update DB
+    ?INFO_MSG(
+        "Updating story view StoryId=~p Viewer=~p",
+        [StoryId, ViewerUsername]
+    ),
+
+    catch fly_mod_utils:update_story_view(
+        Server,
+        StoryId,
+        ViewerUsername
+    ),
+
+    %% Build owner JID
+    OwnerJid =
+        case binary:match(OwnerJidStr, <<"@">>) of
+            nomatch ->
+                jid:make(OwnerJidStr, Server, <<>>);
+
+            _ ->
+                jid:from_string(OwnerJidStr)
+        end,
+
+    ?INFO_MSG("Resolved OwnerJid=~p", [OwnerJid]),
+
+    OwnerJidStr1 = jid:to_string(OwnerJid),
+
+    MessageId =
+        fly_mod_utils:get_iq_message_id(16),
+
+    %% Build routed message
+    XmlBody =
+        #xmlel{
+            name = <<"message">>,
+            attrs = [
+                {<<"from">>, jid:to_string(From)},
+                {<<"to">>, OwnerJidStr1},
+                {<<"type">>, <<"chat">>},
+                {<<"id">>, MessageId}
+            ],
+            children = [
+                #xmlel{
+                    name = <<"story">>,
+                    attrs = [
+                        {<<"xmlns">>, ?NS_RECEIPTS},
+                        {<<"status">>, <<"story_seen">>},
+                        {<<"story_id">>, StoryId},
+                        {<<"viewer">>, ViewerUsername}
+                    ],
+                    children = []
+                }
+            ]
+        },
+
+    ?INFO_MSG(
+        "Routing story_seen packet XmlBody=~p",
+        [XmlBody]
+    ),
+
+    %% Route message
+    try
+        ejabberd_router:route(
+            From,
+            OwnerJid,
+            XmlBody
+        ),
+
+        ?INFO_MSG(
+            "story_seen routed successfully to=~p",
+            [OwnerJidStr1]
+        )
+
+    catch
+        Class:Reason:Stacktrace ->
+            ?ERROR_MSG(
+                "story_seen routing failed class=~p reason=~p stack=~p",
+                [Class, Reason, Stacktrace]
+            )
+    end,
+
+    %% Check owner resources
+    #jid{
+        luser = OUser,
+        lserver = OServer
+    } = OwnerJid,
+
+    TResources =
+        ejabberd_sm:get_user_resources(
+            OUser,
+            OServer
+        ),
+
+    ?INFO_MSG(
+        "Owner resources=~p",
+        [TResources]
+    ),
+
+    %% Final response
+    fly_mod_utils:generate_subel(
+        IQ,
+        #user_activities{
+            type = RequestType,
+            result_type = <<"story seen recorded">>,
+            story_id = StoryId
+        }
+    ).
 
 story_like(From, RequestType, SubEl, IQ) ->
-  #jid{lserver = Server, luser = LikerUsername} = From,
-  StoryId = fxml:get_attr_s(<<"story_id">>, SubEl#xmlel.attrs),
-  OwnerJidStr = fxml:get_attr_s(<<"story_owner">>, SubEl#xmlel.attrs),
-  
-  case StoryId =/= <<"">> of
-    true -> fly_mod_utils:update_story_like(Server, StoryId, LikerUsername);
-    false -> ok
-  end,
-  
-  OwnerJid = case binary:match(OwnerJidStr, <<"@">>) of
-    nomatch -> jid:make(OwnerJidStr, Server, <<>>);
-    _ -> jid:from_string(OwnerJidStr)
-  end,
-  OwnerJidStr1 = jid:to_string(OwnerJid),
-  #jid{luser = OUser, lserver = OServer} = OwnerJid,
-  FromU = jid:encode(jid:remove_resource(From)),
-  MessageId = fly_mod_utils:get_iq_message_id(16),
-  XmlBody = #xmlel{name = <<"message">>,
-      attrs = [{<<"from">>, jid:to_string(From)}, {<<"to">>, OwnerJidStr1}, {<<"type">>, <<"chat">>}, {<<"id">>, MessageId}],
-      children = [#xmlel{name = <<"story">>,
-        attrs = [{<<"xmlns">>, ?NS_RECEIPTS}, {<<"status">>, <<"story_like">>}, {<<"story_id">>, StoryId}],
-        children = []}]},
-        
-  ejabberd_router:route(From, OwnerJid, XmlBody),
-  TResources = ejabberd_sm:get_user_resources(OUser, OServer),
-  if length(TResources) =:= 0 ->
-      mod_offline:store_packet({From, xmpp:decode(XmlBody)});
-  true ->
-      ok
-  end,
-  fly_mod_utils:generate_subel(IQ, #user_activities{type = <<"story_like">>, result_type = <<"success">>, story_id = StoryId}).
+    ?INFO_MSG("process_iq_set story_like", []),
+    %% Debug incoming packet
+    ?INFO_MSG("SubEl FULL = ~p", [SubEl]),
+    ?INFO_MSG("SubEl attrs = ~p", [SubEl#xmlel.attrs]),
+    ?INFO_MSG("SubEl children = ~p", [SubEl#xmlel.children]),
+
+    #jid{ lserver = Server,luser = LikerUsername} = From,
+
+    StoryId = fxml:get_tag_attr_s(<<"story_id">>, SubEl),
+    OwnerJidStr = fxml:get_tag_attr_s(<<"story_owner">>, SubEl),
+    ?INFO_MSG("story_like extracted StoryId=~p Owner=~p Liker=~p", [StoryId, OwnerJidStr, LikerUsername]),
+    %% Validate story_id
+    case StoryId of
+        <<>> ->
+            ?ERROR_MSG("story_like missing story_id", []),
+            fly_mod_utils:generate_subel(IQ,#user_activities{type = RequestType, result_type = <<"missing story_id">>});
+        _ ->
+            ok
+    end,
+    %% Validate story_owner
+    case OwnerJidStr of
+        <<>> ->
+            ?ERROR_MSG("story_like missing story_owner", []),
+            fly_mod_utils:generate_subel( IQ,#user_activities{type = RequestType, result_type = <<"missing story_owner">>, story_id = StoryId});
+        _ ->
+            ok
+    end,
+
+    %% Update DB
+    ?INFO_MSG("Updating story like StoryId=~p Liker=~p", [StoryId, LikerUsername]),
+    catch fly_mod_utils:update_story_like(Server,StoryId,LikerUsername),
+    %% Build owner JID
+    OwnerJid =
+        case binary:match(OwnerJidStr, <<"@">>) of
+            nomatch ->
+                jid:make(OwnerJidStr, Server, <<>>);
+            _ ->
+                jid:from_string(OwnerJidStr)
+        end,
+    ?INFO_MSG("Resolved OwnerJid=~p", [OwnerJid]),
+    OwnerJidStr1 =
+        jid:to_string(OwnerJid),
+    MessageId =fly_mod_utils:get_iq_message_id(16),
+
+    %% Build routed message
+    XmlBody =
+        #xmlel{
+            name = <<"message">>,
+            attrs = [
+                {<<"from">>, jid:to_string(From)},
+                {<<"to">>, OwnerJidStr1},
+                {<<"type">>, <<"chat">>},
+                {<<"id">>, MessageId}
+            ],
+            children = [
+                #xmlel{
+                    name = <<"story">>,
+                    attrs = [
+                        {<<"xmlns">>, ?NS_RECEIPTS},
+                        {<<"status">>, <<"story_like">>},
+                        {<<"story_id">>, StoryId},
+                        {<<"liker">>, LikerUsername}
+                    ],
+                    children = []
+                }
+            ]
+        },
+
+    ?INFO_MSG(
+        "Routing story_like packet XmlBody=~p",
+        [XmlBody]
+    ),
+    %% Route message
+    try
+        ejabberd_router:route(
+            From,
+            OwnerJid,
+            XmlBody
+        ),
+
+        ?INFO_MSG(
+            "story_like routed successfully to=~p",
+            [OwnerJidStr1]
+        )
+
+    catch
+        Class:Reason:Stacktrace ->
+            ?ERROR_MSG(
+                "story_like routing failed class=~p reason=~p stack=~p",
+                [Class, Reason, Stacktrace]
+            )
+    end,
+
+    %% Check owner resources
+    #jid{
+        luser = OUser,
+        lserver = OServer
+    } = OwnerJid,
+
+    TResources =
+        ejabberd_sm:get_user_resources(
+            OUser,
+            OServer
+        ),
+
+    ?INFO_MSG(
+        "Owner resources=~p",
+        [TResources]
+    ),
+
+    %% Store offline if no resources
+    % if
+    %     length(TResources) =:= 0 ->
+    %         mod_offline:store_packet(
+    %             {From, xmpp:decode(XmlBody)}
+    %         );
+
+    %     true ->
+    %         ok
+    % end,
+
+    %% Final response
+    fly_mod_utils:generate_subel(
+        IQ,
+        #user_activities{
+            type = RequestType,
+            result_type = <<"story like recorded">>,
+            story_id = StoryId
+        }
+    ).
 
 delete_story(From, RequestType, SubEl, IQ) ->
     #jid{lserver = FromServer} = From,
@@ -3368,7 +3634,98 @@ delete_story(From, RequestType, SubEl, IQ) ->
 
     %% 4. Return IQ Result back to the sender
     fly_mod_utils:generate_subel(IQ, #user_activities{
-        type = RequestType, 
-        result_type = <<"success">>, 
+        type = RequestType,
+        result_type = <<"success">>,
         story_id = StoryId
+    }).
+
+meeting_reminder(From, RequestType, SubEl, IQ) ->
+    #jid{lserver = FromServer} = From,
+
+    %% 1. Extract attributes from the incoming IQ
+    SessionId     = fxml:get_attr_s(<<"session_id">>, SubEl#xmlel.attrs),
+    RoomId        = fxml:get_attr_s(<<"room_id">>, SubEl#xmlel.attrs),
+    ChatId        = fxml:get_attr_s(<<"chat_id">>, SubEl#xmlel.attrs),
+    CallMode      = fxml:get_attr_s(<<"call_mode">>, SubEl#xmlel.attrs),
+    CallType      = fxml:get_attr_s(<<"call_type">>, SubEl#xmlel.attrs),
+    ScheduledAt   = fxml:get_attr_s(<<"scheduled_at">>, SubEl#xmlel.attrs),
+    MessageIdAttr = fxml:get_attr_s(<<"message_id">>, SubEl#xmlel.attrs),
+    ReminderMins  = fxml:get_attr_s(<<"reminder_before_minutes">>, SubEl#xmlel.attrs),
+
+    ?INFO_MSG("meeting_reminder request from=~ts message_id=~ts session_id=~ts room_id=~ts",
+              [jid:to_string(From), MessageIdAttr, SessionId, RoomId]),
+
+    %% 2. Lookup message_status to determine chat_type, from_user, to_user
+    {ChatType, MsgFromUser, MsgToUser} =
+        case catch fly_mod_utils:get_message_chat_info(FromServer, MessageIdAttr) of
+            {selected, _Cols, [[CT, FU, TU] | _]} ->
+                {CT, FU, TU};
+            _ ->
+                {<<>>, <<>>, <<>>}
+        end,
+
+    ?INFO_MSG("meeting_reminder message_status chat_type=~ts from_user=~ts to_user=~ts",
+              [ChatType, MsgFromUser, MsgToUser]),
+
+    %% 3. Build the list of target users based on chat_type
+    TargetUsers =
+        case ChatType of
+            <<"normal">> ->
+                %% Group: from_user is the group id, fetch all participants
+                case catch fly_mod_utils:get_all_group_participants(FromServer, MsgFromUser) of
+                    {selected, _, Rows} ->
+                        [U || [U] <- Rows, U =/= <<>>];
+                    _ ->
+                        []
+                end;
+            _ ->
+                %% Single (one-to-one): notify only from_user and to_user
+                lists:usort([U || U <- [MsgFromUser, MsgToUser], U =/= <<>>])
+        end,
+
+    ?INFO_MSG("meeting_reminder targets=~p chat_type=~ts", [TargetUsers, ChatType]),
+
+    %% 4. Route the meeting_reminder notification to each target user
+    NotifyMessageId = fly_mod_utils:get_iq_message_id(16),
+    lists:foreach(fun(TargetUser) ->
+        ToUserJid = jid:make(TargetUser, FromServer, <<>>),
+        ToUserStr = jid:to_string(ToUserJid),
+
+        XmlBody = #xmlel{name = <<"message">>,
+            attrs = [
+                {<<"from">>, jid:to_string(From)},
+                {<<"to">>, ToUserStr},
+                {<<"type">>, <<"chat">>},
+                {<<"id">>, NotifyMessageId}
+            ],
+            children = [#xmlel{name = <<"meeting">>,
+                attrs = [
+                    {<<"xmlns">>, ?NS_RECEIPTS},
+                    {<<"status">>, <<"meeting_reminder">>},
+                    {<<"session_id">>, SessionId},
+                    {<<"room_id">>, RoomId},
+                    {<<"chat_id">>, ChatId},
+                    {<<"call_mode">>, CallMode},
+                    {<<"call_type">>, CallType},
+                    {<<"scheduled_at">>, ScheduledAt},
+                    {<<"message_id">>, MessageIdAttr},
+                    {<<"reminder_before_minutes">>, ReminderMins}
+                ],
+                children = []}]},
+
+        try
+            ejabberd_router:route(From, ToUserJid, XmlBody),
+            ?INFO_MSG("meeting_reminder routed message_id=~ts to=~ts", [MessageIdAttr, ToUserStr])
+        catch
+            Class:Reason ->
+                ?ERROR_MSG("meeting_reminder failed message_id=~ts to=~ts: ~p:~p",
+                           [MessageIdAttr, ToUserStr, Class, Reason])
+        end
+    end, TargetUsers),
+
+    %% 5. Return IQ result to the sender
+    fly_mod_utils:generate_subel(IQ, #user_activities{
+        type = RequestType,
+        result_type = <<"success">>,
+        message_id = MessageIdAttr
     }).
