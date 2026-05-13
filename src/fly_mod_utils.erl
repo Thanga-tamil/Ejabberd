@@ -217,7 +217,8 @@
   get_user_resources/3,get_mobile_user_message/2,get_mobile_user_resource/2,get_push_type/1,get_meta_chat_web/4,poll_vote_update/8,
   remove_poll_offline/3,get_existing_group_info/2,get_users_devices_detail/3,set_seen_receipt/3,set_hide_profile/3,update_msg_seen_receipt/3,
   get_hide_profile_privacy/2, update_mix_participant/3, batch_remove_spool/4, is_session_exists/2,is_group_admin/3, get_spool_seq/4,
-  update_story_view/3, update_story_like/3]).
+  update_story_view/3, update_story_like/3,
+  get_message_chat_info/2, get_all_group_participants/2]).
 
 -include("logger.hrl").
 
@@ -625,6 +626,18 @@ get_participants(LServer, NodeHost, From) ->
     LServer,
     [<<"select username from mix_participant  where  channel='">>,NodeHost,<<"' and username='">>,From,<<"';">>]).
 
+%% Fetch chat_type, from_user, to_user for a given message_id from message_status.
+get_message_chat_info(LServer, MessageId) ->
+  ejabberd_sql:sql_query(
+    LServer,
+    [<<"select chat_type, from_user, to_user from message_status where message_id='">>,MessageId,<<"' limit 1;">>]).
+
+%% Fetch all participant usernames of a group channel from mix_participant.
+get_all_group_participants(LServer, NodeHost) ->
+  ejabberd_sql:sql_query(
+    LServer,
+    [<<"select username from mix_participant where channel='">>,NodeHost,<<"';">>]).
+
 %% Update admin of the group using Jid
 %%
 %%
@@ -801,8 +814,14 @@ get_offline_msg(LServer,LUser) ->
     [<<"select  chat_type, xml, message_id from spool where username = '">>,LUser, <<"' and (chat_type = 'chat' or chat_type = 'normal') and status = 0 ;">>]).
 
 update_story_view(FServer, StoryId, ViewerId) ->
-  ejabberd_sql:sql_query(FServer,
-    [<<"INSERT IGNORE INTO story_views (story_id, viewer_username, viewed_at) VALUES (">>, StoryId, <<", '">>, ViewerId, <<"', NOW());">>]).
+  ejabberd_sql:sql_query(
+    FServer,
+    [<<"INSERT IGNORE INTO story_views (story_id, viewer_username, viewed_at) VALUES ('">>,
+     StoryId,
+     <<"', '">>,
+     ViewerId,
+     <<"', NOW());">>]
+  ).
 
 update_story_like(FServer, StoryId, LikerId) ->
   ejabberd_sql:sql_query(FServer,
@@ -1448,7 +1467,15 @@ insert_status(#jid{luser = User}, #jid{luser = ToUser,lserver = ToServer}, Messa
     EditMsgId = EditmsgId
 end,
 
-  ?INFO_MSG("Insert message is DisappearAt ~p", [DisappearAt]), 
+DisappearAtValue =
+    case DisappearAt of
+        <<"">> ->
+            <<"NULL">>;
+        _ ->
+            [<<"'">>, DisappearAt, <<"'">>]
+    end,
+
+  ?INFO_MSG("Insert message is DisappearAt ~p", [DisappearAtValue]), 
   if EditMsgId =:= MessageId ->
     if Topicid =:= <<"">> ->
       ejabberd_sql:sql_query( ToServer, [<<"insert into message_status (from_user,to_user,status, recent,message_id, edit_message_id, message_type,  topic_id, meta_data, txt,chat_type,from_notification,blocked,message_time,to_notification,message_notification,received_at,seen_at) values
@@ -1463,7 +1490,7 @@ end,
   %ejabberd_sql:sql_query(ToServer, [<<"delete from spool where username = '">>,ToUser, <<"' and message_id ='">>,MessageId, <<"';">>]), % commented to retain recalled message on edit in offline storage 
   ejabberd_sql:sql_query( ToServer, [<<"update  message_status set edit_status = 1, status = 0,  edit_message_id = '">>, EditMsgId , <<"' where message_id = '">>, MessageId, <<"' ;">>])
   end,
-  ejabberd_sql:sql_query( ToServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg, meta_data, disappear_at) values ('">>, User, <<"', '">>, ToUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'chat', '">>, Msg, <<"', '">>, MetaData, <<"', '">>,DisappearAt,<<"' );">>]).
+  ejabberd_sql:sql_query(ToServer, [<<"insert into chat_message_edit_history (from_user,to_user,message_id,edit_message_id,chat_type,msg,meta_data,disappear_at) values ('">>, User, <<"','">>, ToUser, <<"','">>, MessageId, <<"','">>, EditMsgId, <<"','chat','">>, Msg, <<"','">>, MetaData, <<"', ">>, DisappearAtValue, <<" );">>]).
 
 mute_status(Lserver, Luser, Tuser)->
   ejabberd_sql:sql_query(Lserver,
