@@ -3638,7 +3638,10 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
 
     ?INFO_MSG("meeting_reminder targets=~p chat_type=~ts", [TargetUsers, ChatType]),
 
-    %% 4. Route the meeting_reminder notification to each target user
+    %% 4. Update call_sessions to mark reminder as notified
+    fly_mod_utils:update_call_session_reminder_status(FromServer, RoomId),
+
+    %% 5. Route the meeting_reminder notification to each target user
     NotifyMessageId = fly_mod_utils:get_iq_message_id(16),
     lists:foreach(fun(TargetUser) ->
         ToUserJid = jid:make(TargetUser, FromServer, <<>>),
@@ -3668,6 +3671,17 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
 
         try
             ejabberd_router:route(From, ToUserJid, XmlBody),
+
+            % case fly_mod_utils:get_mobile_user_message(ToUserJid, FromServer) of
+            %   true ->
+            %     mod_offline:store_packet({ToUserJid, xmpp:decode(XmlBody)}),
+            %     fly_mod_offline_push:send_offline_message({FromServer,xmpp:decode(XmlBody)});
+            %   false ->
+            %     ok
+            % end,
+             
+            fly_mod_offline_push:send_offline_message({FromServer,xmpp:decode(XmlBody)}),
+            
             ?INFO_MSG("meeting_reminder routed message_id=~ts to=~ts", [MessageIdAttr, ToUserStr])
         catch
             Class:Reason ->
