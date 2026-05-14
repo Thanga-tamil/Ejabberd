@@ -350,6 +350,14 @@ send_offline_message(({_Action, #message{from = Sender, to = Recipient, type = C
         true ->
           push(Server, <<"chat">>, Sender, Recipient,
             <<"mediacall">>, SubEl, Packet)
+      end,
+      Meeting = fxml:get_subtag_with_xmlns(Packet, <<"meeting">>,
+        <<"urn:xmpp:receipts">>),
+      if Meeting =:= false ->
+        ok;
+        true ->
+          push(Server, <<"chat">>, Sender, Recipient,
+            <<"meeting_reminder">>, SubEl, Packet)
       end;
       _ ->
         Call = fxml:get_subtag_with_xmlns(Packet, <<"call">>,
@@ -986,6 +994,43 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
             true ->
               send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server)
             end;
+    ChatType == <<"meeting_reminder">> ->
+      Server = To#jid.server,
+      Meeting = fxml:get_subtag_with_xmlns(Packet, <<"meeting">>,
+        <<"urn:xmpp:receipts">>),
+      MessageId = fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs),
+      
+      SessionId = fxml:get_attr_s(<<"session_id">>, Meeting#xmlel.attrs),
+      RoomId = fxml:get_attr_s(<<"room_id">>, Meeting#xmlel.attrs),
+      ChatId = fxml:get_attr_s(<<"chat_id">>, Meeting#xmlel.attrs),
+      CallMode = fxml:get_attr_s(<<"call_mode">>, Meeting#xmlel.attrs),
+      CallType = fxml:get_attr_s(<<"call_type">>, Meeting#xmlel.attrs),
+      ScheduledAt = fxml:get_attr_s(<<"scheduled_at">>, Meeting#xmlel.attrs),
+      ReminderMins = fxml:get_attr_s(<<"reminder_before_minutes">>, Meeting#xmlel.attrs),
+      Status = fxml:get_attr_s(<<"status">>, Meeting#xmlel.attrs),
+
+      BF = [
+        {<<"type">>, "meeting_reminder"},
+        {<<"status">>, binary_to_list(Status)},
+        {<<"session_id">>, binary_to_list(SessionId)},
+        {<<"room_id">>, binary_to_list(RoomId)},
+        {<<"chat_id">>, binary_to_list(ChatId)},
+        {<<"call_mode">>, binary_to_list(CallMode)},
+        {<<"call_type">>, binary_to_list(CallType)},
+        {<<"scheduled_at">>, binary_to_list(ScheduledAt)},
+        {<<"message_id">>, binary_to_list(MessageId)},
+        {<<"reminder_before_minutes">>, binary_to_list(ReminderMins)},
+        {<<"userDomain">>, binary_to_list(Server)},
+        {<<"user_type">>, binary_to_list(PushType)},
+        {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
+        {<<"title">>, "Meeting Reminder"}
+      ],
+      Payload = create_android_json(DeviceToken, BF),
+      if DeviceType == <<"android">> ->
+        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server);
+      true ->
+        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server)
+      end;
     true -> {ok, <<"chat type is different gcm">>}
   end.
 
@@ -1272,6 +1317,7 @@ handle_connection_recovery(Host) ->
 
 %% Send Android push payloads to the rabbit mq server
 send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host) ->
+  ?LOG_INFO("send_android_payload_to_rabbitmq ChatType: ~p, Payload: ~s", [ChatType, Payload]),
 
   ChannelPid = check_rabbit_mq_connection_is_alive(Channel,Host),
   if (ChatType =:= <<"call">>)  or (ChatType =:= <<"mediacall">>)->
@@ -1318,6 +1364,7 @@ send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host) ->
 
 %% Send Android push payloads to the rabbit mq server
 send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host) ->
+  ?LOG_INFO("send_web_payload_to_rabbitmq ChatType: ~p, Payload: ~s", [ChatType, Payload]),
 
   ChannelPid = check_rabbit_mq_connection_is_alive(Channel,Host),
   if (ChatType =:= <<"call">>)  or (ChatType =:= <<"mediacall">>)->
@@ -1349,6 +1396,7 @@ send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host) ->
   end.
 %% Send IOS push payloads to the rabbit mq server
 send_payload(Payload, ChatType, RMQConnection, RMExchange,Host, PushType) ->
+  ?LOG_INFO("send_payload (IOS) ChatType: ~p, PushType: ~p, Payload: ~s", [ChatType, PushType, Payload]),
   ChannelPid = check_rabbit_mq_connection_is_alive(RMQConnection,Host),
 
   if ChatType =:= <<"mediacall">> ->
@@ -1954,6 +2002,45 @@ end,
 
           send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType)
       end;
+    ChatType == <<"meeting_reminder">> ->
+      Server = Recipient#jid.server,
+      Meeting = fxml:get_subtag_with_xmlns(Packet, <<"meeting">>,
+        <<"urn:xmpp:receipts">>),
+      MessageId = fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs),
+
+      SessionId = fxml:get_attr_s(<<"session_id">>, Meeting#xmlel.attrs),
+      RoomId = fxml:get_attr_s(<<"room_id">>, Meeting#xmlel.attrs),
+      ChatId = fxml:get_attr_s(<<"chat_id">>, Meeting#xmlel.attrs),
+      CallMode = fxml:get_attr_s(<<"call_mode">>, Meeting#xmlel.attrs),
+      CallType = fxml:get_attr_s(<<"call_type">>, Meeting#xmlel.attrs),
+      ScheduledAt = fxml:get_attr_s(<<"scheduled_at">>, Meeting#xmlel.attrs),
+      ReminderMins = fxml:get_attr_s(<<"reminder_before_minutes">>, Meeting#xmlel.attrs),
+      Status = fxml:get_attr_s(<<"status">>, Meeting#xmlel.attrs),
+
+      Args = [
+        {type, "meeting_reminder"},
+        {status, binary_to_list(Status)},
+        {session_id, binary_to_list(SessionId)},
+        {room_id, binary_to_list(RoomId)},
+        {chat_id, binary_to_list(ChatId)},
+        {call_mode, binary_to_list(CallMode)},
+        {call_type, binary_to_list(CallType)},
+        {scheduled_at, binary_to_list(ScheduledAt)},
+        {message_id, binary_to_list(MessageId)},
+        {reminder_before_minutes, binary_to_list(ReminderMins)},
+        {userDomain, binary_to_list(Server)},
+        {user_type, binary_to_list(UserType)},
+        {push_from, binary_to_list(<<"MirrorFly">>)}
+      ],
+
+      Msg = [
+        {<<"mutable-content">>, integer_to_list(1)},
+        {alert, "Meeting Reminder"},
+        {mode, binary_to_list(Mode)},
+        {sound, binary_to_list(<<"default">>)}
+      ],
+      JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode, 0, 0, PushType),
+      send_payload(JSON, ChatType, Channel, RMExchange, Server, PushType);
     true -> {ok, <<"chat type is different in ios">>,ChatType}
   end.
 
