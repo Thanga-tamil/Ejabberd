@@ -218,7 +218,7 @@
   remove_poll_offline/3,get_existing_group_info/2,get_users_devices_detail/3,set_seen_receipt/3,set_hide_profile/3,update_msg_seen_receipt/3,
   get_hide_profile_privacy/2, update_mix_participant/3, batch_remove_spool/4, is_session_exists/2,is_group_admin/3, get_spool_seq/4,
   update_story_view/3, update_story_like/3,delete_story_like/3,
-  get_message_chat_info/2, get_all_group_participants/2]).
+  get_message_chat_info/2, get_all_group_participants/2, update_call_session_reminder_status/2]).
 
 -include("logger.hrl").
 
@@ -637,6 +637,12 @@ get_all_group_participants(LServer, NodeHost) ->
   ejabberd_sql:sql_query(
     LServer,
     [<<"select username from mix_participant where channel='">>,NodeHost,<<"';">>]).
+
+%% Update call_sessions table to mark reminder as notified for a given room_id.
+update_call_session_reminder_status(LServer, RoomId) ->
+  ejabberd_sql:sql_query(
+    LServer,
+    [<<"UPDATE call_sessions SET is_reminder_notified = 1 where room_id='">>, RoomId, <<"' ;">>]).
 
 %% Update admin of the group using Jid
 %%
@@ -1838,7 +1844,7 @@ check_group_exists(FServer, GroupId) ->
     [<<"SELECT from_user FROM message_status WHERE from_user  = '">>,GroupId,<<"';">>]).
 
 get_existing_group_info(FServer, GroupId) ->
-  ejabberd_sql:sql_query(FServer, [<<"SELECT nickname, description, image, msg_disappear FROM vcard_search WHERE username = '">>,GroupId,<<"' ;">>]).
+  ejabberd_sql:sql_query(FServer, [<<"SELECT nickname, description, image, msg_disappear, on_ongoing_call, ongoing_call_link FROM vcard_search WHERE username = '">>,GroupId,<<"' ;">>]).
 
 group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser}, TUser, Groupid,NotifyId, RequestType, Msgid, TimeStamp, Txt)->
   % MsgId = get_iq_message_id(8),
