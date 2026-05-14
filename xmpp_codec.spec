@@ -190,7 +190,7 @@
            result = {user_activities, '$remove_user', '$device_id', '$vote_id', '$edit_message_id', '$type', '$id', '$send_seen', '$license_data', '$result_type','$status','$password',
            '$socket_id','$message_from','$message_to','$to_user', '$from_user', '$mode', '$send_to', '$poll_option_id', '$voter_user_id', '$poll_id', '$send_from', '$message_type','$message_id','$message_ids','$message','$chat_type','$reply_id','$delete_type','$favourite','$_els','$position','$limit','$row_id','$updated_at',
            '$call_status','$call_type','$caller_device','$call_id','$call_attend_status', '$last_msg_id', '$remove_message_user', '$calllog_ids', '$mute_status','$archive_status','$group_id','$archive','$block_status','$permission_status','$meta_data', '$topic_id', '$topic_time', '$user_list', '$action', '$mute_setting', '$busy_message', '$busy_status', '$busy', '$sim_bind_logout','$msg_disappear', '$emoji_id', '$story_id','$username','$caption','$background_color','$font_style','$duration','$media_url','$story_type',
-           '$thumbnail_url','$width','$height','$blur_hash','$created_at','$expires_at','$duration_seconds','$story_owner'},
+           '$thumbnail_url','$width','$height','$blur_hash','$created_at','$expires_at','$duration_seconds','$story_owner','$like'},
                      attrs = [#attr{name = <<"remove_user">>,default = <<"">>},
                               #attr{name = <<"type">>,default = <<"">>},
                               #attr{name = <<"id">>,default = <<"">>},
@@ -265,7 +265,8 @@
                               #attr{name = <<"created_at">>,default = <<"">>},
                               #attr{name = <<"expires_at">>,default = <<"">>},
                               #attr{name = <<"duration_seconds">>,default = <<"">>},
-                              #attr{name = <<"story_owner">>,default = <<"">>}],
+                              #attr{name = <<"story_owner">>,default = <<"">>},
+                              #attr{name = <<"like">>,default = <<"">>}],
                        cdata = #cdata{default = <<"">>, label = '$result_type'}}).
 
 -xml(del_message_activities,
