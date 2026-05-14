@@ -2748,22 +2748,22 @@ send_bulk_message(From, RequestType, SubEl, IQ) ->
     Attributes = [<<"message_from">>, <<"message_to">>, <<"message_type">>, <<"message_id">>, <<"message">>, <<"group_id">>, <<"chat_type">>,<<"to_user">>, <<"disappear_at">>],
     Results = lists:map(fun(Attr) -> fxml:get_path_s(SubEl, [{attr, Attr}]) end, Attributes),
     [MessageFrom, MessageTo, MessageType, MessageId, MessageTag, GroupId, ChatType, TeamId, DisappearAt] = Results,
-    FromServer = From#jid.lserver,
-    case ChatType of
-        <<"chat">> -> 
-            ChunkSize = 100,
-            process_bulk_chunks(
-                From, TeamId, MessageFrom, MessageType, ChunkSize, 0, 
-                IQ, RequestType, ChatType
-            );
-        <<"normal">> -> 
-            send_message(ChatType, MessageFrom, GroupId, MessageType, MessageTag, MessageId, #{ from_broadcast => true, disappear_at => DisappearAt }),
-            fly_mod_utils:remove_bulk_notification(From, TeamId),
-            ?INFO_MSG("send_message: ~p ", [TeamId]),
-            fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>});
-        _ -> 
-            undefined
-    end.
+    
+    Result = fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Send successfully">>}),
+
+    spawn(fun() ->
+        case ChatType of
+            <<"chat">> -> 
+                process_bulk_chunks(From, TeamId, MessageFrom, MessageType, 100, 0, IQ, RequestType, ChatType);
+            <<"normal">> -> 
+                send_message(ChatType, MessageFrom, GroupId, MessageType, MessageTag, MessageId, #{ from_broadcast => true, disappear_at => DisappearAt }),
+                fly_mod_utils:remove_bulk_notification(From, TeamId);
+            _ -> 
+                ok
+        end
+    end),
+    ?INFO_MSG("send_bulk_message: ~p ", [TeamId]),
+    Result.
 
 process_bulk_chunks(From, TeamId, MessageFrom, MessageType, ChunkSize, Offset, IQ, RequestType, ChatType) ->
     case catch fly_mod_utils:get_bulk_message_details(From, TeamId, Offset, ChunkSize) of
@@ -3450,38 +3450,25 @@ story_seen(From, RequestType, SubEl, IQ) ->
     ).
 
 story_like(From, RequestType, SubEl, IQ) ->
-    ?INFO_MSG("process_iq_set story_like", []),
-    %% Debug incoming packet
-    ?INFO_MSG("SubEl FULL = ~p", [SubEl]),
-    ?INFO_MSG("SubEl attrs = ~p", [SubEl#xmlel.attrs]),
-    ?INFO_MSG("SubEl children = ~p", [SubEl#xmlel.children]),
+    #jid{lserver = Server, luser = LikerUsername} = From,
 
-    #jid{ lserver = Server,luser = LikerUsername} = From,
+    StoryId = fxml:get_attr_s(<<"story_id">>, SubEl#xmlel.attrs),
+    OwnerJidStr = fxml:get_attr_s(<<"story_owner">>, SubEl#xmlel.attrs),
 
-    StoryId = fxml:get_tag_attr_s(<<"story_id">>, SubEl),
-    OwnerJidStr = fxml:get_tag_attr_s(<<"story_owner">>, SubEl),
-    ?INFO_MSG("story_like extracted StoryId=~p Owner=~p Liker=~p", [StoryId, OwnerJidStr, LikerUsername]),
-    %% Validate story_id
-    case StoryId of
-        <<>> ->
-            ?ERROR_MSG("story_like missing story_id", []),
-            fly_mod_utils:generate_subel(IQ,#user_activities{type = RequestType, result_type = <<"missing story_id">>});
-        _ ->
-            ok
-    end,
-    %% Validate story_owner
-    case OwnerJidStr of
-        <<>> ->
-            ?ERROR_MSG("story_like missing story_owner", []),
-            fly_mod_utils:generate_subel( IQ,#user_activities{type = RequestType, result_type = <<"missing story_owner">>, story_id = StoryId});
+    %% Frontend flag
+    %% 1 = like
+    %% 0 = unlike
+    LikeFlag = fxml:get_attr_s(<<"like">>, SubEl#xmlel.attrs),
+
+    %% Handle DB operation
+    case {StoryId =/= <<"">>, LikeFlag} of
+        {true, <<"1">>} -> fly_mod_utils:update_story_like(Server, StoryId, LikerUsername);
+        {true, <<"0">>} -> fly_mod_utils:delete_story_like(Server, StoryId, LikerUsername);
         _ ->
             ok
     end,
 
-    %% Update DB
-    ?INFO_MSG("Updating story like StoryId=~p Liker=~p", [StoryId, LikerUsername]),
-    catch fly_mod_utils:update_story_like(Server,StoryId,LikerUsername),
-    %% Build owner JID
+    %% Owner jid handling
     OwnerJid =
         case binary:match(OwnerJidStr, <<"@">>) of
             nomatch ->
@@ -3489,12 +3476,21 @@ story_like(From, RequestType, SubEl, IQ) ->
             _ ->
                 jid:from_string(OwnerJidStr)
         end,
-    ?INFO_MSG("Resolved OwnerJid=~p", [OwnerJid]),
-    OwnerJidStr1 =
-        jid:to_string(OwnerJid),
-    MessageId =fly_mod_utils:get_iq_message_id(16),
 
-    %% Build routed message
+    OwnerJidStr1 = jid:to_string(OwnerJid),
+    #jid{luser = OUser, lserver = OServer} = OwnerJid,
+
+    FromU = jid:encode(jid:remove_resource(From)),
+    MessageId = fly_mod_utils:get_iq_message_id(16),
+
+    %% Dynamic status based on like/unlike
+    Status =
+        case LikeFlag of
+            <<"1">> -> <<"story_like">>;
+            <<"0">> -> <<"story_unlike">>;
+            _ -> <<"story_like">>
+        end,
+
     XmlBody =
         #xmlel{
             name = <<"message">>,
@@ -3509,78 +3505,35 @@ story_like(From, RequestType, SubEl, IQ) ->
                     name = <<"story">>,
                     attrs = [
                         {<<"xmlns">>, ?NS_RECEIPTS},
-                        {<<"status">>, <<"story_like">>},
+                        {<<"status">>, Status},
                         {<<"story_id">>, StoryId},
-                        {<<"liker">>, LikerUsername}
+                        {<<"like">>, LikeFlag}
                     ],
                     children = []
                 }
             ]
         },
+    %% Route to owner
+    ejabberd_router:route(From, OwnerJid, XmlBody),
+    %% Store offline if owner offline
+    % TResources = ejabberd_sm:get_user_resources(OUser, OServer),
 
-    ?INFO_MSG(
-        "Routing story_like packet XmlBody=~p",
-        [XmlBody]
-    ),
-    %% Route message
-    try
-        ejabberd_router:route(
-            From,
-            OwnerJid,
-            XmlBody
-        ),
-
-        ?INFO_MSG(
-            "story_like routed successfully to=~p",
-            [OwnerJidStr1]
-        )
-
-    catch
-        Class:Reason:Stacktrace ->
-            ?ERROR_MSG(
-                "story_like routing failed class=~p reason=~p stack=~p",
-                [Class, Reason, Stacktrace]
-            )
-    end,
-
-    %% Check owner resources
-    #jid{
-        luser = OUser,
-        lserver = OServer
-    } = OwnerJid,
-
-    TResources =
-        ejabberd_sm:get_user_resources(
-            OUser,
-            OServer
-        ),
-
-    ?INFO_MSG(
-        "Owner resources=~p",
-        [TResources]
-    ),
-
-    %% Store offline if no resources
     % if
     %     length(TResources) =:= 0 ->
-    %         mod_offline:store_packet(
-    %             {From, xmpp:decode(XmlBody)}
-    %         );
-
+    %         mod_offline:store_packet({From, xmpp:decode(XmlBody)});
     %     true ->
     %         ok
     % end,
 
-    %% Final response
     fly_mod_utils:generate_subel(
         IQ,
         #user_activities{
-            type = RequestType,
-            result_type = <<"story like recorded">>,
+            type = Status,
+            result_type = <<"success">>,
             story_id = StoryId
         }
     ).
-
+    
 delete_story(From, RequestType, SubEl, IQ) ->
     #jid{lserver = FromServer} = From,
 
