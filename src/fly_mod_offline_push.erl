@@ -505,6 +505,8 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
         TimestampValue = <<"">>;
       ChatType == <<"adminblock">> ->
         TimestampValue = <<"">>;
+      ChatType == <<"meeting_reminder">> ->
+        TimestampValue = <<"">>;
       ChatType == <<"reaction">>; ChatType == <<"group_reaction">> ->
         TimestampValue = <<"">>;
       true ->
