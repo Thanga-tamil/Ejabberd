@@ -3706,6 +3706,7 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
                     {<<"xmlns">>, ?NS_RECEIPTS},
                     {<<"status">>, <<"meeting_reminder">>},
                     {<<"session_id">>, SessionId},
+                    {<<"user_jid">>, ToUserStr},
                     {<<"room_id">>, RoomId},
                     {<<"chat_id">>, ChatId},
                     {<<"call_mode">>, CallMode},
