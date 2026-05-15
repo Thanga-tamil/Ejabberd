@@ -1446,19 +1446,16 @@ clear_particular_call_log(#jid{luser = User,lserver = Server},RoomId) ->
 %% &param RecallStatus
 %% @return List
 
-update_recall(#jid{lserver = Server}, MessageId) ->
+
+update_recall(#jid{luser = _User,lserver = Server}, MessageId) ->
   Range = binary:split(MessageId, <<",">>, [global]),
-  IDs = [[<<"'">>, N, <<"'">>] || N <- Range, N =/= <<>>],
-  case IDs of
-    [] -> ok;
-    _ ->
-      IDList = join(IDs, <<",">>),
-      ?INFO_MSG("Bulk update_recall for IDs: ~p", [MessageId]),
-      ejabberd_sql:sql_query(Server, [<<"UPDATE message_status SET recall_status = 1 WHERE message_id IN (">>, IDList, <<");">>]),
-      ejabberd_sql:sql_query(Server, [<<"DELETE FROM message_favourite WHERE message_id IN (">>, IDList, <<");">>]),
-      ejabberd_sql:sql_query(Server, [<<"UPDATE chat_recent SET recall_status = 1 WHERE message_id IN (">>, IDList, <<");">>]),
-      ejabberd_sql:sql_query(Server, [<<"UPDATE call_sessions SET reminder_before_minutes = 0, scheduled_at = 0, message_id = '' WHERE message_id IN (">>, IDList, <<");">>])
-  end.
+  lists:foreach(fun(N) ->
+  ?INFO_MSG ("Single Chat update_recall Message Sent ~p", [N]),   
+  ejabberd_sql:sql_query(Server, [<<"update message_status set recall_status =  1 where message_id='">>,N,<<"';">>]),
+  ejabberd_sql:sql_query(Server, [<<"DELETE FROM message_favourite WHERE message_id = '">>,N,<<"';">>]),
+  ejabberd_sql:sql_query(Server, [<<"update chat_recent set recall_status  =  1 where message_id='">>,N,<<"';">>]),
+  ejabberd_sql:sql_query(Server, [<<"UPDATE call_sessions SET reminder_before_minutes= ' ',  scheduled_at = '', message_id = '' WHERE message_id = '">>, N, <<"';">>])
+  end, Range).
 
 %% insert message status
 %%
