@@ -3769,6 +3769,7 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
                     {<<"xmlns">>, ?NS_RECEIPTS},
                     {<<"status">>, <<"meeting_reminder">>},
                     {<<"session_id">>, SessionId},
+                    {<<"user_jid">>, ToUserStr},
                     {<<"room_id">>, RoomId},
                     {<<"chat_id">>, ChatId},
                     {<<"call_mode">>, CallMode},
@@ -3780,16 +3781,7 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
                 children = []}]},
 
         try
-            ejabberd_router:route(From, ToUserJid, XmlBody),
-
-            % case fly_mod_utils:get_mobile_user_message(ToUserJid, FromServer) of
-            %   true ->
-            %     mod_offline:store_packet({ToUserJid, xmpp:decode(XmlBody)}),
-            %     fly_mod_offline_push:send_offline_message({FromServer,xmpp:decode(XmlBody)});
-            %   false ->
-            %     ok
-            % end,
-             
+            ejabberd_router:route(From, ToUserJid, XmlBody),             
             fly_mod_offline_push:send_offline_message({FromServer,xmpp:decode(XmlBody)}),
             
             ?INFO_MSG("meeting_reminder routed message_id=~ts to=~ts", [MessageIdAttr, ToUserStr])

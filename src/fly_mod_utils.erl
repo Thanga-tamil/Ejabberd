@@ -1450,16 +1450,15 @@ clear_particular_call_log(#jid{luser = User,lserver = Server},RoomId) ->
 %% &param RecallStatus
 %% @return List
 
+
 update_recall(#jid{luser = _User,lserver = Server}, MessageId) ->
   Range = binary:split(MessageId, <<",">>, [global]),
   lists:foreach(fun(N) ->
-  %ejabberd_sql:sql_query(Server, [<<"delete FROM spool  where message_id='">>,N,<<"';">>]), % commented to retain recalled message in offline storage
-    
+  ?INFO_MSG ("Single Chat update_recall Message Sent ~p", [N]),   
   ejabberd_sql:sql_query(Server, [<<"update message_status set recall_status =  1 where message_id='">>,N,<<"';">>]),
-
   ejabberd_sql:sql_query(Server, [<<"DELETE FROM message_favourite WHERE message_id = '">>,N,<<"';">>]),
-
-  ejabberd_sql:sql_query(Server, [<<"update chat_recent set recall_status  =  1 where message_id='">>,N,<<"';">>])
+  ejabberd_sql:sql_query(Server, [<<"update chat_recent set recall_status  =  1 where message_id='">>,N,<<"';">>]),
+  ejabberd_sql:sql_query(Server, [<<"UPDATE call_sessions SET reminder_before_minutes= ' ',  scheduled_at = '', message_id = '' WHERE message_id = '">>, N, <<"';">>])
   end, Range).
 
 %% insert message status

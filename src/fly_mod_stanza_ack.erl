@@ -335,6 +335,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
       true ->
         fly_mod_offline_push:send_offline_message({_C2SState,RecallTimeStampedPacket})
       end,
+    ?INFO_MSG("Bulk update_recall for IDs in stanza: ~p", [Id]),  
     fly_mod_utils:update_recall(From, Id);
 
     T when (T == ok) ->
