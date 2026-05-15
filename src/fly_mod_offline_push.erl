@@ -468,7 +468,9 @@ get_string() ->
 %% @return atom
 send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
   MsgId = fxml:get_attr_s(<<"id">>,Packet#xmlel.attrs),
-  Rs = has_more_resources(Recipient#jid.luser,Recipient#jid.server),
+  Rs = if ChatType == <<"meeting_reminder">> -> "";
+    true -> has_more_resources(Recipient#jid.luser,Recipient#jid.server)
+  end,
 
   CallMode =
     case lists:keyfind(<<"mediacall">>, #xmlel.name, Packet#xmlel.children) of
