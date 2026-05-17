@@ -3715,8 +3715,8 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
     MessageIdAttr = fxml:get_attr_s(<<"message_id">>, SubEl#xmlel.attrs),
     ReminderMins  = fxml:get_attr_s(<<"reminder_before_minutes">>, SubEl#xmlel.attrs),
 
-    ?INFO_MSG("meeting_reminder request from=~ts message_id=~ts session_id=~ts room_id=~ts",
-              [jid:to_string(From), MessageIdAttr, SessionId, RoomId]),
+    ?INFO_MSG("meeting_reminder request from=~ts message_id=~ts session_id=~ts room_id=~ts chat_id=~ts call_mode=~ts call_type=~ts scheduled_at=~ts reminder_before_minutes=~ts",
+              [jid:to_string(From), MessageIdAttr, SessionId, RoomId, ChatId, CallMode, CallType, ScheduledAt, ReminderMins]),
 
     %% 2. Lookup message_status to determine chat_type, from_user, to_user
     {ChatType, MsgFromUser, MsgToUser} =
