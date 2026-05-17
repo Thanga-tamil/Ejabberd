@@ -468,7 +468,9 @@ get_string() ->
 %% @return atom
 send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
   MsgId = fxml:get_attr_s(<<"id">>,Packet#xmlel.attrs),
-  Rs = has_more_resources(Recipient#jid.luser,Recipient#jid.server),
+  Rs = if ChatType == <<"meeting_reminder">> -> "";
+    true -> has_more_resources(Recipient#jid.luser,Recipient#jid.server)
+  end,
 
   CallMode =
     case lists:keyfind(<<"mediacall">>, #xmlel.name, Packet#xmlel.children) of
@@ -1006,6 +1008,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
       RoomId = fxml:get_attr_s(<<"room_id">>, Meeting#xmlel.attrs),
       ChatId = fxml:get_attr_s(<<"chat_id">>, Meeting#xmlel.attrs),
       CallMode = fxml:get_attr_s(<<"call_mode">>, Meeting#xmlel.attrs),
+      UserJid = fxml:get_attr_s(<<"user_jid">>, Meeting#xmlel.attrs),
       CallType = fxml:get_attr_s(<<"call_type">>, Meeting#xmlel.attrs),
       ScheduledAt = fxml:get_attr_s(<<"scheduled_at">>, Meeting#xmlel.attrs),
       ReminderMins = fxml:get_attr_s(<<"reminder_before_minutes">>, Meeting#xmlel.attrs),
@@ -1017,6 +1020,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
         {<<"session_id">>, binary_to_list(SessionId)},
         {<<"room_id">>, binary_to_list(RoomId)},
         {<<"chat_id">>, binary_to_list(ChatId)},
+        {<<"user_jid">>, binary_to_list(UserJid)},
         {<<"call_mode">>, binary_to_list(CallMode)},
         {<<"call_type">>, binary_to_list(CallType)},
         {<<"scheduled_at">>, binary_to_list(ScheduledAt)},

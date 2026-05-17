@@ -778,13 +778,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
         GroupInfo = fly_mod_utils:get_existing_group_info(FServer, LUser),
         ?INFO_MSG("Existing GroupInfo fetch result: ~p", [GroupInfo]),
 
-        case GroupInfo of
-          {selected, _, [[Nickname, Description, Image, OldMsgDisappear, OldOnOngoingCall, OldOngoingCallLink]]} ->
-            ?INFO_MSG("Existing Group Info - Nickname: ~p, Description: ~p, Image: ~p, MsgDisappear: ~p, OnOngoingCall: ~p, OngoingCallLink: ~p", [Nickname, Description, Image, OldMsgDisappear, OldOnOngoingCall, OldOngoingCallLink]);
-          _ ->
-            ?LOG_INFO("No existing group info found for ~p", [LUser])
-        end,
-        
+      
         JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
         SetVcard = mod_vcard:set_vcard(LUser, FServer, VCard),
         ?INFO_MSG("SetVcard result for ~p: ~p", [LUser, SetVcard]),
@@ -861,8 +855,8 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                         FifthChanges = case {OldOnOngoingCall, IncomingOnOngoingCall} of
                             {OldOnOngoingCall, NewOnCall} when OldOnOngoingCall =:= NewOnCall ->
                                 FourthChanges;
-                            {OldOnOngoingCall, NewOnCall} ->
-                                ?INFO_MSG("OnOngoingCall updated for group ~p from ~p to ~p", [LUser, OldOnOngoingCall, NewOnCall]),
+                            {OldOnOngoingCallSec, NewOnCall} ->
+                                ?INFO_MSG("OnOngoingCall updated for group ~p from ~p to ~p", [LUser, OldOnOngoingCallSec, NewOnCall]),
                                 [ongoing_call | FourthChanges]
                         end,
 
