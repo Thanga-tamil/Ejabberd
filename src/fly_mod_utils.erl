@@ -641,9 +641,9 @@ get_all_group_participants(LServer, NodeHost) ->
 
 %% Update call_sessions table to mark reminder as notified for a given room_id.
 update_call_session_reminder_status(LServer, RoomId) ->
-  ejabberd_sql:sql_query(
-    LServer,
-    [<<"UPDATE call_sessions SET is_reminder_notified = 1 where room_id='">>, RoomId, <<"' ;">>]).
+  Query = [<<"UPDATE call_sessions SET is_reminder_notified = 1 where room_id='">>, RoomId, <<"' ;">>],
+  ?INFO_MSG("update_call_session_reminder_status SQL Query: ~s", [iolist_to_binary(Query)]),
+  ejabberd_sql:sql_query(LServer, Query).
 
   
 %% Update call session schedule and insert meet participant
