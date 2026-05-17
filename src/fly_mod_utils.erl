@@ -645,6 +645,17 @@ update_call_session_reminder_status(LServer, RoomId) ->
     [<<"UPDATE call_sessions SET is_reminder_notified = 1 where room_id='">>, RoomId, <<"' ;">>]).
 
   
+%% Update call session schedule and insert meet participant
+%% @param FServer Server host
+%% @param FUser From user (initiator)
+%% @param TUser To user
+%% @param ScheduledAtVal Scheduled time (integer)
+%% @param ReminderVal Reminder time in minutes
+%% @param FinalMessageId Message ID
+%% @param JoinUri Meet join URI
+%% @param ChatType Chat type (<<"chat">> or <<"groupchat">>)
+%% @param GroupId Group ID
+%% @return ok
 update_call_session_schedule(FServer, FUser, TUser, ScheduledAtVal, ReminderVal, FinalMessageId, JoinUri, ChatType, GroupId) ->
   ChatIdUpdate = if ChatType =:= <<"chat">> -> <<"">>;
                     true -> [<<", chat_id = '">>, GroupId, <<"'">>]
