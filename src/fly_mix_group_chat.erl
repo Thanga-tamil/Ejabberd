@@ -757,6 +757,12 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
   IncomingMsgDisappear = fxml:get_path_s(VCard, [{elem, <<"msgDisappear">>}, cdata]),
   ?INFO_MSG("IncomingMsgDisappear : ~p", [IncomingMsgDisappear]),
 
+  IncomingOnOngoingCall = fxml:get_path_s(VCard, [{elem, <<"onOngoingCall">>}, cdata]),
+  ?INFO_MSG("IncomingOnOngoingCall : ~p", [IncomingOnOngoingCall]),
+
+  IncomingOngoingCallLink = fxml:get_path_s(VCard, [{elem, <<"ongoingCallLink">>}, cdata]),
+  ?INFO_MSG("IncomingOngoingCallLink : ~p", [IncomingOngoingCallLink]),
+
   
   if NewStatus =:= <<"new">> ->
     mod_vcard:set_vcard(LUser, FServer, VCard),
@@ -772,13 +778,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
         GroupInfo = fly_mod_utils:get_existing_group_info(FServer, LUser),
         ?INFO_MSG("Existing GroupInfo fetch result: ~p", [GroupInfo]),
 
-        case GroupInfo of
-          {selected, _, [[Nickname, Description, Image, OldMsgDisappear]]} ->
-            ?INFO_MSG("Existing Group Info - Nickname: ~p, Description: ~p, Image: ~p, MsgDisappear: ~p", [Nickname, Description, Image, OldMsgDisappear]);
-          _ ->
-            ?LOG_INFO("No existing group info found for ~p", [LUser])
-        end,
-        
+      
         JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
         SetVcard = mod_vcard:set_vcard(LUser, FServer, VCard),
         ?INFO_MSG("SetVcard result for ~p: ~p", [LUser, SetVcard]),
@@ -796,7 +796,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                 ?INFO_MSG("devinprogress -> FServer : ~p LUser : ~p", [FServer, LUser]),
 
                 case catch GroupInfo of
-                    {selected, _, [[OldNick, OldDesc, OldImage, OldMsgDisp]]} ->
+                    {selected, _, [[OldNick, OldDesc, OldImage, OldMsgDisp, OldOnOngoingCall, OldOngoingCallLink]]} ->
                         % Track changes
                         Changes = [],
                         
@@ -843,12 +843,30 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                         end,
 
                          % Handle msg_disappear changes
-                        FinalChanges = case {OldMsgDisp, IncomingMsgDisappear} of
+                        FourthChanges = case {OldMsgDisp, IncomingMsgDisappear} of
                             {OldMsgDisp, NewMsgDis} when OldMsgDisp =:= NewMsgDis ->
                                 ThirdChanges;
                             {OldMsgDisp, NewMsgDis} ->
                                 ?INFO_MSG("MsgDisappear updated for group ~p from ~p to ~p", [LUser, OldMsgDisp, NewMsgDis]),
                                 [msg_disappear | ThirdChanges]
+                        end,
+
+                        % Handle on_ongoing_call changes
+                        FifthChanges = case {OldOnOngoingCall, IncomingOnOngoingCall} of
+                            {OldOnOngoingCall, NewOnCall} when OldOnOngoingCall =:= NewOnCall ->
+                                FourthChanges;
+                            {OldOnOngoingCallSec, NewOnCall} ->
+                                ?INFO_MSG("OnOngoingCall updated for group ~p from ~p to ~p", [LUser, OldOnOngoingCallSec, NewOnCall]),
+                                [ongoing_call | FourthChanges]
+                        end,
+
+                        % Handle ongoing_call_link changes
+                        FinalChanges = case {OldOngoingCallLink, IncomingOngoingCallLink} of
+                            {OldOngoingCallLink, NewCallLink} when OldOngoingCallLink =:= NewCallLink ->
+                                FifthChanges;
+                            {OldOngoingCallLink, NewCallLink} ->
+                                ?INFO_MSG("OngoingCallLink updated for group ~p from ~p to ~p", [LUser, OldOngoingCallLink, NewCallLink]),
+                                [ongoing_call_link | FifthChanges]
                         end,
 
                         % Then handle the notifications based on what changed
@@ -885,6 +903,17 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                                             true -> <<"22">> % UPDATED
                                         end,
                                         update_group_info_to_members(From, To, Status, VCard, JIDs, NotifyId, SubEl, <<"">>);
+                                    ongoing_call ->
+                                        NotifyId = if
+                                            IncomingOnOngoingCall =:= <<"1">> -> <<"24">>; % CALL STARTED
+                                            IncomingOnOngoingCall =:= <<"0">> -> <<"25">>; % CALL ENDED
+                                            true -> <<"4">>
+                                        end,
+                                        % update_group_info_to_members(From, To, Status, VCard, JIDs, NotifyId, SubEl, <<"">>); % Logic commented as per request
+                                        update_group_info_to_members(From, To, Status, VCard, JIDs, <<"4">>, SubEl, <<"">>); % Default update notification
+                                    ongoing_call_link ->
+                                        % update_group_info_to_members(From, To, Status, VCard, JIDs, <<"24">>, SubEl, <<"">>); % Logic commented as per request
+                                        update_group_info_to_members(From, To, Status, VCard, JIDs, <<"4">>, SubEl, <<"">>); % Default update notification
                                      _  ->
                                       update_group_info_to_members(From, To, Status, VCard, JIDs, <<"4">>, SubEl, <<"">>)
 

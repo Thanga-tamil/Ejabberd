@@ -218,7 +218,8 @@
   remove_poll_offline/3,get_existing_group_info/2,get_users_devices_detail/3,set_seen_receipt/3,set_hide_profile/3,update_msg_seen_receipt/3,
   get_hide_profile_privacy/2, update_mix_participant/3, batch_remove_spool/4, is_session_exists/2,is_group_admin/3, get_spool_seq/4,
   update_story_view/3, update_story_like/3,
-  get_message_chat_info/2, get_all_group_participants/2, update_call_session_reminder_status/2, update_call_session_schedule/9]).
+  get_message_chat_info/2, get_all_group_participants/2, update_call_session_reminder_status/2, update_call_session_schedule/9,
+  delete_story_like/3]).
 
 -include("logger.hrl").
 
@@ -879,6 +880,10 @@ update_story_view(FServer, StoryId, ViewerId) ->
 update_story_like(FServer, StoryId, LikerId) ->
   ejabberd_sql:sql_query(FServer,
     [<<"INSERT IGNORE INTO story_likes (story_id, liker_username, liked_at) VALUES (">>, StoryId, <<", '">>, LikerId, <<"', NOW());">>]).
+
+delete_story_like(FServer, StoryId, LikerId) ->
+    ejabberd_sql:sql_query(FServer,
+        [<<"DELETE FROM story_likes WHERE story_id = ">>,StoryId,<<" AND liker_username = '">>,LikerId,<<"';">>]).
 
 %% update offline messages status from spool table
 %%
@@ -1886,7 +1891,7 @@ check_group_exists(FServer, GroupId) ->
     [<<"SELECT from_user FROM message_status WHERE from_user  = '">>,GroupId,<<"';">>]).
 
 get_existing_group_info(FServer, GroupId) ->
-  ejabberd_sql:sql_query(FServer, [<<"SELECT nickname, description, image, msg_disappear FROM vcard_search WHERE username = '">>,GroupId,<<"' ;">>]).
+  ejabberd_sql:sql_query(FServer, [<<"SELECT nickname, description, image, msg_disappear, on_ongoing_call, ongoing_call_link FROM vcard_search WHERE username = '">>,GroupId,<<"' ;">>]).
 
 group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser}, TUser, Groupid,NotifyId, RequestType, Msgid, TimeStamp, Txt)->
   % MsgId = get_iq_message_id(8),

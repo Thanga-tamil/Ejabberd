@@ -101,7 +101,9 @@ sql_schemas() ->
                      #sql_column{name = <<"msg_disappear">>, type = integer, default = true},
                      #sql_column{name = <<"updated_by">>, type = text, default = <<>>},
                      #sql_column{name = <<"disp_updated_at">>, type = text, default = <<>>},
-                     #sql_column{name = <<"description">>, type = text, default = <<>>}],
+                     #sql_column{name = <<"description">>, type = text, default = <<>>},
+                     #sql_column{name = <<"on_ongoing_call">>, type = integer, default = true},
+                     #sql_column{name = <<"ongoing_call_link">>, type = text, default = <<>>}],
                 indices = [#sql_index{
                               columns = [<<"server_host">>, <<"lusername">>],
                               unique = true},
@@ -171,7 +173,9 @@ set_vcard(LUser, LServer, VCARD,
               msg_disappear = MsgDisappear,
               updated_by = UpdatedBy,
               disp_updated_at = DispUpdatedAt,
-              description = Description
+              description = Description,
+              on_ongoing_call = OnOngoingCall,
+              ongoing_call_link = OngoingCallLink
           }) ->
 
     %% =========================
@@ -192,7 +196,7 @@ set_vcard(LUser, LServer, VCARD,
         try
             case ejabberd_sql:sql_query(
                     LServer,
-                    [<<"select fn, lfn, family, lfamily, given, lgiven, middle, lmiddle, nickname, lnickname, bday, lbday, ctry, lctry, locality, llocality, email, lemail, orgname, lorgname, orgunit, lorgunit, status, lstatus, image, limage, thumbimage, lthumbimage, history, mobilenumber, lmobilenumber, msg_disappear, updated_by, disp_updated_at, description from vcard_search where lusername= '">>, LUser, <<"' ">>]
+                    [<<"select fn, lfn, family, lfamily, given, lgiven, middle, lmiddle, nickname, lnickname, bday, lbday, ctry, lctry, locality, llocality, email, lemail, orgname, lorgname, orgunit, lorgunit, status, lstatus, image, limage, thumbimage, lthumbimage, history, mobilenumber, lmobilenumber, msg_disappear, updated_by, disp_updated_at, description, on_ongoing_call, ongoing_call_link from vcard_search where lusername= '">>, LUser, <<"' ">>]
                 ) of
                 {selected, []} -> 
                     ?INFO_MSG("vcard search empty", []),
@@ -297,7 +301,9 @@ set_vcard(LUser, LServer, VCARD,
     MsgDisappear1Raw = Pick(MsgDisappear, 32),
     UpdatedBy1 = Pick(UpdatedBy, 33),
     DispUpdatedAt1 = Pick(DispUpdatedAt, 34),
-    Description1 = Pick(Description, 35), 
+    Description1 = Pick(Description, 35),
+    OnOngoingCall1 = Pick(OnOngoingCall, 36),
+    OngoingCallLink1 = Pick(OngoingCallLink, 37),
 
     %% ==========================================================
     %% GROUP ADMIN GUARD: Only allow msg_disappear update for groups
@@ -383,7 +389,8 @@ set_vcard(LUser, LServer, VCARD,
         "ThumbImage=~p LThumbImage=~p~n"
         "History=~p~n"
         "MobileNumber=~p LMobileNumber=~p~n"
-        "MsgDisappear=~p UpdatedBy=~p DispUpdatedAt=~p Description=~p",
+        "MsgDisappear=~p UpdatedBy=~p DispUpdatedAt=~p Description=~p~n"
+        "OnOngoingCall=~p OngoingCallLink=~p",
         [
             FN1, LFN1,
             Family1, LFamily1,
@@ -401,7 +408,8 @@ set_vcard(LUser, LServer, VCARD,
             ThumbImage1, LThumbImage1,
             History1,
             MobileNumber1, LMobileNumber1,
-            MsgDisappear1, UpdatedBy1, DispUpdatedAt1, Description1
+            MsgDisappear1, UpdatedBy1, DispUpdatedAt1, Description1,
+            OnOngoingCall1, OngoingCallLink1
         ]
     ),
 
@@ -425,12 +433,12 @@ set_vcard(LUser, LServer, VCARD,
                       _ -> false
                   end,
 
-    ?INFO_MSG("msg_disappear", [MsgDisappear1]),
-    ?INFO_MSG("msg_disappear norm", [MsgDisappear1Norm]),
-    ?INFO_MSG("disp_updated_at", [DispUpdatedAt1]),
-    ?INFO_MSG("disp_updated_at norm", [DispUpdatedAt1Norm]),
-    ?INFO_MSG("disp_updated_at raw", [DispUpdatedAt]),
-    ?INFO_MSG("is timestamp", [IsTimestamp]),
+    ?INFO_MSG("msg_disappear: ~p", [MsgDisappear1]),
+    ?INFO_MSG("msg_disappear norm: ~p", [MsgDisappear1Norm]),
+    ?INFO_MSG("disp_updated_at: ~p", [DispUpdatedAt1]),
+    ?INFO_MSG("disp_updated_at norm: ~p", [DispUpdatedAt1Norm]),
+    ?INFO_MSG("disp_updated_at raw: ~p", [DispUpdatedAt]),
+    ?INFO_MSG("is timestamp: ~p", [IsTimestamp]),
     
     ejabberd_sql:sql_transaction(
             LServer,
@@ -482,7 +490,9 @@ set_vcard(LUser, LServer, VCARD,
                                  "msg_disappear=%(MsgDisappear1Norm)s",
                                  "updated_by=%(UpdatedBy1)s",
                                  "description=%(Description1)s",
-                                 "disp_updated_at=%(DispUpdatedAt1Norm)s"]);
+                                 "disp_updated_at=%(DispUpdatedAt1Norm)s",
+                                 "on_ongoing_call=%(OnOngoingCall1)s",
+                                 "ongoing_call_link=%(OngoingCallLink1)s"]);
                 IsTimestamp ->
                     ?SQL_UPSERT(LServer, "vcard_search",
                                 ["username=%(User)s",
@@ -522,7 +532,9 @@ set_vcard(LUser, LServer, VCARD,
                                  "msg_disappear=%(MsgDisappear1Norm)s",
                                  "updated_by=%(UpdatedBy1)s",
                                  "description=%(Description1)s",
-                                 "disp_updated_at=FROM_UNIXTIME(%(DispUpdatedAt)s)"]);
+                                 "disp_updated_at=FROM_UNIXTIME(%(DispUpdatedAt)s)",
+                                 "on_ongoing_call=%(OnOngoingCall1)s",
+                                 "ongoing_call_link=%(OngoingCallLink1)s"]);
                 true ->
                     ?SQL_UPSERT(LServer, "vcard_search",
                                 ["username=%(User)s",
@@ -562,7 +574,9 @@ set_vcard(LUser, LServer, VCARD,
                                  "msg_disappear=%(MsgDisappear1Norm)s",
                                  "updated_by=%(UpdatedBy1)s",
                                  "description=%(Description1)s",
-                                 "disp_updated_at=%(DispUpdatedAt1Norm)s"])
+                                 "disp_updated_at=%(DispUpdatedAt1Norm)s",
+                                 "on_ongoing_call=%(OnOngoingCall1)s",
+                                 "ongoing_call_link=%(OngoingCallLink1)s"])
                 end
    
 
