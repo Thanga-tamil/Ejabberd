@@ -218,7 +218,7 @@
   remove_poll_offline/3,get_existing_group_info/2,get_users_devices_detail/3,set_seen_receipt/3,set_hide_profile/3,update_msg_seen_receipt/3,
   get_hide_profile_privacy/2, update_mix_participant/3, batch_remove_spool/4, is_session_exists/2,is_group_admin/3, get_spool_seq/4,
   update_story_view/3, update_story_like/3,
-  get_message_chat_info/2, get_all_group_participants/2, update_call_session_reminder_status/2]).
+  get_message_chat_info/2, get_all_group_participants/2, update_call_session_reminder_status/2, update_call_session_schedule/9]).
 
 -include("logger.hrl").
 
@@ -643,6 +643,42 @@ update_call_session_reminder_status(LServer, RoomId) ->
   ejabberd_sql:sql_query(
     LServer,
     [<<"UPDATE call_sessions SET is_reminder_notified = 1 where room_id='">>, RoomId, <<"' ;">>]).
+
+  
+update_call_session_schedule(FServer, FUser, TUser, ScheduledAtVal, ReminderVal, FinalMessageId, JoinUri, ChatType, GroupId) ->
+  ChatIdUpdate = if ChatType =:= <<"chat">> -> <<"">>;
+                    true -> [<<", chat_id = '">>, GroupId, <<"'">>]
+                 end,
+  ejabberd_sql:sql_query(FServer, [
+      <<"UPDATE call_sessions SET scheduled_at = ">>, integer_to_binary(ScheduledAtVal),
+      <<", reminder_before_minutes = ">>, integer_to_binary(if ReminderVal =:= undefined -> 0; true -> ReminderVal end),
+      <<", message_id = '">>, FinalMessageId, <<"'">>,
+      ChatIdUpdate,
+      <<" WHERE join_uri = '">>, JoinUri, <<"';">>
+  ]),
+  if ChatType =:= <<"chat">> ->
+      ejabberd_sql:sql_query(FServer, [
+          <<"INSERT INTO meet_participant (message_id, from_user, to_user, call_from, meet_type, join_uri, scheduled_at) VALUES ('">>,
+          FinalMessageId, <<"', '">>, FUser, <<"', '">>, TUser, <<"', '">>, FUser, <<"', 'chat', '">>, JoinUri, <<"', ">>, integer_to_binary(ScheduledAtVal), <<");">>
+      ]);
+  true ->
+      case get_all_group_participants(FServer, GroupId) of
+          {selected, [<<"username">>], [_|_] = Rows} ->
+              {_, ValuesIolist} = lists:foldl(fun([Participant], {IsFirst, Acc}) ->
+                  Elem = [<<"('">>, FinalMessageId, <<"', '">>, GroupId, <<"', '">>, Participant, <<"', '">>, FUser, <<"', 'normal', '">>, JoinUri, <<"', ">>, integer_to_binary(ScheduledAtVal), <<")">>],
+                  if IsFirst -> {false, [Elem]};
+                     true -> {false, [Acc, <<",">>, Elem]}
+                  end
+              end, {true, []}, Rows),
+              ejabberd_sql:sql_query(FServer, [
+                  <<"INSERT INTO meet_participant (message_id, from_user, to_user, call_from, meet_type, join_uri, scheduled_at) VALUES ">>,
+                  ValuesIolist,
+                  <<" ON DUPLICATE KEY UPDATE scheduled_at = VALUES(scheduled_at), join_uri = VALUES(join_uri);">>
+              ]);
+          _ ->
+              ok
+      end
+  end.
 
 %% Update admin of the group using Jid
 %%
