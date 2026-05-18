@@ -383,16 +383,16 @@ raw_to_record(LServer,
           usj = {User, LServer, LJID},
           us = {User, LServer},
           jid = LJID,
-          name = Nick,
+          name = sanitize(Nick),
           subscription = Subscription,
           ask = Ask,
-          nickname = Nickname,
-          status = Status,
-          email = Email,
-          mobile = Mobilenumber,
-          thumbimage = Thumbimage,
+          nickname = sanitize(Nickname),
+          status = sanitize(Status),
+          email = sanitize(Email),
+          mobile = sanitize(Mobilenumber),
+          thumbimage = sanitize(Thumbimage),
           is_admin_blocked = list_to_binary(integer_to_list(IsAdminBlocked)),
-          image = Image,
+          image = sanitize(Image),
           msg_disappear = MsgDisappear
       }
   catch
@@ -400,6 +400,9 @@ raw_to_record(LServer,
           ?ERROR_MSG("~ts", [format_row_error(User, LServer, {jid, SJID})]),
           error
   end.
+
+sanitize(null) -> <<>>;
+sanitize(V) -> V.
 
 %%--------------------------------------------------------------------
 %% Helper function to decode binary or integer

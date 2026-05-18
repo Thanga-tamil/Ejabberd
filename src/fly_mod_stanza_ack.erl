@@ -156,6 +156,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             true ->
               {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,MentionList, DisappearAt , _} = ContentAcknowledge
           end,
+           ?INFO_MSG("on_user_send_packet ~p",[EditMsgid]),
           case catch fly_mod_utils:check_blockeduser(FServer, FUser, TUser) of
             {selected, _, []} ->
               BlockUser = <<"0">>;
@@ -182,8 +183,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
               {_, _, FlatTimeStamp} = GetTimestamp,
               TimeStampedPacket = NewPacket
           end,
-          store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, MetaData,BlockUser, EditMsgid, FlatTimeStamp),
-
+       
         if BlockUser == <<"0">> ->
           case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
             true ->
@@ -209,7 +209,44 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             Metadata = MetaData
         end,
 
-        fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid,DisappearAt);
+       case xmpp:get_meta(NewPacket) of
+        #{from_broadcast := true} -> ok;
+        _ ->
+            if MessageType =:= <<"meet">> ->
+                ?INFO_MSG("Processing meet message: Metadata=~p", [Metadata]),
+                try
+                    {MetaDataJson} = jiffy:decode(Metadata),
+                    ScheduledAt = proplists:get_value(<<"meet_schedule_at">>, MetaDataJson),
+                    ReminderBeforeMinute = proplists:get_value(<<"reminder_before_minute">>, MetaDataJson),
+                    JoinUri = proplists:get_value(<<"join_uri">>, MetaDataJson),
+                    JSONMessageId = proplists:get_value(<<"message_id">>, MetaDataJson),
+                    FinalMessageId = if (JSONMessageId =:= <<>>) or (JSONMessageId =:= <<"">>) or (JSONMessageId =:= undefined) ->
+                                        MessageId;
+                                     true ->
+                                        JSONMessageId
+                                     end,
+                    ScheduledAtVal = if is_binary(ScheduledAt) -> binary_to_integer(ScheduledAt); true -> ScheduledAt end,
+                    ReminderVal = if is_binary(ReminderBeforeMinute) -> binary_to_integer(ReminderBeforeMinute); true -> ReminderBeforeMinute end,
+                    ?INFO_MSG("Meet extracted values: FinalMessageId=~p, ScheduledAtVal=~p, ReminderVal=~p, JoinUri=~p", [FinalMessageId, ScheduledAtVal, ReminderVal, JoinUri]),
+                    if (ScheduledAtVal =/= undefined) and (FinalMessageId =/= undefined) and (JoinUri =/= undefined) ->
+                        Res = fly_mod_utils:update_call_session_schedule(FServer, FUser, TUser, ScheduledAtVal, ReminderVal, FinalMessageId, JoinUri, SType, <<"">>),
+                        ?INFO_MSG("call_sessions update result: ~p", [Res]);
+                    true ->
+                        ?INFO_MSG("Skipping call_sessions update: missing values ~p", []),
+                        ok
+                    end
+                catch
+                    E:R -> 
+                        ?ERROR_MSG("Error parsing meet metadata or SQL: ~p ~p", [E, R]),
+                        ok
+                end;
+            true ->
+                ok
+            end,
+          store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, Metadata,BlockUser, EditMsgid, FlatTimeStamp),
+          fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid,DisappearAt)
+       end;
+      
         S when (S == false) ->
           BlockUser = <<"0">>,
           ok
@@ -293,6 +330,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
       true ->
         fly_mod_offline_push:send_offline_message({_C2SState,RecallTimeStampedPacket})
       end,
+    ?INFO_MSG("Bulk update_recall for IDs in stanza: ~p", [Id]),  
     fly_mod_utils:update_recall(From, Id);
 
     T when (T == ok) ->

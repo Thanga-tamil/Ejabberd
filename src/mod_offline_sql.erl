@@ -208,6 +208,180 @@ true ->
  end
 end.
 
+
+%% ─────────────────────────────────────────────────────────────────────────────
+%% store_message optimization -start
+%% ─────────────────────────────────────────────────────────────────────────────
+
+store_message_v1(#offline_msg{us = {LUser, LServer}} = M) ->
+  From      = M#offline_msg.from,
+  To        = M#offline_msg.to,
+  ChatType  = erlang:atom_to_binary(xmpp:get_type(M#offline_msg.packet), utf8),
+  Packet    = xmpp:set_from_to(M#offline_msg.packet, From, To),
+  NewPacket = misc:add_delay_info(Packet, jid:make(LServer),
+                                  M#offline_msg.timestamp, <<"Offline Storage">>),
+  XML       = fxml:element_to_binary(xmpp:encode(NewPacket)),
+  Message   = fxml:element_to_binary(xmpp:encode(M#offline_msg.packet)),
+
+  {TUser, FResource, MessageId} = resolve_message_meta(ChatType, From, To, M, NewPacket, Packet),
+
+  store_to_spool(LUser, LServer, TUser, FResource, MessageId, ChatType, XML, Message).
+
+
+%% ─────────────────────────────────────────────────────────────────────────────
+%% Resolve TUser, FResource, MessageId based on chat type
+%% ─────────────────────────────────────────────────────────────────────────────
+
+resolve_message_meta(<<"normal">>, From, _To, M, NewPacket, _Packet) ->
+  Stanza    = xmpp:encode(NewPacket),
+  #jid{user = TUser, lresource = FResource} = From,
+  MessageId = resolve_group_message_id(Stanza, xmpp:get_id(M#offline_msg.packet)),
+  {TUser, FResource, MessageId};
+
+resolve_message_meta(_ChatType, From, To, M, NewPacket, Packet) ->
+  #jid{lresource = FResource} = From,
+  {TUser, MessageId} = resolve_carbon_or_direct(Packet, To, M, NewPacket),
+  {TUser, FResource, MessageId}.
+
+
+%% ─────────────────────────────────────────────────────────────────────────────
+%% For normal (group) messages – extract submission-id if present
+%% ─────────────────────────────────────────────────────────────────────────────
+
+resolve_group_message_id(Stanza, FallbackId) ->
+  case fxml:get_subtag(Stanza, <<"mix">>) of
+    false -> FallbackId;
+    Mix   ->
+      case fxml:get_subtag(Stanza, <<"body">>) of
+        false -> FallbackId;
+        _Body -> resolve_submission_id(Mix, FallbackId)
+      end
+  end.
+
+resolve_submission_id(Mix, FallbackId) ->
+  case fxml:get_subtag(Mix, <<"submission-id">>) of
+    false        -> FallbackId;
+    SubmissionID -> fxml:get_tag_cdata(SubmissionID)
+  end.
+
+
+%% ─────────────────────────────────────────────────────────────────────────────
+%% For non-normal messages – carbon copy or direct
+%% ─────────────────────────────────────────────────────────────────────────────
+
+resolve_carbon_or_direct(Packet, To, M, NewPacket) ->
+  case mod_carboncopy:is_carbon_copy(Packet) of
+    false ->
+      #jid{user = TUser} = To,
+      {TUser, xmpp:get_id(M#offline_msg.packet)};
+    true ->
+      resolve_carbon_meta(NewPacket, To)
+  end.
+
+resolve_carbon_meta(NewPacket, To) ->
+  CarbonPacket = misc:unwrap_carbon(xmpp:encode(NewPacket)),
+  case fxml:get_subtag(CarbonPacket, <<"sent">>) of
+    false ->
+      #jid{user = TUser} = To,
+      {TUser, <<"">>};
+    SentPacket ->
+      resolve_forwarded_meta(SentPacket, To)
+  end.
+
+resolve_forwarded_meta(SentPacket, To) ->
+  case fxml:get_subtag(SentPacket, <<"forwarded">>) of
+    false ->
+      #jid{user = TUser} = To,
+      {TUser, <<"">>};
+    ForwardedPacket ->
+      resolve_message_packet_meta(ForwardedPacket, To)
+  end.
+
+resolve_message_packet_meta(ForwardedPacket, To) ->
+  case fxml:get_subtag(ForwardedPacket, <<"message">>) of
+    false ->
+      #jid{user = TUser} = To,
+      {TUser, <<"">>};
+    MessagePacket ->
+      extract_carbon_tuser_and_id(MessagePacket, To)
+  end.
+
+extract_carbon_tuser_and_id(MessagePacket, _To) ->
+  Attrs = MessagePacket#xmlel.attrs,
+  MsgId = fxml:get_attr_s(<<"id">>, Attrs),
+  case fxml:get_attr_s(<<"type">>, Attrs) of
+    <<"normal">> ->
+      MessageId = resolve_carbon_group_id(MessagePacket, MsgId),
+      FromUser  = jid:from_string(fxml:get_attr_s(<<"from">>, Attrs)),
+      #jid{user = TUser} = FromUser,
+      {TUser, MessageId};
+    _ ->
+      FromUser = jid:from_string(fxml:get_attr_s(<<"to">>, Attrs)),
+      #jid{user = TUser} = FromUser,
+      {TUser, MsgId}
+  end.
+
+resolve_carbon_group_id(MessagePacket, FallbackId) ->
+  case fxml:get_subtag(MessagePacket, <<"mix">>) of
+    false -> FallbackId;
+    Mix   -> resolve_submission_id(Mix, FallbackId)
+  end.
+
+
+%% ─────────────────────────────────────────────────────────────────────────────
+%% Spool insert – fan-out to all resources or a specific one
+%% ─────────────────────────────────────────────────────────────────────────────
+
+store_to_spool(LUser, LServer, TUser, FResource, MessageId, ChatType, XML, _Message) ->
+  case FResource of
+    <<"">> ->
+      insert_for_all_resources(LUser, LServer, TUser, MessageId, ChatType, XML);
+    _ ->
+      UResource = normalize_resource(FResource),
+      insert_for_resource(LUser, LServer, TUser, UResource, MessageId, ChatType, XML)
+  end.
+
+normalize_resource(FResource) ->
+  case string:str(binary_to_list(FResource), "Mobile") of
+    1 -> iolist_to_binary(re:replace(binary_to_list(FResource), "Mobile-", ""));
+    _ -> FResource
+  end.
+
+insert_for_all_resources(LUser, LServer, TUser, MessageId, ChatType, XML) ->
+  case catch fly_mod_utils:get_user_resources(LUser, LServer) of
+    {selected, _, [_ | _] = Result} ->
+      lists:foreach(fun([UResources]) ->
+        do_spool_insert(LUser, LServer, TUser, UResources, MessageId, ChatType, XML)
+      end, Result);
+    _ -> ok
+  end.
+
+insert_for_resource(LUser, LServer, TUser, UResource, MessageId, ChatType, XML) ->
+  case catch fly_mod_utils:get_user_resource(LUser, LServer, UResource) of
+    {selected, _, [_ | _] = Result} ->
+      lists:foreach(fun([UResources]) ->
+        do_spool_insert(LUser, LServer, TUser, UResources, MessageId, ChatType, XML)
+      end, Result);
+    _ -> ok
+  end.
+
+do_spool_insert(LUser, LServer, TUser, DeviceId, MessageId, ChatType, XML) ->
+  ejabberd_sql:sql_query(
+    LServer,
+    ?SQL_INSERT(
+      "spool",
+      ["username=%(LUser)s",
+       "server_host=%(LServer)s",
+       "message_id=%(MessageId)s",
+       "chat_type=%(ChatType)s",
+       "to_user=%(TUser)s",
+       "device_id=%(DeviceId)s",
+       "xml=%(XML)s"])).
+
+%% ─────────────────────────────────────────────────────────────────────────────
+%% store_message optimization - end
+%% ─────────────────────────────────────────────────────────────────────────────
+
 pop_messages(LUser, LServer,LResource) ->
 case get_and_del_spool_msg_t(LServer, LUser,LResource) of
 	{atomic, {selected, Rs}} ->

@@ -98,10 +98,12 @@ sql_schemas() ->
                      #sql_column{name = <<"history">>, type = text, default = <<>>},
                      #sql_column{name = <<"mobilenumber">>, type = text, default = <<>>},
                      #sql_column{name = <<"lmobilenumber">>, type = text, default = <<>>},
-                     #sql_column{name = <<"msg_disappear">>, type = text, default = <<>>},
+                     #sql_column{name = <<"msg_disappear">>, type = integer, default = true},
                      #sql_column{name = <<"updated_by">>, type = text, default = <<>>},
                      #sql_column{name = <<"disp_updated_at">>, type = text, default = <<>>},
-                     #sql_column{name = <<"description">>, type = text, default = <<>>}],
+                     #sql_column{name = <<"description">>, type = text, default = <<>>},
+                     #sql_column{name = <<"on_ongoing_call">>, type = integer, default = true},
+                     #sql_column{name = <<"ongoing_call_link">>, type = text, default = <<>>}],
                 indices = [#sql_index{
                               columns = [<<"server_host">>, <<"lusername">>],
                               unique = true},
@@ -171,7 +173,9 @@ set_vcard(LUser, LServer, VCARD,
               msg_disappear = MsgDisappear,
               updated_by = UpdatedBy,
               disp_updated_at = DispUpdatedAt,
-              description = Description
+              description = Description,
+              on_ongoing_call = OnOngoingCall,
+              ongoing_call_link = OngoingCallLink
           }) ->
 
     %% =========================
@@ -192,7 +196,7 @@ set_vcard(LUser, LServer, VCARD,
         try
             case ejabberd_sql:sql_query(
                     LServer,
-                    [<<"select fn, lfn, family, lfamily, given, lgiven, middle, lmiddle, nickname, lnickname, bday, lbday, ctry, lctry, locality, llocality, email, lemail, orgname, lorgname, orgunit, lorgunit, status, lstatus, image, limage, thumbimage, lthumbimage, history, mobilenumber, lmobilenumber, msg_disappear, updated_by, disp_updated_at, description from vcard_search where lusername= '">>, LUser, <<"' ">>]
+                    [<<"select fn, lfn, family, lfamily, given, lgiven, middle, lmiddle, nickname, lnickname, bday, lbday, ctry, lctry, locality, llocality, email, lemail, orgname, lorgname, orgunit, lorgunit, status, lstatus, image, limage, thumbimage, lthumbimage, history, mobilenumber, lmobilenumber, msg_disappear, updated_by, disp_updated_at, description, on_ongoing_call, ongoing_call_link from vcard_search where lusername= '">>, LUser, <<"' ">>]
                 ) of
                 {selected, []} -> 
                     ?INFO_MSG("vcard search empty", []),
@@ -287,18 +291,86 @@ set_vcard(LUser, LServer, VCARD,
     LOrgUnit1 = Pick(LOrgUnit, 22),
     Status1 = Pick(Status, 23),
     LStatus1 = Pick(LStatus, 24),
-    Image1 = Pick(Image, 25),
-    LImage1 = Pick(LImage, 26),
-    ThumbImage1 = Pick(ThumbImage, 27),
-    LThumbImage1 = Pick(LThumbImage, 28),
+    Image1 = ToBin(Image),
+    LImage1 = ToBin(LImage),
+    ThumbImage1 = ToBin(ThumbImage),
+    LThumbImage1 = ToBin(LThumbImage),
     History1 = Pick(History, 29),
     MobileNumber1 = Pick(MobileNumber, 30),
     LMobileNumber1 = Pick(LMobileNumber, 31),
-    MsgDisappear1 = Pick(MsgDisappear, 32),
+    MsgDisappear1Raw = Pick(MsgDisappear, 32),
     UpdatedBy1 = Pick(UpdatedBy, 33),
-    DispUpdatedAt1 = Pick(DispUpdatedAt, 34), 
-    Description1 = Pick(Description, 35), 
+    DispUpdatedAt1 = Pick(DispUpdatedAt, 34),
+    Description1 = Pick(Description, 35),
+    OnOngoingCall1 = Pick(OnOngoingCall, 36),
+    OngoingCallLink1 = Pick(OngoingCallLink, 37),
 
+    %% ==========================================================
+    %% GROUP ADMIN GUARD: Only allow msg_disappear update for groups
+    %% if the requester (UpdatedBy) is an admin (affiliation != 'n').
+    %% ==========================================================
+    %% Detection logic:
+    %%  - MsgDisappear (from XML) is non-empty (caller is trying to set it)
+    %%  - LUser exists in mix_channel (confirming it is a group)
+    %%  - UpdatedBy1 is non-empty (we know who is requesting)
+    %%  - If user is NOT an admin .. revert to old value (no update)
+    %% ==========================================================
+    MsgDisappear1 =
+        if
+            MsgDisappear1Raw == <<>> ->
+                %% No new value supplied for msg_disappear; nothing to guard.
+                %% Keeping whatever Pick decided (the existing value).
+                MsgDisappear1Raw;
+            true ->
+                %% A new msg_disappear value was supplied. Check if group.
+                IsGroup = case catch ejabberd_sql:sql_query(
+                    LServer,
+                    [<<"select count(*) from mix_channel where channel = '">>,
+                     LUser, <<"';">>]
+                ) of
+                    {selected, _, [[<<"0">>]]} -> false;
+                    {selected, _, [[0]]}       -> false;
+                    {selected, _, [[_Cnt]]}    -> true;
+                    _                          -> false
+                end,
+                case IsGroup of
+                    false ->
+                        %% Not a group chat vCard - allow update as-is
+                        MsgDisappear1Raw;
+                    true ->
+                        %% It is a group: check requester's admin status
+                        case UpdatedBy1 of
+                            <<>> ->
+                                %% No updatedBy info; cannot validate; keep existing value
+                                ?WARNING_MSG(
+                                    "Group msg_disappear update DENIED: "
+                                    "no updatedBy provided for group=~p; "
+                                    "keeping old value",
+                                    [LUser]),
+                                SafeNth(32, ExistingRow);
+                            _ ->
+                                IsAdmin = fly_mod_utils:is_group_admin(
+                                    LServer, LUser, UpdatedBy1),
+                                case IsAdmin of
+                                    true ->
+                                        ?INFO_MSG(
+                                            "Group msg_disappear update ALLOWED: "
+                                            "user=~p is admin of group=~p",
+                                            [UpdatedBy1, LUser]),
+                                        MsgDisappear1Raw;
+                                    false ->
+                                        ?WARNING_MSG(
+                                            "Group msg_disappear update DENIED: "
+                                            "user=~p is NOT admin of group=~p; "
+                                            "keeping old value",
+                                            [UpdatedBy1, LUser]),
+                                        SafeNth(32, ExistingRow)
+                                end
+                        end
+                end
+        end,
+
+        
     ?INFO_MSG(
         "Final picked vcard values:~n"
         "FN=~p LFN=~p~n"
@@ -317,7 +389,8 @@ set_vcard(LUser, LServer, VCARD,
         "ThumbImage=~p LThumbImage=~p~n"
         "History=~p~n"
         "MobileNumber=~p LMobileNumber=~p~n"
-        "MsgDisappear=~p UpdatedBy=~p DispUpdatedAt=~p Description=~p",
+        "MsgDisappear=~p UpdatedBy=~p DispUpdatedAt=~p Description=~p~n"
+        "OnOngoingCall=~p OngoingCallLink=~p",
         [
             FN1, LFN1,
             Family1, LFamily1,
@@ -335,7 +408,8 @@ set_vcard(LUser, LServer, VCARD,
             ThumbImage1, LThumbImage1,
             History1,
             MobileNumber1, LMobileNumber1,
-            MsgDisappear1, UpdatedBy1, DispUpdatedAt1, Description1
+            MsgDisappear1, UpdatedBy1, DispUpdatedAt1, Description1,
+            OnOngoingCall1, OngoingCallLink1
         ]
     ),
 
@@ -343,11 +417,29 @@ set_vcard(LUser, LServer, VCARD,
     %% WRITE TRANSACTION (ONLY UPSERTS)
     %% =========================
 
+    %% Live columns msg_disappear (INT) and disp_updated_at (DATETIME NOT NULL)
+    %% reject '' under MySQL strict mode; fall back to their DB defaults.
+    MsgDisappear1Norm = case MsgDisappear1 of
+                            <<>> -> <<"0">>;
+                            _    -> MsgDisappear1
+                        end,
+    DispUpdatedAt1Norm = case DispUpdatedAt1 of
+                            <<>> -> <<"0000-00-00 00:00:00">>;
+                            _    -> DispUpdatedAt1
+                        end,
+
     IsTimestamp = case catch binary_to_integer(DispUpdatedAt) of
                       IT when is_integer(IT) -> true;
                       _ -> false
                   end,
 
+    ?INFO_MSG("msg_disappear: ~p", [MsgDisappear1]),
+    ?INFO_MSG("msg_disappear norm: ~p", [MsgDisappear1Norm]),
+    ?INFO_MSG("disp_updated_at: ~p", [DispUpdatedAt1]),
+    ?INFO_MSG("disp_updated_at norm: ~p", [DispUpdatedAt1Norm]),
+    ?INFO_MSG("disp_updated_at raw: ~p", [DispUpdatedAt]),
+    ?INFO_MSG("is timestamp: ~p", [IsTimestamp]),
+    
     ejabberd_sql:sql_transaction(
             LServer,
             fun() ->
@@ -395,10 +487,12 @@ set_vcard(LUser, LServer, VCARD,
                                  "history=%(History1)s",
                                  "mobilenumber=%(MobileNumber1)s",
                                  "lmobilenumber=%(LMobileNumber1)s",
-                                 "msg_disappear=%(MsgDisappear1)s",
+                                 "msg_disappear=%(MsgDisappear1Norm)s",
                                  "updated_by=%(UpdatedBy1)s",
                                  "description=%(Description1)s",
-                                 "disp_updated_at=%(DispUpdatedAt1)s"]);
+                                 "disp_updated_at=%(DispUpdatedAt1Norm)s",
+                                 "on_ongoing_call=%(OnOngoingCall1)s",
+                                 "ongoing_call_link=%(OngoingCallLink1)s"]);
                 IsTimestamp ->
                     ?SQL_UPSERT(LServer, "vcard_search",
                                 ["username=%(User)s",
@@ -435,10 +529,12 @@ set_vcard(LUser, LServer, VCARD,
                                  "history=%(History1)s",
                                  "mobilenumber=%(MobileNumber1)s",
                                  "lmobilenumber=%(LMobileNumber1)s",
-                                 "msg_disappear=%(MsgDisappear1)s",
+                                 "msg_disappear=%(MsgDisappear1Norm)s",
                                  "updated_by=%(UpdatedBy1)s",
                                  "description=%(Description1)s",
-                                 "disp_updated_at=FROM_UNIXTIME(%(DispUpdatedAt)s)"]);
+                                 "disp_updated_at=FROM_UNIXTIME(%(DispUpdatedAt)s)",
+                                 "on_ongoing_call=%(OnOngoingCall1)s",
+                                 "ongoing_call_link=%(OngoingCallLink1)s"]);
                 true ->
                     ?SQL_UPSERT(LServer, "vcard_search",
                                 ["username=%(User)s",
@@ -475,10 +571,12 @@ set_vcard(LUser, LServer, VCARD,
                                  "history=%(History1)s",
                                  "mobilenumber=%(MobileNumber1)s",
                                  "lmobilenumber=%(LMobileNumber1)s",
-                                 "msg_disappear=%(MsgDisappear1)s",
+                                 "msg_disappear=%(MsgDisappear1Norm)s",
                                  "updated_by=%(UpdatedBy1)s",
                                  "description=%(Description1)s",
-                                 "disp_updated_at=%(DispUpdatedAt1)s"])
+                                 "disp_updated_at=%(DispUpdatedAt1Norm)s",
+                                 "on_ongoing_call=%(OnOngoingCall1)s",
+                                 "ongoing_call_link=%(OngoingCallLink1)s"])
                 end
    
 
