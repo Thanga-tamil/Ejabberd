@@ -671,6 +671,31 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
                             end,
                             #jid{luser = FromUser} = From,
                             SUser = fly_mod_utils:get_user_from_string_jid(MessageSend),
+                            if MessageType =:= <<"meet">> ->
+                                try
+                                    {MetaDataJson} = jiffy:decode(MetaData),
+                                    ScheduledAt = proplists:get_value(<<"meet_schedule_at">>, MetaDataJson),
+                                    ReminderBeforeMinute = proplists:get_value(<<"reminder_before_minute">>, MetaDataJson),
+                                    JoinUri = proplists:get_value(<<"join_uri">>, MetaDataJson),
+                                    JSONMessageId = proplists:get_value(<<"message_id">>, MetaDataJson),
+                                    FinalMessageId = if (JSONMessageId =:= <<>>) or (JSONMessageId =:= <<"">>) or (JSONMessageId =:= undefined) ->
+                                                        MessageId;
+                                                     true ->
+                                                        JSONMessageId
+                                                     end,
+                                    ScheduledAtVal = if is_binary(ScheduledAt) -> binary_to_integer(ScheduledAt); true -> ScheduledAt end,
+                                    ReminderVal = if is_binary(ReminderBeforeMinute) -> binary_to_integer(ReminderBeforeMinute); true -> ReminderBeforeMinute end,
+                                    if (ScheduledAtVal =/= undefined) and (FinalMessageId =/= undefined) and (JoinUri =/= undefined) ->
+                                        fly_mod_utils:update_call_session_schedule(LServer, SUser, Chan, ScheduledAtVal, ReminderVal, FinalMessageId, JoinUri, <<"meet">>, Chan);
+                                    true ->
+                                        ok
+                                    end
+                                catch
+                                    _E:_R -> ok
+                                end;
+                            true ->
+                                ok
+                            end,
                             EditMsgId = case EditMsgId0 of
                                             <<>> -> MessageId;
                                             _ -> EditMsgId0
