@@ -3239,6 +3239,11 @@ post_story(From, RequestType, SubEl, IQ) ->
       ?INFO_MSG("post_story routing story_id=~ts to=~ts msg_id=~ts", [StoryId, ToUserStr, MessageId]),
       try
         ejabberd_router:route(From, ToUserJid, XmlBody),
+        TResources = ejabberd_sm:get_user_resources(TargetUser, FromServer),
+        if length(TResources) =:= 0 ->
+             mod_offline:store_packet({ToUserJid, xmpp:decode(XmlBody)});
+           true -> ok
+        end,
         ?INFO_MSG("post_story routed story_id=~ts to=~ts", [StoryId, ToUserStr])
       catch
         Class:Reason:Stacktrace ->
@@ -3292,6 +3297,11 @@ delete_story(From, RequestType, SubEl, IQ) ->
 
       try
         ejabberd_router:route(From, ToUserJid, XmlBody),
+        TResources = ejabberd_sm:get_user_resources(TargetUser, FromServer),
+        if length(TResources) =:= 0 ->
+             mod_offline:store_packet({ToUserJid, xmpp:decode(XmlBody)});
+           true -> ok
+        end,
         ?INFO_MSG("delete_story routed story_id=~ts to=~ts", [StoryId, ToUserStr])
       catch
         Class:Reason ->
