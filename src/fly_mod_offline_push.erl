@@ -1002,8 +1002,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
       Server = To#jid.server,
       Meeting = fxml:get_subtag_with_xmlns(Packet, <<"meeting">>,
         <<"urn:xmpp:receipts">>),
-      MessageId = fxml:get_attr_s(<<"message_id">>, Packet#xmlel.attrs),
-      
+      MessageId = fxml:get_attr_s(<<"message_id">>, Meeting#xmlel.attrs),
       SessionId = fxml:get_attr_s(<<"session_id">>, Meeting#xmlel.attrs),
       RoomId = fxml:get_attr_s(<<"room_id">>, Meeting#xmlel.attrs),
       ChatId = fxml:get_attr_s(<<"chat_id">>, Meeting#xmlel.attrs),
@@ -1013,6 +1012,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
       ScheduledAt = fxml:get_attr_s(<<"scheduled_at">>, Meeting#xmlel.attrs),
       ReminderMins = fxml:get_attr_s(<<"reminder_before_minutes">>, Meeting#xmlel.attrs),
       Status = fxml:get_attr_s(<<"status">>, Meeting#xmlel.attrs),
+      MessageFrom = fxml:get_attr_s(<<"message_from">>, Meeting#xmlel.attrs),
+      ChatTypeParam = fxml:get_attr_s(<<"chat_type">>, Meeting#xmlel.attrs),
+      MessageTo = fxml:get_attr_s(<<"message_to">>, Meeting#xmlel.attrs),
 
       BF = [
         {<<"type">>, "meeting_reminder"},
@@ -1029,7 +1031,10 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
         {<<"userDomain">>, binary_to_list(Server)},
         {<<"user_type">>, binary_to_list(PushType)},
         {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
-        {<<"title">>, "Meeting Reminder"}
+        {<<"title">>, "Meeting Reminder"},
+        {<<"message_from">>, binary_to_list(MessageFrom)},
+        {<<"chat_type">>, binary_to_list(ChatTypeParam)},
+        {<<"message_to">>, binary_to_list(MessageTo)}
       ],
       Payload = create_android_json(DeviceToken, BF),
       if DeviceType == <<"android">> ->
@@ -2012,7 +2017,7 @@ end,
       Server = Recipient#jid.server,
       Meeting = fxml:get_subtag_with_xmlns(Packet, <<"meeting">>,
         <<"urn:xmpp:receipts">>),
-      MessageId = fxml:get_attr_s(<<"message_id">>, Packet#xmlel.attrs),
+      MessageId = fxml:get_attr_s(<<"message_id">>, Meeting#xmlel.attrs),
       SessionId = fxml:get_attr_s(<<"session_id">>, Meeting#xmlel.attrs),
       RoomId = fxml:get_attr_s(<<"room_id">>, Meeting#xmlel.attrs),
       ChatId = fxml:get_attr_s(<<"chat_id">>, Meeting#xmlel.attrs),
@@ -2023,6 +2028,9 @@ end,
     
       ReminderMins = fxml:get_attr_s(<<"reminder_before_minutes">>, Meeting#xmlel.attrs),
       Status = fxml:get_attr_s(<<"status">>, Meeting#xmlel.attrs),
+      MessageFrom = fxml:get_attr_s(<<"message_from">>, Meeting#xmlel.attrs),
+      ChatTypeParam = fxml:get_attr_s(<<"chat_type">>, Meeting#xmlel.attrs),
+      MessageTo = fxml:get_attr_s(<<"message_to">>, Meeting#xmlel.attrs),
 
       Args = [
         {type, "meeting_reminder"},
@@ -2038,7 +2046,10 @@ end,
         {reminder_before_minutes, binary_to_list(ReminderMins)},
         {userDomain, binary_to_list(Server)},
         {user_type, binary_to_list(UserType)},
-        {push_from, binary_to_list(<<"MirrorFly">>)}
+        {push_from, binary_to_list(<<"MirrorFly">>)},
+        {message_from, binary_to_list(MessageFrom)},
+        {chat_type, binary_to_list(ChatTypeParam)},
+        {message_to, binary_to_list(MessageTo)}
       ],
 
       Msg = [
