@@ -3724,17 +3724,24 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
     ScheduledAt   = fxml:get_attr_s(<<"scheduled_at">>, SubEl#xmlel.attrs),
     MessageIdAttr = fxml:get_attr_s(<<"message_id">>, SubEl#xmlel.attrs),
     ReminderMins  = fxml:get_attr_s(<<"reminder_before_minutes">>, SubEl#xmlel.attrs),
+    MsgFromParam  = fxml:get_attr_s(<<"message_from">>, SubEl#xmlel.attrs),
+    ChatTypeParam = fxml:get_attr_s(<<"chat_type">>, SubEl#xmlel.attrs),
+    MsgToParam    = fxml:get_attr_s(<<"message_to">>, SubEl#xmlel.attrs),
 
-    ?INFO_MSG("meeting_reminder request from=~ts message_id=~ts session_id=~ts room_id=~ts chat_id=~ts call_mode=~ts call_type=~ts scheduled_at=~ts reminder_before_minutes=~ts",
-              [jid:to_string(From), MessageIdAttr, SessionId, RoomId, ChatId, CallMode, CallType, ScheduledAt, ReminderMins]),
+    ?INFO_MSG("meeting_reminder request from=~ts message_id=~ts session_id=~ts room_id=~ts chat_id=~ts call_mode=~ts call_type=~ts scheduled_at=~ts reminder_before_minutes=~ts message_from=~ts chat_type=~ts message_to=~ts",
+              [jid:to_string(From), MessageIdAttr, SessionId, RoomId, ChatId, CallMode, CallType, ScheduledAt, ReminderMins, MsgFromParam, ChatTypeParam, MsgToParam]),
 
     %% 2. Lookup message_status to determine chat_type, from_user, to_user
     {ChatType, MsgFromUser, MsgToUser} =
-        case catch fly_mod_utils:get_message_chat_info(FromServer, MessageIdAttr) of
-            {selected, _Cols, [[CT, FU, TU] | _]} ->
-                {CT, FU, TU};
-            _ ->
-                {<<>>, <<>>, <<>>}
+        if ChatTypeParam =/= <<>> ->
+            {ChatTypeParam, MsgFromParam, MsgToParam};
+        true ->
+            case catch fly_mod_utils:get_message_chat_info(FromServer, MessageIdAttr) of
+                {selected, _Cols, [[CT, FU, TU] | _]} ->
+                    {CT, FU, TU};
+                _ ->
+                    {<<>>, <<>>, <<>>}
+            end
         end,
 
     ?INFO_MSG("meeting_reminder message_status chat_type=~ts from_user=~ts to_user=~ts",
@@ -3786,7 +3793,10 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
                     {<<"call_type">>, CallType},
                     {<<"scheduled_at">>, ScheduledAt},
                     {<<"message_id">>, MessageIdAttr},
-                    {<<"reminder_before_minutes">>, ReminderMins}
+                    {<<"reminder_before_minutes">>, ReminderMins},
+                    {<<"message_from">>, MsgFromUser},
+                    {<<"chat_type">>, ChatType},
+                    {<<"message_to">>, MsgToUser}
                 ],
                 children = []}]},
 
