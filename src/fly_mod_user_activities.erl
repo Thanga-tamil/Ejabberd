@@ -3225,7 +3225,10 @@ post_story(From, RequestType, SubEl, IQ) ->
   CreatedAt    = fxml:get_attr_s(<<"created_at">>, SubEl#xmlel.attrs),
   ExpiresAt    = fxml:get_attr_s(<<"expires_at">>, SubEl#xmlel.attrs),
 
-  MessageId = fly_mod_utils:get_iq_message_id(16),
+  MessageId = case StoryId of
+    <<>> -> fly_mod_utils:get_iq_message_id(16);
+    _ -> StoryId
+  end,
   ?INFO_MSG("post_story request from=~ts@~ts story_id=~ts targets=~p created_at=~ts expires_at=~ts",
             [FromUser, FromServer, StoryId, UsersList, CreatedAt, ExpiresAt]),
 
@@ -3292,7 +3295,10 @@ delete_story(From, RequestType, SubEl, IQ) ->
 
   StoryId  = fxml:get_attr_s(<<"story_id">>, SubEl#xmlel.attrs),
   Username = fxml:get_attr_s(<<"username">>, SubEl#xmlel.attrs),
-  MessageId = fly_mod_utils:get_iq_message_id(16),
+  MessageId = case StoryId of
+    <<>> -> fly_mod_utils:get_iq_message_id(16);
+    _ -> StoryId
+  end,
 
   ?INFO_MSG("delete_story request from=~ts story_id=~ts targets=~p",
             [jid:to_string(From), StoryId, UsersList]),
