@@ -212,7 +212,7 @@
   get_last/2, get_custom_attributes/1,is_carbon_copy/1,
   update_license_lookup/1, validate_license/3,message_status/3,message_status_new/3,
   decrypt_license_data/2,get_participants/3,update_mute_chat/3,update_archive_chat/3,get_user_settings/1,
-  set_user_settings/2, get_archived_chats/1,update_recent_unread_chat/2,update_recent_group_unread_chat/3,
+  set_user_settings/2, set_privacy_type/2, get_archived_chats/1,update_recent_unread_chat/2,update_recent_group_unread_chat/3,
   update_block_status_user/3,update_block_status_group/3,get_contact_permission/1,update_vcard_date/2,get_user_resources/2,
   get_user_resources/3,get_mobile_user_message/2,get_mobile_user_resource/2,get_push_type/1,get_meta_chat_web/4,poll_vote_update/8,
   remove_poll_offline/3,get_existing_group_info/2,get_users_devices_detail/3,set_seen_receipt/3,set_hide_profile/3,update_msg_seen_receipt/3,
@@ -221,9 +221,16 @@
   get_message_chat_info/2, get_all_group_participants/2, update_call_session_reminder_status/2, update_call_session_schedule/9,
   delete_story_like/3]).
 
+-export_type([chat_users_privacy_type/0, chat_privacy_sql_value/0]).
+
 -include("logger.hrl").
 
 -include_lib("xmpp/include/xmpp.hrl").
+
+%% Values accepted on the `privacy_type' query attribute (MySQL enum + empty to clear as NULL).
+-type chat_users_privacy_type() :: <<"contact">> | <<"include">> | <<"exclude">> | <<>>.
+
+-type chat_privacy_sql_value() :: cleared | <<"contact">> | <<"include">> | <<"exclude">>.
 
 -include("ejabberd_sql_pt.hrl").
 
@@ -2282,6 +2289,33 @@ get_user_settings(#jid{luser = FUser, lserver = LServer}) ->
 set_user_settings(#jid{luser = FUser, lserver = LServer}, Archive) ->
   ejabberd_sql:sql_query( LServer,
     [<<"update chat_users set archive = ">>, binary_to_list(Archive), <<" where username='">>,FUser,<<"';">>]).
+
+%% Update chat_users.privacy_type (enum contact|include|exclude). Empty value sets NULL.
+-spec set_privacy_type(jid(), binary()) -> ok | {error, invalid_privacy_type}.
+-spec normalize_chat_privacy_type(binary()) -> {ok, chat_privacy_sql_value()} | error.
+set_privacy_type(#jid{luser = FUser, lserver = LServer}, PrivacyTypeBin) ->
+  case normalize_chat_privacy_type(PrivacyTypeBin) of
+    {ok, cleared} ->
+      ejabberd_sql:sql_query(LServer,
+        [<<"update chat_users set privacy_type = NULL where username='">>, FUser, <<"';">>]),
+      ok;
+    {ok, Value} ->
+      ejabberd_sql:sql_query(LServer,
+        [<<"update chat_users set privacy_type = '">>, Value, <<"' where username='">>, FUser, <<"';">>]),
+      ok;
+    error ->
+      {error, invalid_privacy_type}
+  end.
+
+normalize_chat_privacy_type(<<>>) ->
+  {ok, cleared};
+normalize_chat_privacy_type(B) when is_binary(B) ->
+  case string:lowercase(B) of
+    <<"contact">> -> {ok, <<"contact">>};
+    <<"include">> -> {ok, <<"include">>};
+    <<"exclude">> -> {ok, <<"exclude">>};
+    _ -> error
+  end.
 
 get_archived_chats(#jid{luser = FUser, lserver = LServer}) ->
   ejabberd_sql:sql_query( LServer,

@@ -29,6 +29,11 @@
 -type value() :: string().
 -type opts() :: [{name(), value(), value()}, ...].
 
+-export_type([user_activities_privacy_type/0]).
+
+%% `privacy_type' attribute on <query xmlns='jabber:iq:user_activities'/> (see xmpp_codec.spec).
+-type user_activities_privacy_type() :: fly_mod_utils:chat_users_privacy_type().
+
 
 start_link(Host, Opts) ->
   Proc = gen_mod:get_module_proc(Host, ?PROCNAME),
@@ -210,6 +215,8 @@ process_iq_set(From, _To, RequestType, IQ) ->
       mute_notification(From, RequestType, SubEl, IQ);
     <<"update_archive_chat">> ->
       update_archive_chat(From, RequestType, SubEl, IQ);
+    <<"update_privacy_type">> ->
+      update_privacy_type(From, RequestType, SubEl, IQ);
     <<"update_user_busy">> ->
       update_user_busy(From, RequestType, SubEl, IQ);
     <<"register_update">> ->
@@ -1333,6 +1340,22 @@ update_archive_chat(FromJid, RequestType, SubEl, IQ) ->
       ok
   end,
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Updated successfully">>}).
+
+-spec update_privacy_type(jid(), binary(), xmlel(), xmlel()) -> xmlel().
+update_privacy_type(From, RequestType, SubEl, IQ) ->
+  PrivacyType = fxml:get_path_s(SubEl, [{attr, <<"privacy_type">>}]),
+  case fly_mod_utils:set_privacy_type(From, PrivacyType) of
+    ok ->
+      Echo = case PrivacyType of
+        <<>> -> <<>>;
+        B -> string:lowercase(B)
+      end,
+      Xml = [#xmlel{name = <<"privacy_setting">>,
+        attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>}, {<<"privacy_type">>, Echo}]}],
+      fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Updated successfully">>, sub_els = Xml});
+    {error, invalid_privacy_type} ->
+      fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Invalid privacy_type; allowed: contact, include, exclude">>})
+  end.
 
   update_user_busy(From, RequestType, SubEl, IQ) ->
     BusyStatus = fxml:get_path_s(SubEl, [{attr, <<"busy_status">>}]),
