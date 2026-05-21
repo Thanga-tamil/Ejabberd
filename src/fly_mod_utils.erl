@@ -879,11 +879,16 @@ update_story_view(FServer, StoryId, ViewerId) ->
 
 update_story_like(FServer, StoryId, LikerId) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"INSERT IGNORE INTO story_likes (story_id, liker_username, liked_at) VALUES (">>, StoryId, <<", '">>, LikerId, <<"', NOW());">>]).
+    [<<"INSERT IGNORE INTO story_likes (story_id, liker_username, liked_at) VALUES ('">>,
+     StoryId,
+     <<"', '">>,
+     LikerId,
+     <<"', NOW());">>]).
 
 delete_story_like(FServer, StoryId, LikerId) ->
     ejabberd_sql:sql_query(FServer,
-        [<<"DELETE FROM story_likes WHERE story_id = ">>,StoryId,<<" AND liker_username = '">>,LikerId,<<"';">>]).
+        [<<"DELETE FROM story_likes WHERE story_id = '">>, StoryId,
+         <<"' AND liker_username = '">>, LikerId, <<"';">>]).
 
 %% update offline messages status from spool table
 %%
