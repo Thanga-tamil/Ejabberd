@@ -212,7 +212,7 @@
   get_last/2, get_custom_attributes/1,is_carbon_copy/1,
   update_license_lookup/1, validate_license/3,message_status/3,message_status_new/3,
   decrypt_license_data/2,get_participants/3,update_mute_chat/3,update_archive_chat/3,get_user_settings/1,
-  set_user_settings/2, get_archived_chats/1,update_recent_unread_chat/2,update_recent_group_unread_chat/3,
+  set_user_settings/2, set_privacy_type/2, get_archived_chats/1,update_recent_unread_chat/2,update_recent_group_unread_chat/3,
   update_block_status_user/3,update_block_status_group/3,get_contact_permission/1,update_vcard_date/2,get_user_resources/2,
   get_user_resources/3,get_mobile_user_message/2,get_mobile_user_resource/2,get_push_type/1,get_meta_chat_web/4,poll_vote_update/8,
   remove_poll_offline/3,get_existing_group_info/2,get_users_devices_detail/3,set_seen_receipt/3,set_hide_profile/3,update_msg_seen_receipt/3,
@@ -879,11 +879,16 @@ update_story_view(FServer, StoryId, ViewerId) ->
 
 update_story_like(FServer, StoryId, LikerId) ->
   ejabberd_sql:sql_query(FServer,
-    [<<"INSERT IGNORE INTO story_likes (story_id, liker_username, liked_at) VALUES (">>, StoryId, <<", '">>, LikerId, <<"', NOW());">>]).
+    [<<"INSERT IGNORE INTO story_likes (story_id, liker_username, liked_at) VALUES ('">>,
+     StoryId,
+     <<"', '">>,
+     LikerId,
+     <<"', NOW());">>]).
 
 delete_story_like(FServer, StoryId, LikerId) ->
     ejabberd_sql:sql_query(FServer,
-        [<<"DELETE FROM story_likes WHERE story_id = ">>,StoryId,<<" AND liker_username = '">>,LikerId,<<"';">>]).
+        [<<"DELETE FROM story_likes WHERE story_id = '">>, StoryId,
+         <<"' AND liker_username = '">>, LikerId, <<"';">>]).
 
 %% update offline messages status from spool table
 %%
@@ -2282,6 +2287,17 @@ get_user_settings(#jid{luser = FUser, lserver = LServer}) ->
 set_user_settings(#jid{luser = FUser, lserver = LServer}, Archive) ->
   ejabberd_sql:sql_query( LServer,
     [<<"update chat_users set archive = ">>, binary_to_list(Archive), <<" where username='">>,FUser,<<"';">>]).
+
+%% Update chat_users.privacy_type. Empty value clears the column (NULL).
+-spec set_privacy_type(jid(), binary()) -> ok.
+set_privacy_type(#jid{luser = FUser, lserver = LServer}, <<>>) ->
+  ejabberd_sql:sql_query(LServer,
+    [<<"update chat_users set privacy_type = NULL where username='">>, FUser, <<"';">>]),
+  ok;
+set_privacy_type(#jid{luser = FUser, lserver = LServer}, PrivacyTypeBin) when is_binary(PrivacyTypeBin) ->
+  ejabberd_sql:sql_query(LServer,
+    [<<"update chat_users set privacy_type = '">>, PrivacyTypeBin, <<"' where username='">>, FUser, <<"';">>]),
+  ok.
 
 get_archived_chats(#jid{luser = FUser, lserver = LServer}) ->
   ejabberd_sql:sql_query( LServer,
