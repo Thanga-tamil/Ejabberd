@@ -3622,7 +3622,7 @@ story_like(From, RequestType, SubEl, IQ) ->
     Status =
         case LikeFlag of
             <<"1">> -> <<"story_like">>;
-            <<"0">> -> <<"story_unlike">>;
+            <<"0">> -> <<"story_like">>;
             _ -> <<"story_like">>
         end,
 
