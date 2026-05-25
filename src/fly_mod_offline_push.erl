@@ -612,6 +612,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
                         <<"contact">> -> <<"Contact">>;
                         <<"file">> -> <<"Document">>;
                         <<"meet">> -> <<"Meet">>;
+                        <<"story_reply">> -> <<"Story Reply">>;
                         _ ->
                         <<"Text">>
                       end,
@@ -1088,6 +1089,8 @@ gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
                           <<"contact">> ->
                           binary_to_list(<<"Contact">>);
                           <<"file">> -> binary_to_list(<<"Document">>);
+                          <<"story_reply">> ->
+                          binary_to_list(<<"Story Reply">>);
                           _ ->
                           binary_to_list(<<"Text">>)
                         end,
@@ -1557,6 +1560,10 @@ end,
                         Message_Content = SubEl,
                         binary_to_list(UserNickName) ++
                         ": " ++ binary_to_list(<<"Meet">>);
+                        <<"story_reply">> ->
+                        Message_Content = SubEl,
+                        binary_to_list(UserNickName) ++
+                        ": " ++ binary_to_list(<<"Story Reply">>);
                         _ ->
                         Message_Content = SubEl,
                         binary_to_list(UserNickName)
@@ -2130,6 +2137,13 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
                             binary_to_list(GroupName) ++
                             ": " ++
                             binary_to_list(<<"Contact">>);
+                          <<"story_reply">> ->
+                          Message_Content = Message,
+                          binary_to_list(UserNickName) ++
+                            "@" ++
+                            binary_to_list(GroupName) ++
+                            ": " ++
+                            binary_to_list(<<"Story Reply">>);
                           _ ->
                           Message_Content = Message,
 
@@ -2361,6 +2375,8 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
                             <<"contact">> ->
                             binary_to_list(<<"Contact">>);
                             <<"file">> -> binary_to_list(<<"Document">>);
+                            <<"story_reply">> ->
+                            binary_to_list(<<"Story Reply">>);
                             _ ->
                             binary_to_list(<<"Text">>)
                           end,
@@ -2687,6 +2703,9 @@ ios_send_bulk_push(Server, ToUser, MessageContent, _FromUser, FlatTimeStamp, Cha
                     <<"contact">> ->
                       Message_Content = MSGBody,
                       binary_to_list(<<"Contact">>);
+                    <<"story_reply">> ->
+                      Message_Content = MSGBody,
+                      binary_to_list(<<"Story Reply">>);
                     _ ->
                       Message_Content = MSGBody,
                       binary_to_list(GroupName)
