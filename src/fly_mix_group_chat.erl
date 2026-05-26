@@ -855,15 +855,15 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                         FifthChanges = 
                         case binary:match(string:lowercase(Lresource), <<"mobile">>) of
                           nomatch ->
-                            FourthChanges;
-                          {_, _} -> 
                             case {OldOnOngoingCall, IncomingOnOngoingCall} of
                               {OldOnOngoingCall, NewOnCall} when OldOnOngoingCall =:= NewOnCall ->
                                 FourthChanges;
                             {OldOnOngoingCallSec, NewOnCall} ->
                               ?INFO_MSG("OnOngoingCall updated for group ~p from ~p to ~p", [LUser, OldOnOngoingCallSec, NewOnCall]),
                               [ongoing_call | FourthChanges]
-                            end
+                            end;
+                          {_, 6} -> 
+                            FourthChanges
                         end,
 
                         % Handle ongoing_call_link changes
