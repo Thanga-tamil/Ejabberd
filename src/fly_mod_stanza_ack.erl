@@ -140,8 +140,8 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
     {FUserId, _, FResource} = jid:tolower(From),
     {TUserId, _, TResource} = jid:tolower(To),
     ?LOG_INFO(
-      "c2s_authenticated_packet:fly_mod_stanza_ack ~p",
-      [#{stanza_id => MessageId,
+      "user_send_packet:fly_mod_stanza_ack for to_user=~p with message details: ~p",
+      [TUserId, #{stanza_id => MessageId,
          type => Type,
          from_user_id => FUserId,
          from_resource => FResource,
@@ -523,6 +523,18 @@ send_ack_response(From, To, ReceiptId, Type, DisappearAt) ->
       children = []},
   Proc = gen_mod:get_module_proc(ServerHost, ?MODULE),
   Msg = #message{from = To, to = From, type = chat, sub_els = [XmlBody]},
+  
+    {FUserId, _, FResource} = jid:tolower(From),
+    {TUserId, _, TResource} = jid:tolower(To),
+    ?LOG_INFO(
+      "singlechat ack for message_sender=~p stanza details: ~p",
+      [From, #{stanza_id => ReceiptId,
+         type => Type,
+         from_user_id => FUserId,
+         from_resource => FResource,
+         to_user_id => TUserId,
+         to_resource => TResource}]),
+
   gen_server:cast(Proc, {send_ack,Msg}).
 
 depends(_, _) ->

@@ -444,8 +444,8 @@ user_send_packet({#message{} = Packet, State}) ->
     {FUserId, _, FResource} = jid:tolower(From),
     {TUserId, _, TResource} = jid:tolower(To),
 		?LOG_INFO(
-			"c2s_authenticated_packet:mod_privacy ~p",
-			[#{stanza_id => StanzaId,
+			"user_send_packet:mod_privacy for to_user=~p with message details: ~p",
+			[TUserId, #{stanza_id => StanzaId,
 				 type => Type,
 				 from_user_id => FUserId,
 				 from_resource => FResource,

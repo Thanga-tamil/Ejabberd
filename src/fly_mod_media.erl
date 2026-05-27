@@ -399,8 +399,8 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
   {FUserId, _, FResource} = jid:tolower(From),
   {TUserId, _, TResource} = jid:tolower(To),
   ?LOG_INFO(
-    "c2s_authenticated_packet:fly_mod_media ~p",
-    [#{stanza_id => xmpp:get_id(XML),
+    "user_send_packet:fly_mod_media for to_user=~p with message details: ~p",
+    [TUserId, #{stanza_id => xmpp:get_id(XML),
        type => Type,
        from_user_id => FUserId,
        from_resource => FResource,

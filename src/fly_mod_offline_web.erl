@@ -50,8 +50,8 @@ on_user_send_packet({#message{from = From,to = To,type = Type, id = MessageId } 
     {FUserId, _, FResource2} = jid:tolower(From),
     {TUserId, _, TResource} = jid:tolower(To),
     ?LOG_INFO(
-      "c2s_authenticated_packet:fly_mod_offline_web ~p",
-      [#{stanza_id => StanzaId,
+      "user_send_packet:fly_mod_offline_web for to_user=~p with message details: ~p",
+      [TUserId, #{stanza_id => StanzaId,
          type => Type,
          from_user_id => FUserId,
          from_resource => FResource2,

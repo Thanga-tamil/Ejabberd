@@ -1344,7 +1344,7 @@ send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host, Pa
     Type = safe_get_msg_type(Packet),
     {FUserId, _, FResource} = safe_get_from_parts(Packet),
     {TUserId, _, TResource} = safe_get_to_parts(Packet),
-    ?LOG_INFO("publishing to rabbitmq exchange=~p routing_key=~p stanza: ~p", [RMExchange, RKey,
+    ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
       #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
     case amqp_channel:cast(ChannelPid,
       #'basic.publish'{
@@ -1352,11 +1352,11 @@ send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host, Pa
         routing_key = RKey},
       #amqp_msg{payload = list_to_binary(Payload)}) of
       ok ->
-        ?LOG_INFO("published to rabbitmq exchange=~p routing_key=~p stanza: ~p", [RMExchange, RKey,
+        ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
           #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
         {ok, <<"success">>};
       Error ->
-        ?LOG_INFO("publish_failed to rabbitmq exchange=~p routing_key=~p stanza: ~p error=~p", [RMExchange, RKey,
+        ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, RKey,
           #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
         ?ERROR_MSG("Android: Unable to send call push notification to the rabbitmq server server: ~p", [Error])
     end;
@@ -1366,7 +1366,7 @@ send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host, Pa
     Type = safe_get_msg_type(Packet),
     {FUserId, _, FResource} = safe_get_from_parts(Packet),
     {TUserId, _, TResource} = safe_get_to_parts(Packet),
-    ?LOG_INFO("chat type group_reaction, publishing to rabbitmq exchange=~p routing_key=~p stanza: ~p", [RMExchange, RKey,
+    ?LOG_INFO("chat type group_reaction, publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
       #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
       case amqp_channel:cast(ChannelPid,
         #'basic.publish'{
@@ -1374,11 +1374,11 @@ send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host, Pa
           routing_key = RKey},
         #amqp_msg{payload = list_to_binary(Payload)}) of
         ok ->
-          ?LOG_INFO("published to rabbitmq exchange=~p routing_key=~p stanza: ~p", [RMExchange, RKey,
+          ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
             #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
           {ok, <<"success">>};
           Error ->
-            ?LOG_INFO("publish_failed to rabbitmq exchange=~p routing_key=~p stanza: ~p error=~p", [RMExchange, RKey,
+            ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, RKey,
               #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
             ?ERROR_MSG("Android: Unable to send push messages to the rabbitmq server Q[aos_grp_react_push] server: ~p", [Error])
       end;
@@ -1388,7 +1388,7 @@ send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host, Pa
       Type = safe_get_msg_type(Packet),
       {FUserId, _, FResource} = safe_get_from_parts(Packet),
       {TUserId, _, TResource} = safe_get_to_parts(Packet),
-      ?LOG_INFO("publishing to rabbitmq exchange=~p routing_key=~p stanza: ~p", [RMExchange, RKey,
+      ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
         #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
       case amqp_channel:cast(ChannelPid,
         #'basic.publish'{
@@ -1396,11 +1396,11 @@ send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host, Pa
           routing_key = RKey},
         #amqp_msg{payload = list_to_binary(Payload)}) of
         ok ->
-          ?LOG_INFO("published to rabbitmq exchange=~p routing_key=~p stanza: ~p", [RMExchange, RKey,
+          ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
             #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
           {ok, <<"success">>};
           Error ->
-            ?LOG_INFO("publish_failed to rabbitmq exchange=~p routing_key=~p stanza: ~p error=~p", [RMExchange, RKey,
+            ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, RKey,
               #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
             ?ERROR_MSG("Android: Unable to send push messages to the rabbitmq server server: ~p", [Error])
       end
@@ -1417,18 +1417,18 @@ send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host, Packet
     Type = safe_get_msg_type(Packet),
     {FUserId, _, FResource} = safe_get_from_parts(Packet),
     {TUserId, _, TResource} = safe_get_to_parts(Packet),
-    ?LOG_INFO("publishing to rabbitmq exchange=~p routing_key=~p stanza: ~p", [RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-    ?LOG_INFO("publishing to rabbitmq exchange=~p routing_key=~p payload_len=~p", [RMExchange, RKey, byte_size(list_to_binary(Payload))]),
+    ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
+    ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p payload_len=~p", [TUserId, RMExchange, RKey, byte_size(list_to_binary(Payload))]),
     case amqp_channel:cast(ChannelPid,
       #'basic.publish'{
         exchange = RMExchange,
         routing_key = RKey},
       #amqp_msg{payload = list_to_binary(Payload)}) of
       ok ->
-        ?LOG_INFO("published to rabbitmq exchange=~p routing_key=~p stanza: ~p", [RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
+        ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
         {ok, <<"success">>};
       Error ->
-        ?LOG_INFO("publish_failed to rabbitmq exchange=~p routing_key=~p stanza: ~p error=~p", [RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
+        ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
         ?ERROR_MSG("Android: Unable to send call push notification to the rabbitmq server server: ~p", [Error])
     end;
     true ->
@@ -1437,15 +1437,15 @@ send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host, Packet
       Type = safe_get_msg_type(Packet),
       {FUserId, _, FResource} = safe_get_from_parts(Packet),
       {TUserId, _, TResource} = safe_get_to_parts(Packet),
-      ?LOG_INFO("publishing to rabbitmq exchange=~p routing_key=~p stanza: ~p", [RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-      ?LOG_INFO("publishing to rabbitmq exchange=~p routing_key=~p payload_len=~p", [RMExchange, RKey, byte_size(list_to_binary(Payload))]),
+      ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
+      ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p payload_len=~p", [TUserId, RMExchange, RKey, byte_size(list_to_binary(Payload))]),
       case amqp_channel:cast(ChannelPid,
         #'basic.publish'{
           exchange = RMExchange,
           routing_key = RKey},
         #amqp_msg{payload = list_to_binary(Payload)}) of
         ok ->
-          ?LOG_INFO("published to rabbitmq exchange=~p routing_key=~p", [RMExchange, RKey]),
+          ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p", [TUserId, RMExchange, RKey]),
           {ok, <<"success">>};
         Error ->
           ?ERROR_MSG("Android: Unable to send push messages to the rabbitmq server server: ~p", [Error])
@@ -1468,7 +1468,7 @@ send_payload(Payload, ChatType, RMQConnection, RMExchange,Host, PushType, Packet
     Type = safe_get_msg_type(Packet),
     {FUserId, _, FResource} = safe_get_from_parts(Packet),
     {TUserId, _, TResource} = safe_get_to_parts(Packet),
-    ?LOG_INFO("publishing to rabbitmq exchange=~p routing_key=~p stanza: ~p", [RMExchange, Queue,
+    ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, Queue,
       #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
     case amqp_channel:cast(ChannelPid,
       #'basic.publish'{
@@ -1476,11 +1476,11 @@ send_payload(Payload, ChatType, RMQConnection, RMExchange,Host, PushType, Packet
         routing_key = Queue},
       #amqp_msg{payload = list_to_binary(Payload)}) of
       ok ->
-        ?LOG_INFO("published to rabbitmq exchange=~p routing_key=~p stanza: ~p", [RMExchange, Queue,
+        ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, Queue,
           #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
         {ok, <<"success">>};
       Error ->
-        ?LOG_INFO("publish_failed to rabbitmq exchange=~p routing_key=~p stanza: ~p error=~p", [RMExchange, Queue,
+        ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, Queue,
           #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
         ?ERROR_MSG("IOS: Unable to send call push to the rabbitmq server server: ~p", [Error])
     end;
@@ -1498,7 +1498,7 @@ send_payload(Payload, ChatType, RMQConnection, RMExchange,Host, PushType, Packet
       Type = safe_get_msg_type(Packet),
       {FUserId, _, FResource} = safe_get_from_parts(Packet),
       {TUserId, _, TResource} = safe_get_to_parts(Packet),
-      ?LOG_INFO("publishing to rabbitmq exchange=~p routing_key=~p stanza: ~p", [RMExchange, Queue,
+      ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, Queue,
         #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
       case amqp_channel:cast(ChannelPid,
         #'basic.publish'{
@@ -1506,11 +1506,11 @@ send_payload(Payload, ChatType, RMQConnection, RMExchange,Host, PushType, Packet
           routing_key = Queue},
         #amqp_msg{payload = list_to_binary(Payload)}) of
         ok ->
-          ?LOG_INFO("published to rabbitmq exchange=~p routing_key=~p stanza: ~p", [RMExchange, Queue,
+          ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, Queue,
             #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
           {ok, <<"success">>};
         Error ->
-          ?LOG_INFO("publish_failed to rabbitmq exchange=~p routing_key=~p stanza: ~p error=~p", [RMExchange, Queue,
+          ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, Queue,
             #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
           ?ERROR_MSG("IOS: Unable to send push messages to the rabbitmq server server: ~p", [Error])
       end
