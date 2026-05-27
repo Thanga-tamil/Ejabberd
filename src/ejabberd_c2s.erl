@@ -616,7 +616,7 @@ handle_authenticated_packet(Pkt, #{lserver := LServer, jid := JID,
 				     LServer, State, [Pkt1]),
     #jid{luser = LUser} = JID,
 	?LOG_INFO(
-	"after run user_send_packet hook: ~p",
+	"run user_send_packet hook: ~p",
 	[#{
 		stanza_id => StanzaId,
 		type => Type,
