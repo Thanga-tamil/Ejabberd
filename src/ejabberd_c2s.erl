@@ -127,9 +127,38 @@ send(Pid, Pkt) when is_pid(Pid) ->
     xmpp_stream_in:send(Pid, Pkt);
 send(#{lserver := LServer} = State, Pkt) ->
     Pkt1 = fix_from_to(Pkt, State),
+    	StanzaId = xmpp:get_id(Pkt),
+	From = xmpp:get_from(Pkt),
+	To = xmpp:get_to(Pkt),
+	Type = xmpp:get_type(Pkt),
+
+	{FUserId, _, FResource} = jid:tolower(From),
+	{TUserId, _, TResource} = jid:tolower(To),
+
+	
+
     case ejabberd_hooks:run_fold(c2s_filter_send, LServer, {Pkt1, State}, []) of
-	{drop, State1} -> State1;
-	{Pkt2, State1} -> xmpp_stream_in:send(State1, Pkt2)
+	{drop, State1} -> 
+		?LOG_INFO("after running c2s_filter_send drop at user_receive_packet xmpp_stream_in: ~p",
+			[#{stanza_id => StanzaId,
+			   type => Type,
+			   from_user_id => FUserId,
+			   from_resource => FResource,
+			   to_user_id => TUserId,
+			   to_resource => TResource
+			}]), 
+			State1;
+	{Pkt2, State1} -> 
+		?LOG_INFO("xmpp_stream_in send to reciever success: ~p",
+			[#{
+			   stanza_id => StanzaId,
+			   type => Type,
+			   from_user_id => FUserId,
+			   from_resource => FResource,
+			   to_user_id => TUserId,
+			   to_resource => TResource
+			}]),
+	xmpp_stream_in:send(State1, Pkt2)
     end.
 
 -spec send_error(state(), xmpp_element(), stanza_error()) -> state().
@@ -255,7 +284,15 @@ process_info(#{lserver := LServer} = State, {route, Packet}) ->
 			user_receive_packet, LServer,
 			{Packet, State1}, []),
 	case Packet1 of
-		drop -> State2;
+		drop -> 
+			?LOG_INFO("after run dropping packet: ~p", 
+				[#{stanza_id => StanzaId,
+				   type => Type,
+				   from_user_id => FUserId,
+				   from_resource => FResource,
+				   to_user_id => TUserId,
+				   to_resource => TResource}]),
+			State2;
 		_ -> send(State2, Packet1)
 	    end;
        true ->
