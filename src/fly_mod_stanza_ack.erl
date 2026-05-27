@@ -137,6 +137,16 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
   #jid{user = TUser, lserver = TServer} = To,
 
     MessageId = Packet#message.id,
+    {FUserId, _, FResource} = jid:tolower(From),
+    {TUserId, _, TResource} = jid:tolower(To),
+    ?LOG_INFO(
+      "user_send_packet:fly_mod_stanza_ack for to_user=~p with message details: ~p",
+      [TUserId, #{stanza_id => MessageId,
+         type => Type,
+         from_user_id => FUserId,
+         from_resource => FResource,
+         to_user_id => TUserId,
+         to_resource => TResource}]),
   ContentAcknowledge = xmpp:get_subtag(Packet, #chatcontent{}),
   if (ContentAcknowledge =:= false) or (Type =:= normal)  ->
     BlockUser = <<"0">>,
@@ -244,7 +254,15 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
                 ok
             end,
           store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, Metadata,BlockUser, EditMsgid, FlatTimeStamp),
-          fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid,DisappearAt)
+          fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid,DisappearAt),
+        ?LOG_INFO(
+      "single chat db persistence: ~p",
+      [#{stanza_id => MessageId,
+         type => Type,
+         from_user_id => FUserId,
+         from_resource => FResource,
+         to_user_id => TUserId,
+         to_resource => TResource}])
        end;
       
         S when (S == false) ->
@@ -505,6 +523,18 @@ send_ack_response(From, To, ReceiptId, Type, DisappearAt) ->
       children = []},
   Proc = gen_mod:get_module_proc(ServerHost, ?MODULE),
   Msg = #message{from = To, to = From, type = chat, sub_els = [XmlBody]},
+  
+    {FUserId, _, FResource} = jid:tolower(From),
+    {TUserId, _, TResource} = jid:tolower(To),
+    ?LOG_INFO(
+      "singlechat ack for message_sender=~p stanza details: ~p",
+      [FUserId, #{stanza_id => ReceiptId,
+         type => Type,
+         from_user_id => FUserId,
+         from_resource => FResource,
+         to_user_id => TUserId,
+         to_resource => TResource}]),
+
   gen_server:cast(Proc, {send_ack,Msg}).
 
 depends(_, _) ->

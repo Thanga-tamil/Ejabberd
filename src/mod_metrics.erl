@@ -93,6 +93,23 @@ user_send_packet({Packet, #{jid := #jid{lserver = LServer}} = C2SState}) ->
 -spec user_receive_packet({stanza(), ejabberd_c2s:state()}) -> {stanza(), ejabberd_c2s:state()}.
 user_receive_packet({Packet, #{jid := #jid{lserver = LServer}} = C2SState}) ->
     push(LServer, user_receive_packet),
+    case Packet of
+        #message{} ->
+            StanzaId = xmpp:get_id(Packet),
+            From = xmpp:get_from(Packet),
+            To = xmpp:get_to(Packet),
+            Type = xmpp:get_type(Packet),
+            {FUserId, _, FResource} = jid:tolower(From),
+            {TUserId, _, TResource} = jid:tolower(To),
+            ?LOG_INFO("user_receive_packet:mod_metrics for to_user=~p with message details: ~p",
+              [TUserId, #{stanza_id => StanzaId,
+                 type => Type,
+                 from_user_id => FUserId,
+                 from_resource => FResource,
+                 to_user_id => TUserId,
+                 to_resource => TResource}]);
+        _ -> ok
+    end,
     {Packet, C2SState}.
 
 -spec s2s_send_packet(stanza()) -> stanza().
