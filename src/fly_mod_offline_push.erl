@@ -1557,6 +1557,9 @@ end,
                         Message_Content = SubEl,
                         binary_to_list(UserNickName) ++
                         ": " ++ binary_to_list(<<"Meet">>);
+                        <<"story_reply">> ->
+                        Message_Content = <<"">>,
+                        binary_to_list(UserNickName);
                         _ ->
                         Message_Content = SubEl,
                         binary_to_list(UserNickName)
@@ -2130,6 +2133,11 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
                             binary_to_list(GroupName) ++
                             ": " ++
                             binary_to_list(<<"Contact">>);
+                          <<"story_reply">> ->
+                          Message_Content = <<"">>,
+                          binary_to_list(UserNickName) ++
+                            "@" ++
+                            binary_to_list(GroupName);
                           _ ->
                           Message_Content = Message,
 
@@ -2687,6 +2695,9 @@ ios_send_bulk_push(Server, ToUser, MessageContent, _FromUser, FlatTimeStamp, Cha
                     <<"contact">> ->
                       Message_Content = MSGBody,
                       binary_to_list(<<"Contact">>);
+                    <<"story_reply">> ->
+                      Message_Content = <<"">>,
+                      binary_to_list(GroupName);
                     _ ->
                       Message_Content = MSGBody,
                       binary_to_list(GroupName)
