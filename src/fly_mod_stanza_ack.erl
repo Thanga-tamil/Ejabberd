@@ -528,7 +528,7 @@ send_ack_response(From, To, ReceiptId, Type, DisappearAt) ->
     {TUserId, _, TResource} = jid:tolower(To),
     ?LOG_INFO(
       "singlechat ack for message_sender=~p stanza details: ~p",
-      [From, #{stanza_id => ReceiptId,
+      [FUserId, #{stanza_id => ReceiptId,
          type => Type,
          from_user_id => FUserId,
          from_resource => FResource,
