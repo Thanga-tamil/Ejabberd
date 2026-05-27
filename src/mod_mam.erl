@@ -399,8 +399,25 @@ sm_receive_packet(Acc) ->
 
 -spec user_receive_packet({stanza(), c2s_state()}) -> {stanza(), c2s_state()}.
 user_receive_packet({#message{from = Peer} = Pkt, #{jid := JID} = C2SState}) ->
-    LUser = JID#jid.luser,
-    LServer = JID#jid.lserver,
+	case Pkt of
+		#message{} ->
+			StanzaId = xmpp:get_id(Pkt),
+			From = xmpp:get_from(Pkt),
+			To = xmpp:get_to(Pkt),
+			Type = xmpp:get_type(Pkt),
+			{FUserId, _, FResource} = jid:tolower(From),
+			{TUserId, _, TResource} = jid:tolower(To),
+			?LOG_INFO("user_receive_packet:mod_mam for to_user=~p with message details: ~p",
+			  [TUserId, #{stanza_id => StanzaId,
+				 type => Type,
+				 from_user_id => FUserId,
+				 from_resource => FResource,
+				 to_user_id => TUserId,
+				 to_resource => TResource}]);
+		_ -> ok
+	end,
+	LUser = JID#jid.luser,
+	LServer = JID#jid.lserver,
     Pkt1 = case should_archive(Pkt, LServer) of
 	       true ->
 		   case store_msg(Pkt, LUser, LServer, Peer, recv) of
