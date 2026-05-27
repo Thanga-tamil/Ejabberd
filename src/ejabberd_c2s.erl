@@ -235,11 +235,26 @@ process_info(#{lserver := LServer} = State, {route, Packet}) ->
 			 #iq{} ->
 			     process_iq_in(State, Packet)
 		     end,
+
     if Pass ->
-	    {Packet1, State2} = ejabberd_hooks:run_fold(
-				  user_receive_packet, LServer,
-				  {Packet, State1}, []),
-	    case Packet1 of
+	StanzaId = xmpp:get_id(Packet),
+	From = xmpp:get_from(Packet),
+	To = xmpp:get_to(Packet),
+	Type = xmpp:get_type(Packet),
+	{FUserId, _, FResource} = jid:tolower(From),
+	{TUserId, _, TResource} = jid:tolower(To),
+	?LOG_INFO(
+	  "user_receive_packet: ~p",
+	  [#{stanza_id => StanzaId,
+	     type => Type,
+	     from_user_id => FUserId,
+	     from_resource => FResource,
+	     to_user_id => TUserId,
+	     to_resource => TResource}]),
+	{Packet1, State2} = ejabberd_hooks:run_fold(
+			user_receive_packet, LServer,
+			{Packet, State1}, []),
+	case Packet1 of
 		drop -> State2;
 		_ -> send(State2, Packet1)
 	    end;
@@ -540,9 +555,39 @@ handle_authenticated_packet(Pkt, #{lserver := LServer, jid := JID,
 	end,
 %% Contus code ended
     Pkt1 = xmpp:put_meta(Pkt, ip, IP),
+
+	StanzaId = xmpp:get_id(Pkt),
+	From = xmpp:get_from(Pkt),
+	To = xmpp:get_to(Pkt),
+	Type = xmpp:get_type(Pkt),
+
+	{FUserId, _, FResource} = jid:tolower(From),
+	{TUserId, _, TResource} = jid:tolower(To),
+
+	?LOG_INFO(
+	"c2s_authenticated_packet: ~p",
+	[#{
+		stanza_id => StanzaId,
+		type => Type,
+		from_user_id => FUserId,
+		from_resource => FResource,
+		to_user_id => TUserId,
+		to_resource => TResource
+	}]),
+
     State1 = ejabberd_hooks:run_fold(c2s_authenticated_packet,
 				     LServer, State, [Pkt1]),
     #jid{luser = LUser} = JID,
+	?LOG_INFO(
+	"user_send_packet: ~p",
+	[#{
+		stanza_id => StanzaId,
+		type => Type,
+		from_user_id => FUserId,
+		from_resource => FResource,
+		to_user_id => TUserId,
+		to_resource => TResource
+	}]),
     {Pkt2, State2} = ejabberd_hooks:run_fold(
 		       user_send_packet, LServer, {Pkt1, State1}, []),
     case Pkt2 of

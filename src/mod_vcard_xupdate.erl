@@ -91,6 +91,22 @@ user_send_packet({#presence{type = available,
     %% This is processed by update_presence/2 explicitly, we don't
     %% want to call this multiple times for performance reasons
     Acc;
+user_send_packet({#message{} = Pkt, State}) ->
+    StanzaId = xmpp:get_id(Pkt),
+    From = xmpp:get_from(Pkt),
+    To = xmpp:get_to(Pkt),
+    Type = xmpp:get_type(Pkt),
+    {FUserId, _, FResource} = jid:tolower(From),
+    {TUserId, _, TResource} = jid:tolower(To),
+    ?LOG_INFO(
+        "c2s_authenticated_packet: ~p",
+        [#{stanza_id => StanzaId,
+            type => Type,
+            from_user_id => FUserId,
+            from_resource => FResource,
+            to_user_id => TUserId,
+            to_resource => TResource}]),
+    update_presence({Pkt, State});
 user_send_packet(Acc) ->
     update_presence(Acc).
 

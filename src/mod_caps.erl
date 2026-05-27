@@ -143,7 +143,18 @@ user_send_packet(Acc) ->
 
 -spec user_receive_packet({stanza(), ejabberd_c2s:state()}) -> {stanza(), ejabberd_c2s:state()}.
 user_receive_packet({#presence{from = From, type = available} = Pkt,
-		     #{lserver := LServer, jid := To} = State}) ->
+                         #{lserver := LServer, jid := To} = State}) ->
+        StanzaId = xmpp:get_id(Pkt),
+        Type = xmpp:get_type(Pkt),
+        {FUserId, _, FResource} = jid:tolower(From),
+        {TUserId, _, TResource} = jid:tolower(To),
+        ?LOG_INFO("user_receive_packet: ~p",
+            [#{stanza_id => StanzaId,
+                 type => Type,
+                 from_user_id => FUserId,
+                 from_resource => FResource,
+                 to_user_id => TUserId,
+                 to_resource => TResource}]),
     IsRemote = case From#jid.lresource of
 		   % Don't store caps for presences sent by our muc rooms
 		   <<>> ->

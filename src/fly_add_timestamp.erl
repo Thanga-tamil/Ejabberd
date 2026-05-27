@@ -32,6 +32,16 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
   #jid{user = TUser, lserver = LServer} = To,
   #jid{user = FUser, lserver = _FServer} = From,
     Type = XML#message.type,
+    {FUserId, _, FResource} = jid:tolower(From),
+    {TUserId, _, TResource} = jid:tolower(To),
+    ?LOG_INFO(
+      "c2s_authenticated_packet: ~p",
+      [#{stanza_id => xmpp:get_id(XML),
+         type => Type,
+         from_user_id => FUserId,
+         from_resource => FResource,
+         to_user_id => TUserId,
+         to_resource => TResource}]),
     %% Add timestamp to chat message and where no DataTag exist
     case Type of
       chat ->
@@ -107,8 +117,18 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
 filter_packet(Acc) ->
   Acc.
 
-filter_packet_receive({#message{from = _From,to = To} = XML, State} = _Acc) ->
+filter_packet_receive({#message{from = From,to = To} = XML, State} = _Acc) ->
 Type = XML#message.type,
+{FUserId, _, FResource} = jid:tolower(From),
+{TUserId, _, TResource} = jid:tolower(To),
+?LOG_INFO(
+  "c2s_authenticated_packet: ~p",
+  [#{stanza_id => xmpp:get_id(XML),
+     type => Type,
+     from_user_id => FUserId,
+     from_resource => FResource,
+     to_user_id => TUserId,
+      to_resource => TResource}]),
 #jid{user = TUser, lserver = LServer} = To,
   case Type of
       normal ->

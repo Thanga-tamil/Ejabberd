@@ -44,8 +44,19 @@ stop(Host) ->
 %% ====================================================================
 
 %% Function triggers when receive message packets from sender
-on_user_send_packet({#message{from = From,to = To,type = _Type, id = MessageId } = Pkt, _C2SState}) ->
+on_user_send_packet({#message{from = From,to = To,type = Type, id = MessageId } = Pkt, _C2SState}) ->
     #jid{luser = FUser, lserver = FServer,lresource = FResource} = From,
+    StanzaId = MessageId,
+    {FUserId, _, FResource2} = jid:tolower(From),
+    {TUserId, _, TResource} = jid:tolower(To),
+    ?LOG_INFO(
+      "c2s_authenticated_packet: ~p",
+      [#{stanza_id => StanzaId,
+         type => Type,
+         from_user_id => FUserId,
+         from_resource => FResource2,
+         to_user_id => TUserId,
+         to_resource => TResource}]),
     Packet = xmpp:encode(Pkt),
   IsValid = fly_mod_utils:validate_license(FServer, true, <<"chat">>),
   if IsValid =:= true ->
