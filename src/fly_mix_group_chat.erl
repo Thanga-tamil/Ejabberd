@@ -740,7 +740,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
   Profile = fxml:get_subtag(SubEl, <<"profile">>),
   VCard = fxml:get_subtag(Profile, <<"vCard">>),
   #jid{user = LUser} = To,
-  #jid{lserver = FServer} = From,
+  {_, FServer, Lresource} = jid:tolower(From),
   Status = <<"group_profile_updated">>,
   ?INFO_MSG("process_set_group_info -> NewStatus: ~p, From: ~p, To: ~p", [NewStatus, From, To]),
   ?INFO_MSG("VCard : ~p", [VCard]), 
@@ -852,12 +852,18 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                         end,
 
                         % Handle on_ongoing_call changes
-                        FifthChanges = case {OldOnOngoingCall, IncomingOnOngoingCall} of
-                            {OldOnOngoingCall, NewOnCall} when OldOnOngoingCall =:= NewOnCall ->
+                        FifthChanges = 
+                        case binary:match(string:lowercase(Lresource), <<"mobile">>) of
+                          nomatch ->
+                            case {OldOnOngoingCall, IncomingOnOngoingCall} of
+                              {OldOnOngoingCall, NewOnCall} when OldOnOngoingCall =:= NewOnCall ->
                                 FourthChanges;
                             {OldOnOngoingCallSec, NewOnCall} ->
-                                ?INFO_MSG("OnOngoingCall updated for group ~p from ~p to ~p", [LUser, OldOnOngoingCallSec, NewOnCall]),
-                                [ongoing_call | FourthChanges]
+                              ?INFO_MSG("OnOngoingCall updated for group ~p from ~p to ~p", [LUser, OldOnOngoingCallSec, NewOnCall]),
+                              [ongoing_call | FourthChanges]
+                            end;
+                          {_, 6} -> 
+                            FourthChanges
                         end,
 
                         % Handle ongoing_call_link changes
@@ -2002,7 +2008,8 @@ Status == <<"remove_admin">> ->
                         {<<"invite_uri">>, InviteUri},
                         {<<"messagemode">>, MessageMode},
                         {<<"accessmode">>, AccessMode},
-                        {<<"customfeatures">>, CustomFeatures}
+                        {<<"customfeatures">>, CustomFeatures},
+                        {<<"message_notification">>, Notification}
                     ],
                     children = [Data]
                 }

@@ -29,7 +29,6 @@
 -type value() :: string().
 -type opts() :: [{name(), value(), value()}, ...].
 
-
 start_link(Host, Opts) ->
   Proc = gen_mod:get_module_proc(Host, ?PROCNAME),
   gen_server:start_link({local, Proc}, ?MODULE,
@@ -210,6 +209,8 @@ process_iq_set(From, _To, RequestType, IQ) ->
       mute_notification(From, RequestType, SubEl, IQ);
     <<"update_archive_chat">> ->
       update_archive_chat(From, RequestType, SubEl, IQ);
+    <<"update_privacy_type">> ->
+      update_privacy_type(From, RequestType, SubEl, IQ);
     <<"update_user_busy">> ->
       update_user_busy(From, RequestType, SubEl, IQ);
     <<"register_update">> ->
@@ -1333,6 +1334,14 @@ update_archive_chat(FromJid, RequestType, SubEl, IQ) ->
       ok
   end,
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Updated successfully">>}).
+
+-spec update_privacy_type(jid(), binary(), xmlel(), xmlel()) -> xmlel().
+update_privacy_type(From, RequestType, SubEl, IQ) ->
+  PrivacyType = fxml:get_path_s(SubEl, [{attr, <<"privacy_type">>}]),
+  fly_mod_utils:set_privacy_type(From, PrivacyType),
+  Xml = [#xmlel{name = <<"privacy_setting">>,
+    attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>}, {<<"privacy_type">>, PrivacyType}]}],
+  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Updated successfully">>, sub_els = Xml}).
 
   update_user_busy(From, RequestType, SubEl, IQ) ->
     BusyStatus = fxml:get_path_s(SubEl, [{attr, <<"busy_status">>}]),
@@ -3202,7 +3211,10 @@ post_story(From, RequestType, SubEl, IQ) ->
   CreatedAt    = fxml:get_attr_s(<<"created_at">>, SubEl#xmlel.attrs),
   ExpiresAt    = fxml:get_attr_s(<<"expires_at">>, SubEl#xmlel.attrs),
 
-  MessageId = fly_mod_utils:get_iq_message_id(16),
+  MessageId = case StoryId of
+    <<>> -> fly_mod_utils:get_iq_message_id(16);
+    _ -> StoryId
+  end,
   ?INFO_MSG("post_story request from=~ts@~ts story_id=~ts targets=~p created_at=~ts expires_at=~ts",
             [FromUser, FromServer, StoryId, UsersList, CreatedAt, ExpiresAt]),
 
@@ -3269,7 +3281,10 @@ delete_story(From, RequestType, SubEl, IQ) ->
 
   StoryId  = fxml:get_attr_s(<<"story_id">>, SubEl#xmlel.attrs),
   Username = fxml:get_attr_s(<<"username">>, SubEl#xmlel.attrs),
-  MessageId = fly_mod_utils:get_iq_message_id(16),
+  MessageId = case StoryId of
+    <<>> -> fly_mod_utils:get_iq_message_id(16);
+    _ -> StoryId
+  end,
 
   ?INFO_MSG("delete_story request from=~ts story_id=~ts targets=~p",
             [jid:to_string(From), StoryId, UsersList]),
@@ -3607,7 +3622,7 @@ story_like(From, RequestType, SubEl, IQ) ->
     Status =
         case LikeFlag of
             <<"1">> -> <<"story_like">>;
-            <<"0">> -> <<"story_unlike">>;
+            <<"0">> -> <<"story_like">>;
             _ -> <<"story_like">>
         end,
 
@@ -3724,17 +3739,24 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
     ScheduledAt   = fxml:get_attr_s(<<"scheduled_at">>, SubEl#xmlel.attrs),
     MessageIdAttr = fxml:get_attr_s(<<"message_id">>, SubEl#xmlel.attrs),
     ReminderMins  = fxml:get_attr_s(<<"reminder_before_minutes">>, SubEl#xmlel.attrs),
+    MsgFromParam  = fxml:get_attr_s(<<"message_from">>, SubEl#xmlel.attrs),
+    ChatTypeParam = fxml:get_attr_s(<<"chat_type">>, SubEl#xmlel.attrs),
+    MsgToParam    = fxml:get_attr_s(<<"message_to">>, SubEl#xmlel.attrs),
 
-    ?INFO_MSG("meeting_reminder request from=~ts message_id=~ts session_id=~ts room_id=~ts chat_id=~ts call_mode=~ts call_type=~ts scheduled_at=~ts reminder_before_minutes=~ts",
-              [jid:to_string(From), MessageIdAttr, SessionId, RoomId, ChatId, CallMode, CallType, ScheduledAt, ReminderMins]),
+    ?INFO_MSG("meeting_reminder request from=~ts message_id=~ts session_id=~ts room_id=~ts chat_id=~ts call_mode=~ts call_type=~ts scheduled_at=~ts reminder_before_minutes=~ts message_from=~ts chat_type=~ts message_to=~ts",
+              [jid:to_string(From), MessageIdAttr, SessionId, RoomId, ChatId, CallMode, CallType, ScheduledAt, ReminderMins, MsgFromParam, ChatTypeParam, MsgToParam]),
 
     %% 2. Lookup message_status to determine chat_type, from_user, to_user
     {ChatType, MsgFromUser, MsgToUser} =
-        case catch fly_mod_utils:get_message_chat_info(FromServer, MessageIdAttr) of
-            {selected, _Cols, [[CT, FU, TU] | _]} ->
-                {CT, FU, TU};
-            _ ->
-                {<<>>, <<>>, <<>>}
+        if ChatTypeParam =/= <<>> ->
+            {ChatTypeParam, MsgFromParam, MsgToParam};
+        true ->
+            case catch fly_mod_utils:get_message_chat_info(FromServer, MessageIdAttr) of
+                {selected, _Cols, [[CT, FU, TU] | _]} ->
+                    {CT, FU, TU};
+                _ ->
+                    {<<>>, <<>>, <<>>}
+            end
         end,
 
     ?INFO_MSG("meeting_reminder message_status chat_type=~ts from_user=~ts to_user=~ts",
@@ -3786,7 +3808,10 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
                     {<<"call_type">>, CallType},
                     {<<"scheduled_at">>, ScheduledAt},
                     {<<"message_id">>, MessageIdAttr},
-                    {<<"reminder_before_minutes">>, ReminderMins}
+                    {<<"reminder_before_minutes">>, ReminderMins},
+                    {<<"message_from">>, MsgFromUser},
+                    {<<"chat_type">>, ChatType},
+                    {<<"message_to">>, MsgToUser}
                 ],
                 children = []}]},
 

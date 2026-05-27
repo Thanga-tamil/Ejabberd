@@ -1002,8 +1002,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
       Server = To#jid.server,
       Meeting = fxml:get_subtag_with_xmlns(Packet, <<"meeting">>,
         <<"urn:xmpp:receipts">>),
-      MessageId = fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs),
-      
+      MessageId = fxml:get_attr_s(<<"message_id">>, Meeting#xmlel.attrs),
       SessionId = fxml:get_attr_s(<<"session_id">>, Meeting#xmlel.attrs),
       RoomId = fxml:get_attr_s(<<"room_id">>, Meeting#xmlel.attrs),
       ChatId = fxml:get_attr_s(<<"chat_id">>, Meeting#xmlel.attrs),
@@ -1013,6 +1012,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
       ScheduledAt = fxml:get_attr_s(<<"scheduled_at">>, Meeting#xmlel.attrs),
       ReminderMins = fxml:get_attr_s(<<"reminder_before_minutes">>, Meeting#xmlel.attrs),
       Status = fxml:get_attr_s(<<"status">>, Meeting#xmlel.attrs),
+      MessageFrom = fxml:get_attr_s(<<"message_from">>, Meeting#xmlel.attrs),
+      ChatTypeParam = fxml:get_attr_s(<<"chat_type">>, Meeting#xmlel.attrs),
+      MessageTo = fxml:get_attr_s(<<"message_to">>, Meeting#xmlel.attrs),
 
       BF = [
         {<<"type">>, "meeting_reminder"},
@@ -1029,7 +1031,10 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
         {<<"userDomain">>, binary_to_list(Server)},
         {<<"user_type">>, binary_to_list(PushType)},
         {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
-        {<<"title">>, "Meeting Reminder"}
+        {<<"title">>, "Meeting Reminder"},
+        {<<"message_from">>, binary_to_list(MessageFrom)},
+        {<<"chat_type">>, binary_to_list(ChatTypeParam)},
+        {<<"message_to">>, binary_to_list(MessageTo)}
       ],
       Payload = create_android_json(DeviceToken, BF),
       if DeviceType == <<"android">> ->
@@ -1552,6 +1557,9 @@ end,
                         Message_Content = SubEl,
                         binary_to_list(UserNickName) ++
                         ": " ++ binary_to_list(<<"Meet">>);
+                        <<"story_reply">> ->
+                        Message_Content = <<"">>,
+                        binary_to_list(UserNickName);
                         _ ->
                         Message_Content = SubEl,
                         binary_to_list(UserNickName)
@@ -2012,16 +2020,20 @@ end,
       Server = Recipient#jid.server,
       Meeting = fxml:get_subtag_with_xmlns(Packet, <<"meeting">>,
         <<"urn:xmpp:receipts">>),
-      MessageId = fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs),
-
+      MessageId = fxml:get_attr_s(<<"message_id">>, Meeting#xmlel.attrs),
       SessionId = fxml:get_attr_s(<<"session_id">>, Meeting#xmlel.attrs),
       RoomId = fxml:get_attr_s(<<"room_id">>, Meeting#xmlel.attrs),
       ChatId = fxml:get_attr_s(<<"chat_id">>, Meeting#xmlel.attrs),
       CallMode = fxml:get_attr_s(<<"call_mode">>, Meeting#xmlel.attrs),
       CallType = fxml:get_attr_s(<<"call_type">>, Meeting#xmlel.attrs),
       ScheduledAt = fxml:get_attr_s(<<"scheduled_at">>, Meeting#xmlel.attrs),
+      TouserJid = fxml:get_attr_s(<<"user_jid">>, Meeting#xmlel.attrs),
+    
       ReminderMins = fxml:get_attr_s(<<"reminder_before_minutes">>, Meeting#xmlel.attrs),
       Status = fxml:get_attr_s(<<"status">>, Meeting#xmlel.attrs),
+      MessageFrom = fxml:get_attr_s(<<"message_from">>, Meeting#xmlel.attrs),
+      ChatTypeParam = fxml:get_attr_s(<<"chat_type">>, Meeting#xmlel.attrs),
+      MessageTo = fxml:get_attr_s(<<"message_to">>, Meeting#xmlel.attrs),
 
       Args = [
         {type, "meeting_reminder"},
@@ -2030,13 +2042,17 @@ end,
         {room_id, binary_to_list(RoomId)},
         {chat_id, binary_to_list(ChatId)},
         {call_mode, binary_to_list(CallMode)},
+        {user_jid, binary_to_list(TouserJid)},
         {call_type, binary_to_list(CallType)},
         {scheduled_at, binary_to_list(ScheduledAt)},
         {message_id, binary_to_list(MessageId)},
         {reminder_before_minutes, binary_to_list(ReminderMins)},
         {userDomain, binary_to_list(Server)},
         {user_type, binary_to_list(UserType)},
-        {push_from, binary_to_list(<<"MirrorFly">>)}
+        {push_from, binary_to_list(<<"MirrorFly">>)},
+        {message_from, binary_to_list(MessageFrom)},
+        {chat_type, binary_to_list(ChatTypeParam)},
+        {message_to, binary_to_list(MessageTo)}
       ],
 
       Msg = [
@@ -2117,6 +2133,11 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
                             binary_to_list(GroupName) ++
                             ": " ++
                             binary_to_list(<<"Contact">>);
+                          <<"story_reply">> ->
+                          Message_Content = <<"">>,
+                          binary_to_list(UserNickName) ++
+                            "@" ++
+                            binary_to_list(GroupName);
                           _ ->
                           Message_Content = Message,
 
@@ -2674,6 +2695,9 @@ ios_send_bulk_push(Server, ToUser, MessageContent, _FromUser, FlatTimeStamp, Cha
                     <<"contact">> ->
                       Message_Content = MSGBody,
                       binary_to_list(<<"Contact">>);
+                    <<"story_reply">> ->
+                      Message_Content = <<"">>,
+                      binary_to_list(GroupName);
                     _ ->
                       Message_Content = MSGBody,
                       binary_to_list(GroupName)
