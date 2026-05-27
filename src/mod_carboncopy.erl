@@ -140,7 +140,7 @@ user_receive_packet({#message{to = To} = Msg, #{jid := JID} = C2SState}) ->
 	Type = xmpp:get_type(Msg),
 	{FUserId, _, FResource} = jid:tolower(From),
 	{TUserId, _, TResource} = jid:tolower(To),
-	?LOG_INFO("user_receive_packet: ~p",
+	?LOG_INFO("user_receive_packet:mod_carboncopy ~p",
 	  [#{stanza_id => StanzaId,
 		 type => Type,
 		 from_user_id => FUserId,

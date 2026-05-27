@@ -273,7 +273,7 @@ process_info(#{lserver := LServer} = State, {route, Packet}) ->
 	{FUserId, _, FResource} = jid:tolower(From),
 	{TUserId, _, TResource} = jid:tolower(To),
 	?LOG_INFO(
-	  "user_receive_packet: ~p",
+	  "run user_receive_packet hook: ~p",
 	  [#{stanza_id => StanzaId,
 	     type => Type,
 	     from_user_id => FUserId,
@@ -602,7 +602,7 @@ handle_authenticated_packet(Pkt, #{lserver := LServer, jid := JID,
 	{TUserId, _, TResource} = jid:tolower(To),
 
 	?LOG_INFO(
-	"c2s_authenticated_packet: ~p",
+	"run c2s_authenticated_packet hook: ~p",
 	[#{
 		stanza_id => StanzaId,
 		type => Type,
@@ -616,7 +616,7 @@ handle_authenticated_packet(Pkt, #{lserver := LServer, jid := JID,
 				     LServer, State, [Pkt1]),
     #jid{luser = LUser} = JID,
 	?LOG_INFO(
-	"user_send_packet: ~p",
+	"after run user_send_packet hook: ~p",
 	[#{
 		stanza_id => StanzaId,
 		type => Type,

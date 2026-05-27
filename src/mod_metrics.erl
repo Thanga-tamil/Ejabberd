@@ -101,7 +101,7 @@ user_receive_packet({Packet, #{jid := #jid{lserver = LServer}} = C2SState}) ->
             Type = xmpp:get_type(Packet),
             {FUserId, _, FResource} = jid:tolower(From),
             {TUserId, _, TResource} = jid:tolower(To),
-            ?LOG_INFO("user_receive_packet: ~p",
+            ?LOG_INFO("user_receive_packet:mod_metrics ~p",
               [#{stanza_id => StanzaId,
                  type => Type,
                  from_user_id => FUserId,

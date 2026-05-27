@@ -99,7 +99,7 @@ user_send_packet({#message{} = Pkt, State}) ->
     {FUserId, _, FResource} = jid:tolower(From),
     {TUserId, _, TResource} = jid:tolower(To),
     ?LOG_INFO(
-        "c2s_authenticated_packet: ~p",
+        "c2s_authenticated_packet:mod_vcard_xupdate ~p",
         [#{stanza_id => StanzaId,
             type => Type,
             from_user_id => FUserId,

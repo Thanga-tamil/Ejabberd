@@ -140,7 +140,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
     {FUserId, _, FResource} = jid:tolower(From),
     {TUserId, _, TResource} = jid:tolower(To),
     ?LOG_INFO(
-      "c2s_authenticated_packet: ~p",
+      "c2s_authenticated_packet:fly_mod_stanza_ack ~p",
       [#{stanza_id => MessageId,
          type => Type,
          from_user_id => FUserId,
