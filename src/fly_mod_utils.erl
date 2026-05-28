@@ -2244,6 +2244,7 @@ update_license_lookup(LServer) ->
     {selected, _, [[Lkey]]} ->
       ?INFO_MSG("Lkey: ~p ", [Lkey]),
       DecryptedMessage = fly_mod_security:aes_decrpyt_license(list_to_binary(ClientKeyValue++ClientKeyValue++ClientKeyValue), <<"k%$/@B[jqAx}>8H@">>, binary_to_list(Lkey)),
+      ?LOG_INFO("DecryptedMessage: ~p ", [DecryptedMessage]),
       {ParsedMessageJson} = jiffy:decode(uri_string:unquote(binary_to_list(DecryptedMessage))),
       AvailableModules = proplists:get_value(<<"modulesPurchased">>, ParsedMessageJson),
       Expiry = proplists:get_value(<<"expiresAt">>, ParsedMessageJson),
