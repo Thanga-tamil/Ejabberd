@@ -662,7 +662,7 @@ update_call_session_schedule(FServer, FUser, TUser, ScheduledAtVal, ReminderVal,
                     true -> [<<", chat_id = '">>, GroupId, <<"'">>]
                  end,
   ejabberd_sql:sql_query(FServer, [
-      <<"UPDATE call_sessions SET scheduled_at = ">>, integer_to_binary(ScheduledAtVal),
+      <<"UPDATE call_sessions SET is_reminder_notified = 0, scheduled_at = ">>, integer_to_binary(ScheduledAtVal),
       <<", reminder_before_minutes = ">>, integer_to_binary(if ReminderVal =:= undefined -> 0; true -> ReminderVal end),
       <<", message_id = '">>, FinalMessageId, <<"'">>,
       ChatIdUpdate,

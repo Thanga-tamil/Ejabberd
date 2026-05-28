@@ -631,9 +631,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     Payload = create_android_json(DeviceToken, BF),
     if (EditMsgId =:= MessageId) or (EditMsgId =:= <<"">>) ->
       if DeviceType ==  <<"android">> ->
-      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
+        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet);
       true ->
-        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server)
+        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet)
       end;
     true ->
       ok
@@ -689,9 +689,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
                             true -> 
                             ok
                           end,
-                        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server);
+                        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet);
                     _ ->
-                        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server)
+                      send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet)
                 end;
               false ->
                 ?LOG_INFO("skipping push, reaction should only route for message sender ~p but got ~p",[MsgSender, ToUser]),
@@ -710,9 +710,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
 
                   case DeviceType of
                     <<"android">> ->
-                      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server);
+                      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet);
                     _ ->
-                      send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server)
+                      send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet)
                   end;
                 true -> 
                   ok
@@ -752,9 +752,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
         {<<"title">>, "Poll"}],
       Payload = create_android_json(DeviceToken, BF),
       if DeviceType ==  <<"android">> ->
-      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
+        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet);
       true ->
-        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server)
+        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet)
       end;
     ChatType == <<"seen">> ->
     FromUser = From#jid.luser,
@@ -781,9 +781,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
       {<<"type">>, binary_to_list(ChatType)}],
     Payload = create_android_json(DeviceToken, BF),
     if DeviceType ==  <<"android">> ->
-      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
+      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet);
       true ->
-        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server)
+        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet)
       end;
     ChatType == <<"recall">> ->
       FromUser = From#jid.luser,
@@ -806,9 +806,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
         {<<"title">>, "This message was deleted"}],
       Payload = create_android_json(DeviceToken, BF),
       if DeviceType ==  <<"android">> ->
-        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
+        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet);
         true ->
-          send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server)
+          send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet)
         end;
 
     ChatType == <<"mediacall">> ->
@@ -957,9 +957,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
           end,
           Payload = create_android_json(DeviceToken, BF),
           if DeviceType ==  <<"android">> ->
-      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
+            send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet);
       true ->
-        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server)
+        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet)
       end
       end;
     ChatType == <<"adminblock">> ->
@@ -994,9 +994,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
 
           Payload = create_android_json(DeviceToken, BF),
           if DeviceType ==  <<"android">> ->
-            send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server);
+            send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet);
             true ->
-              send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server)
+              send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet)
             end;
     ChatType == <<"meeting_reminder">> ->
       Server = To#jid.server,
@@ -1038,9 +1038,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
       ],
       Payload = create_android_json(DeviceToken, BF),
       if DeviceType == <<"android">> ->
-        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server);
+        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet);
       true ->
-        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server)
+        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet)
       end;
     true -> {ok, <<"chat type is different gcm">>}
   end.
@@ -1102,7 +1102,7 @@ gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
         {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
         {<<"type">>, binary_to_list(MessageType)}],
       Payload = create_android_json(DeviceToken, BF),
-      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, LServer);
+      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, LServer, Packet);
       (Items =/= false) and
         (NameSpace =:= <<"urn:xmpp:mix:nodes:participants">>) ->
         #jid{luser = LUser, lserver = LServer} = ToUser,
@@ -1184,7 +1184,7 @@ gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
             {<<"type">>, "normal"}],
           Payload = create_android_json(DeviceToken, BF),
           
-          send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, LServer);
+          send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, LServer, Packet);
           
           true -> {ok, <<"ParticipantJid =/= SendFrom gcm">>}
         end;
@@ -1328,85 +1328,135 @@ handle_connection_recovery(Host) ->
 
 %% Send Android push payloads to the rabbit mq server
 send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host) ->
+  send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Host, undefined).
+
+send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host) ->
+  send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Host, undefined).
+
+send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host, Packet) ->
   ?LOG_INFO("send_android_payload_to_rabbitmq ChatType: ~p, Payload: ~s", [ChatType, Payload]),
 
   ChannelPid = check_rabbit_mq_connection_is_alive(Channel,Host),
   if (ChatType =:= <<"call">>)  or (ChatType =:= <<"mediacall">>)->
+    RKey = <<"android_call">>,
+    %% extract stanza info
+    StanzaId = safe_get_msg_id(Packet),
+    Type = safe_get_msg_type(Packet),
+    {FUserId, _, FResource} = safe_get_from_parts(Packet),
+    {TUserId, _, TResource} = safe_get_to_parts(Packet),
+    ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
+      #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
     case amqp_channel:cast(ChannelPid,
       #'basic.publish'{
         exchange = RMExchange,
-        routing_key = <<"android_call">>},
+        routing_key = RKey},
       #amqp_msg{payload = list_to_binary(Payload)}) of
       ok ->
+        ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
+          #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
         {ok, <<"success">>};
       Error ->
-        ?ERROR_MSG("Android: Unable to send call push notification to the rabbitmq server"
-        "server: ~p",
-          [Error])
+        ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, RKey,
+          #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
+        ?ERROR_MSG("Android: Unable to send call push notification to the rabbitmq server server: ~p", [Error])
     end;
      ChatType =:= <<"group_reaction">> ->
-    ?LOG_INFO("chat type group_reaction, send payload to -> Q[aos_grp_react_push]"),
+    RKey = <<"aos_grp_react_push">>,
+    StanzaId = safe_get_msg_id(Packet),
+    Type = safe_get_msg_type(Packet),
+    {FUserId, _, FResource} = safe_get_from_parts(Packet),
+    {TUserId, _, TResource} = safe_get_to_parts(Packet),
+    ?LOG_INFO("chat type group_reaction, publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
+      #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
       case amqp_channel:cast(ChannelPid,
         #'basic.publish'{
           exchange = RMExchange,
-          routing_key = <<"aos_grp_react_push">>},
+          routing_key = RKey},
         #amqp_msg{payload = list_to_binary(Payload)}) of
         ok ->
+          ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
+            #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
           {ok, <<"success">>};
-        Error ->
-          ?ERROR_MSG("Android: Unable to send push messages to the rabbitmq server Q[aos_grp_react_push]"
-          "server: ~p",
-            [Error])
+          Error ->
+            ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, RKey,
+              #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
+            ?ERROR_MSG("Android: Unable to send push messages to the rabbitmq server Q[aos_grp_react_push] server: ~p", [Error])
       end;
     true ->
+      RKey = <<"android_message">>,
+      StanzaId = safe_get_msg_id(Packet),
+      Type = safe_get_msg_type(Packet),
+      {FUserId, _, FResource} = safe_get_from_parts(Packet),
+      {TUserId, _, TResource} = safe_get_to_parts(Packet),
+      ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
+        #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
       case amqp_channel:cast(ChannelPid,
         #'basic.publish'{
           exchange = RMExchange,
-          routing_key = <<"android_message">>},
+          routing_key = RKey},
         #amqp_msg{payload = list_to_binary(Payload)}) of
         ok ->
+          ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
+            #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
           {ok, <<"success">>};
-        Error ->
-          ?ERROR_MSG("Android: Unable to send push messages to the rabbitmq server"
-          "server: ~p",
-            [Error])
+          Error ->
+            ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, RKey,
+              #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
+            ?ERROR_MSG("Android: Unable to send push messages to the rabbitmq server server: ~p", [Error])
       end
   end.
 
 %% Send Android push payloads to the rabbit mq server
-send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host) ->
+send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host, Packet) ->
   ?LOG_INFO("send_web_payload_to_rabbitmq ChatType: ~p, Payload: ~s", [ChatType, Payload]),
 
   ChannelPid = check_rabbit_mq_connection_is_alive(Channel,Host),
   if (ChatType =:= <<"call">>)  or (ChatType =:= <<"mediacall">>)->
+    RKey = <<"web_call">>,
+    StanzaId = safe_get_msg_id(Packet),
+    Type = safe_get_msg_type(Packet),
+    {FUserId, _, FResource} = safe_get_from_parts(Packet),
+    {TUserId, _, TResource} = safe_get_to_parts(Packet),
+    ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
+    ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p payload_len=~p", [TUserId, RMExchange, RKey, byte_size(list_to_binary(Payload))]),
     case amqp_channel:cast(ChannelPid,
       #'basic.publish'{
         exchange = RMExchange,
-        routing_key = <<"web_call">>},
+        routing_key = RKey},
       #amqp_msg{payload = list_to_binary(Payload)}) of
       ok ->
+        ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
         {ok, <<"success">>};
       Error ->
-        ?ERROR_MSG("Android: Unable to send call push notification to the rabbitmq server"
-        "server: ~p",
-          [Error])
+        ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
+        ?ERROR_MSG("Android: Unable to send call push notification to the rabbitmq server server: ~p", [Error])
     end;
     true ->
+      RKey = <<"web_message">>,
+      StanzaId = safe_get_msg_id(Packet),
+      Type = safe_get_msg_type(Packet),
+      {FUserId, _, FResource} = safe_get_from_parts(Packet),
+      {TUserId, _, TResource} = safe_get_to_parts(Packet),
+      ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
+      ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p payload_len=~p", [TUserId, RMExchange, RKey, byte_size(list_to_binary(Payload))]),
       case amqp_channel:cast(ChannelPid,
         #'basic.publish'{
           exchange = RMExchange,
-          routing_key = <<"web_message">>},
+          routing_key = RKey},
         #amqp_msg{payload = list_to_binary(Payload)}) of
         ok ->
+          ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p", [TUserId, RMExchange, RKey]),
           {ok, <<"success">>};
         Error ->
-          ?ERROR_MSG("Android: Unable to send push messages to the rabbitmq server"
-          "server: ~p",
-            [Error])
+          ?ERROR_MSG("Android: Unable to send push messages to the rabbitmq server server: ~p", [Error])
       end
   end.
 %% Send IOS push payloads to the rabbit mq server
 send_payload(Payload, ChatType, RMQConnection, RMExchange,Host, PushType) ->
+  %% wrapper for backward compatibility; delegate to 7-arg version with undefined Packet
+  send_payload(Payload, ChatType, RMQConnection, RMExchange, Host, PushType, undefined).
+
+send_payload(Payload, ChatType, RMQConnection, RMExchange,Host, PushType, Packet) ->
   ?LOG_INFO("send_payload (IOS) ChatType: ~p, PushType: ~p, Payload: ~s", [ChatType, PushType, Payload]),
   ChannelPid = check_rabbit_mq_connection_is_alive(RMQConnection,Host),
 
@@ -1414,17 +1464,25 @@ send_payload(Payload, ChatType, RMQConnection, RMExchange,Host, PushType) ->
 
     Queue = <<"ios_call">>,
 
+    StanzaId = safe_get_msg_id(Packet),
+    Type = safe_get_msg_type(Packet),
+    {FUserId, _, FResource} = safe_get_from_parts(Packet),
+    {TUserId, _, TResource} = safe_get_to_parts(Packet),
+    ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, Queue,
+      #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
     case amqp_channel:cast(ChannelPid,
       #'basic.publish'{
         exchange = RMExchange,
         routing_key = Queue},
       #amqp_msg{payload = list_to_binary(Payload)}) of
       ok ->
+        ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, Queue,
+          #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
         {ok, <<"success">>};
       Error ->
-        ?ERROR_MSG("IOS: Unable to send call push to the rabbitmq server"
-        "server: ~p",
-          [Error])
+        ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, Queue,
+          #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
+        ?ERROR_MSG("IOS: Unable to send call push to the rabbitmq server server: ~p", [Error])
     end;
     true ->
       Queue =
@@ -1436,17 +1494,25 @@ send_payload(Payload, ChatType, RMQConnection, RMExchange,Host, PushType) ->
           true ->
               <<"ios_message">>
       end,
+      StanzaId = safe_get_msg_id(Packet),
+      Type = safe_get_msg_type(Packet),
+      {FUserId, _, FResource} = safe_get_from_parts(Packet),
+      {TUserId, _, TResource} = safe_get_to_parts(Packet),
+      ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, Queue,
+        #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
       case amqp_channel:cast(ChannelPid,
         #'basic.publish'{
           exchange = RMExchange,
           routing_key = Queue},
         #amqp_msg{payload = list_to_binary(Payload)}) of
         ok ->
+          ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, Queue,
+            #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
           {ok, <<"success">>};
         Error ->
-          ?ERROR_MSG("IOS: Unable to send push messages to the rabbitmq server"
-          "server: ~p",
-            [Error])
+          ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, Queue,
+            #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
+          ?ERROR_MSG("IOS: Unable to send push messages to the rabbitmq server server: ~p", [Error])
       end
   end.
 
@@ -1491,6 +1557,18 @@ create_pair({Key, Value}) ->
 
 add_quotes(String) ->
   lists:append(["\"", String, "\""]).
+
+safe_get_msg_id(Packet) ->
+  try xmpp:get_id(Packet) catch _:_ -> <<>> end.
+
+safe_get_msg_type(Packet) ->
+  try xmpp:get_type(Packet) catch _:_ -> <<>> end.
+
+safe_get_from_parts(Packet) ->
+  try jid:tolower(xmpp:get_from(Packet)) catch _:_ -> {<<>>, <<>>, <<>>} end.
+
+safe_get_to_parts(Packet) ->
+  try jid:tolower(xmpp:get_to(Packet)) catch _:_ -> {<<>>, <<>>, <<>>} end.
 
     apns_single_push(DeviceToken, UserType, VoipDeviceToken, _IOSVersion, ChatType, Sender,
     Recipient, SubEl, TimestampValue, Packet,
@@ -1557,6 +1635,9 @@ end,
                         Message_Content = SubEl,
                         binary_to_list(UserNickName) ++
                         ": " ++ binary_to_list(<<"Meet">>);
+                        <<"story_reply">> ->
+                        Message_Content = <<"">>,
+                        binary_to_list(UserNickName);
                         _ ->
                         Message_Content = SubEl,
                         binary_to_list(UserNickName)
@@ -1587,7 +1668,7 @@ end,
         {sound, binary_to_list(<<"default">>)}],
       JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
       if (EditMsgId =:= MessageId) or (EditMsgId =:= <<"">>) ->
-      send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType);
+      send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType, Packet);
       true ->
         ok
       end;
@@ -1635,7 +1716,7 @@ end,
           {mode, binary_to_list(Mode)},
           {sound, binary_to_list(<<"default">>)}],
         JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
-        send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType);
+        send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType, Packet);
 
     ChatType == <<"recall">> ->
       RecallChattype = fxml:get_attr_s(<<"type">>, Packet#xmlel.attrs),
@@ -1684,7 +1765,7 @@ end,
           {sound, binary_to_list(<<"default">>)}],
         JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
 
-        send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType)
+        send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType, Packet)
                       end, Range);
       ChatType == <<"reaction">>; ChatType == <<"group_reaction">> ->
 
@@ -1763,7 +1844,7 @@ end,
                              true -> 
                               ok
                             end,
-                            send_payload(JSON, ChatType, Channel, RMExchange, Server, PushType);
+                            send_payload(JSON, ChatType, Channel, RMExchange, Server, PushType, Packet);
                         false ->
                           ?LOG_INFO("skipping ios group push, reaction should only route for message sender ~p but got ~p",[MsgSender, ToUser]),
                           ok
@@ -1778,7 +1859,7 @@ end,
                             JSON = create_json(Msg, Args0, binary_to_list(DeviceToken), Mode, 0, 0, PushType),
 
                             ?LOG_INFO("[ios_push]] reaction payload: ~p", [JSON]),
-                            send_payload(JSON, ChatType, Channel, RMExchange, Server, PushType);
+                            send_payload(JSON, ChatType, Channel, RMExchange, Server, PushType, Packet);
                           true ->
                             ?LOG_INFO("skipping ios push, reaction is from message sender ~p",[FromUser]),
                             ok
@@ -1842,7 +1923,7 @@ end,
                             {mode, binary_to_list(Mode)},
                             {sound, binary_to_list(<<"default">>)}],
                           JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
-                          send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType);
+                          send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType, Packet);
     ChatType == <<"mediacall">> ->
       Server = Recipient#jid.server,
       FromUser = Sender#jid.luser,
@@ -2011,7 +2092,7 @@ end,
                 {sound, binary_to_list(<<"default">>)}],
                 JSON = create_json(Msg, Args, binary_to_list(VoipDeviceToken), Mode,1,Expiry,PushType),
 
-          send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType)
+          send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType, Packet)
       end;
     ChatType == <<"meeting_reminder">> ->
       Server = Recipient#jid.server,
@@ -2059,7 +2140,7 @@ end,
         {sound, binary_to_list(<<"default">>)}
       ],
       JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode, 0, 0, PushType),
-      send_payload(JSON, ChatType, Channel, RMExchange, Server, PushType);
+      send_payload(JSON, ChatType, Channel, RMExchange, Server, PushType, Packet);
     true -> {ok, <<"chat type is different in ios">>,ChatType}
   end.
 
@@ -2130,6 +2211,11 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
                             binary_to_list(GroupName) ++
                             ": " ++
                             binary_to_list(<<"Contact">>);
+                          <<"story_reply">> ->
+                          Message_Content = <<"">>,
+                          binary_to_list(UserNickName) ++
+                            "@" ++
+                            binary_to_list(GroupName);
                           _ ->
                           Message_Content = Message,
 
@@ -2153,7 +2239,7 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
         {sent_from, binary_to_list(MsgFrom)},
         {type, binary_to_list(MessageType)}],
       JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
-      send_payload(JSON, ChatType, Channel, RMExchange, LServer, PushType);
+      send_payload(JSON, ChatType, Channel, RMExchange, LServer, PushType, Packet);
       (Items =/= false) and
         (NameSpace =:= <<"urn:xmpp:mix:nodes:participants">>) ->
         Item = fxml:get_subtag(Items, <<"item">>),
@@ -2199,7 +2285,7 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
             {group_id, binary_to_list(GroupId)}],
           JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,Expiry,PushType),
          
-          send_payload(JSON, ChatType, Channel, RMExchange, LServer, PushType);
+          send_payload(JSON, ChatType, Channel, RMExchange, LServer, PushType, Packet);
          
           true -> {ok, <<"ParticipantJid =/= SendFrom ios">>}
         end;
@@ -2687,6 +2773,9 @@ ios_send_bulk_push(Server, ToUser, MessageContent, _FromUser, FlatTimeStamp, Cha
                     <<"contact">> ->
                       Message_Content = MSGBody,
                       binary_to_list(<<"Contact">>);
+                    <<"story_reply">> ->
+                      Message_Content = <<"">>,
+                      binary_to_list(GroupName);
                     _ ->
                       Message_Content = MSGBody,
                       binary_to_list(GroupName)
