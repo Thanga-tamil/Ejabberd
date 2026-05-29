@@ -1973,7 +1973,8 @@ Status == <<"remove_admin">> ->
                         {<<"invite_uri">>, InviteUri},
                         {<<"messagemode">>, MessageMode},
                         {<<"accessmode">>, AccessMode},
-                        {<<"customfeatures">>, CustomFeatures}
+                        {<<"customfeatures">>, CustomFeatures},
+                        {<<"message_notification">>, Notification}
                     ],
                     children = [Data]
                 }
