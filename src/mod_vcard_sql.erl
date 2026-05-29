@@ -98,7 +98,7 @@ sql_schemas() ->
                      #sql_column{name = <<"history">>, type = text, default = <<>>},
                      #sql_column{name = <<"mobilenumber">>, type = text, default = <<>>},
                      #sql_column{name = <<"lmobilenumber">>, type = text, default = <<>>},
-                     #sql_column{name = <<"msg_disappear">>, type = text, default = <<>>},
+                     #sql_column{name = <<"msg_disappear">>, type = integer, default = true},
                      #sql_column{name = <<"updated_by">>, type = text, default = <<>>},
                      #sql_column{name = <<"disp_updated_at">>, type = text, default = <<>>},
                      #sql_column{name = <<"description">>, type = text, default = <<>>}],
@@ -407,11 +407,31 @@ set_vcard(LUser, LServer, VCARD,
     %% =========================
     %% WRITE TRANSACTION (ONLY UPSERTS)
     %% =========================
+    
+
+    %% Live columns msg_disappear (INT) and disp_updated_at (DATETIME NOT NULL)
+    %% reject '' under MySQL strict mode; fall back to their DB defaults.
+    MsgDisappear1Norm = case MsgDisappear1 of
+                            <<>> -> <<"0">>;
+                            _    -> MsgDisappear1
+                        end,
+    DispUpdatedAt1Norm = case DispUpdatedAt1 of
+                            <<>> -> <<"0000-00-00 00:00:00">>;
+                            _    -> DispUpdatedAt1
+                        end,
+
 
     IsTimestamp = case catch binary_to_integer(DispUpdatedAt) of
                       IT when is_integer(IT) -> true;
                       _ -> false
                   end,
+    
+    ?INFO_MSG("msg_disappear: ~p", [MsgDisappear1]),
+    ?INFO_MSG("msg_disappear norm: ~p", [MsgDisappear1Norm]),
+    ?INFO_MSG("disp_updated_at: ~p", [DispUpdatedAt1]),
+    ?INFO_MSG("disp_updated_at norm: ~p", [DispUpdatedAt1Norm]),
+    ?INFO_MSG("disp_updated_at raw: ~p", [DispUpdatedAt]),
+    ?INFO_MSG("is timestamp: ~p", [IsTimestamp]),
 
     ejabberd_sql:sql_transaction(
             LServer,
@@ -460,7 +480,7 @@ set_vcard(LUser, LServer, VCARD,
                                  "history=%(History1)s",
                                  "mobilenumber=%(MobileNumber1)s",
                                  "lmobilenumber=%(LMobileNumber1)s",
-                                 "msg_disappear=%(MsgDisappear1)s",
+                                 "msg_disappear=%(MsgDisappear1Norm)s",
                                  "updated_by=%(UpdatedBy1)s",
                                  "description=%(Description1)s",
                                  "disp_updated_at=%(DispUpdatedAt1)s"]);
@@ -500,7 +520,7 @@ set_vcard(LUser, LServer, VCARD,
                                  "history=%(History1)s",
                                  "mobilenumber=%(MobileNumber1)s",
                                  "lmobilenumber=%(LMobileNumber1)s",
-                                 "msg_disappear=%(MsgDisappear1)s",
+                                 "msg_disappear=%(MsgDisappear1Norm)s",
                                  "updated_by=%(UpdatedBy1)s",
                                  "description=%(Description1)s",
                                  "disp_updated_at=FROM_UNIXTIME(%(DispUpdatedAt)s)"]);
@@ -540,7 +560,7 @@ set_vcard(LUser, LServer, VCARD,
                                  "history=%(History1)s",
                                  "mobilenumber=%(MobileNumber1)s",
                                  "lmobilenumber=%(LMobileNumber1)s",
-                                 "msg_disappear=%(MsgDisappear1)s",
+                                 "msg_disappear=%(MsgDisappear1Norm)s",
                                  "updated_by=%(UpdatedBy1)s",
                                  "description=%(Description1)s",
                                  "disp_updated_at=%(DispUpdatedAt1)s"])
