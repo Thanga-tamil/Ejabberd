@@ -733,7 +733,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
                                                            [<<"INSERT INTO chat_message_edit_history ",
                                                               "(from_user,to_user,message_id,edit_message_id,chat_type,msg,meta_data, disappear_at) VALUES ('">>,
                                                             SUser, <<"','">>, FromUser, <<"','">>, MessageId, <<"','">>, EditMsgId,
-                                                            <<"','normal','">>, MsgData, <<"','">>, MetaData, <<"','">>, DisappearAtValue, <<"');">>]);
+                                                            <<"','normal','">>, MsgData, <<"','">>, MetaData, <<"',">>, DisappearAtValue, <<");">>]);
                                 true ->
                                     ok
                             end;
