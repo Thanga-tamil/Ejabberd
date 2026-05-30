@@ -37,6 +37,7 @@
 -export([check_decoded_jwt/5]).
 
 -include("logger.hrl").
+-include("ejabberd_sql_pt.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
 
 %%%----------------------------------------------------------------------
@@ -124,13 +125,14 @@ check_decoded_jwt(Acc, _, _, _, _) ->
 %%%----------------------------------------------------------------------
 check_jwt_token(User, Server, Token) ->
     % validate is client is app user 
-    case verify_jwt_cache(Server, User, Token) of
+    case verify_jwt(Server, User, Token, redis) of
         true ->
             JWK = ejabberd_option:jwt_key(Server),
             try jose_jwt:verify(JWK, Token) of
                 {true, {jose_jwt, Fields}, Signature} ->
                     Now = erlang:system_time(second),
-                    ?DEBUG("jwt verify at system timestamp ~p: ~p - ~p~n", [Now, Fields, Signature]),
+                    ?DEBUG("jwt verify at system timestamp ~p: ~p - ~p~n", 
+                           [Now, Fields, Signature]),
                     case maps:find(<<"exp">>, Fields) of
                         error ->
                             %% No expiry in token => We consider token invalid:
@@ -161,16 +163,21 @@ check_jwt_token(User, Server, Token) ->
     end.
 
 % Client should have jwt token in redis & db via gateway
-% if no jwt token in cache check sql for as a fallback
+% if no jwt token in cache check sql as a fallback
 % if not found::consider the token is invalid::unauth
-verify_jwt_cache(Server, User, Token) ->
+verify_jwt(Server, User, Token, redis) ->
     case ejabberd_redis:get({jwt_cache, Server, Token}) of
         {ok, ErUser} ->
-            if User =:= ErUser ->
-                true;
-            true ->
-                false
-            end;
-        _ ->
-            false
+            User =:= ErUser;
+        _ -> % once server setup finished, no fallback should be here
+            (fun verify_jwt/4)
+            (Server, User, Token, db)
+    end;
+verify_jwt(Server, User, Token, db) ->
+    Q = ?SQL("SELECT @(username)s FROM chat_access_tokens
+              WHERE token=%(Token)s"),
+    case ejabberd_sql:sql_query(Server, Q) of
+        {selected, []} -> false;
+        {selected, [{SqlUser}]} ->
+            User =:= SqlUser
     end.
