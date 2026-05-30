@@ -231,9 +231,22 @@ c2s_stream_started(State, _) ->
     init_csi_state(State).
 
 -spec c2s_authenticated_packet(c2s_state(), xmpp_element()) -> c2s_state().
-c2s_authenticated_packet(#{lserver := LServer} = C2SState, #csi{type = active}) ->
+
+c2s_authenticated_packet(
+    #{lserver := LServer, jid := JID} = C2SState,
+    #csi{type = active}) ->
+    ?LOG_INFO(
+        "run csi_activity hook for ~ts with activity 'active'",
+        [jid:encode(JID)]
+    ),
     ejabberd_hooks:run_fold(csi_activity, LServer, C2SState, [active]);
-c2s_authenticated_packet(#{lserver := LServer} = C2SState, #csi{type = inactive}) ->
+c2s_authenticated_packet(
+    #{lserver := LServer, jid := JID} = C2SState,
+    #csi{type = inactive}) ->
+    ?LOG_INFO(
+        "run csi_activity hook for ~ts with activity 'inactive'",
+        [jid:encode(JID)]
+    ),
     ejabberd_hooks:run_fold(csi_activity, LServer, C2SState, [inactive]);
 c2s_authenticated_packet(C2SState, _) ->
     C2SState.
