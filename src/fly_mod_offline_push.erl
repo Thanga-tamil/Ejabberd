@@ -7,7 +7,7 @@
 -define(PROCNAME, fly_mod_offline_push).
 -define(MOD_PURPOSE, publication).
 -define(MOD_AMQP, ejabberd_rabbitmq).
--define(MOD_AMQP_F, publish).
+-define(MOD_AMQP_FUN, publish).
 
 %% gen_mod callbacks
 -export([start/2, start_link/2, depends/2, stop/1, send_offline_message/1, 
@@ -1198,64 +1198,6 @@ gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
     end;
     true -> {ok, <<"chat type is different gcm">>}
   end.
-
-send_payload(Payload, ChatType, _, Packet, android) ->
-  RoutingKey =
-  if ChatType =:= <<"call">>; 
-     ChatType =:= <<"mediacall">> ->
-      <<"android_call">>;
-  ChatType =:= <<"group_reaction">> ->
-      <<"aos_grp_react_push">>;
-  true ->
-      <<"android_message">>
-  end,
-  publish(RoutingKey, {Payload, Packet});
-send_payload(Payload, ChatType, _, Packet, web) ->
-  RoutingKey =
-  if ChatType =:= <<"call">>; 
-     ChatType =:= <<"mediacall">> ->
-      <<"web_call">>;
-  true ->
-      <<"web_message">>
-  end,
-  publish(RoutingKey, {Payload, Packet});
-send_payload(Payload, ChatType, PushType, Packet, ios) ->
-  RoutingKey =
-  if ChatType =:= <<"mediacall">> ->
-    <<"ios_call">>;
-  true ->
-    if
-      PushType =:= <<"fcm">> ->
-          <<"ios_message_fcm">>;
-      ChatType =:= <<"group_reaction">> ->
-          <<"ios_grp_react_push">>;
-      true ->
-          <<"ios_message">>
-    end
-  end,
-  publish(RoutingKey, {Payload, Packet}).
-
-publish(RoutingKey, PayPac) ->
-  Args = [?MOD_PURPOSE, RoutingKey, PayPac],
-  apply(?MOD_AMQP, ?MOD_AMQP_F, Args).
-
-create_json(List1, List2, Token, Mode, ViopStatus,Expiration, PushType) ->
-  if Expiration =:= 0 ->
-    if PushType =:= <<"fcm">> ->
-    lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), 
-                  "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{",  create_keyvalue(List2), "}}"]);
-
-    true ->
-      lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), 
-      "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{\"aps\":{", create_keyvalue(List1),
-      "}, ", create_keyvalue(List2), "}}"])
-    end;
-  true ->
-      lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), 
-      "\",\"expiration\":\"", integer_to_list(Expiration), "\",\"mode\":\"", binary_to_list(Mode), 
-      "\",\"data\":{\"aps\":{", create_keyvalue(List1), "}, ", create_keyvalue(List2), "}}"])
-  end.
-
 
 % helper for creating json
 create_keyvalue([Head]) -> create_pair(Head);
@@ -2529,18 +2471,76 @@ send_own_group_push_notifications(FromUser, ToUser,
       ok
   end.
 
-create_android_json(DeviceToken, BF) ->
-  RandomId = fly_mod_utils:get_iq_message_id(7),
-  Expiry = get_timestamp(),
-  lists:append(["{\"deviceToken\":\"", binary_to_list(DeviceToken), "\",\"expiration\":\"", integer_to_list(Expiry), 
-  "\",\"collapse_key\":\"", binary_to_list(RandomId),  "\",\"data\":{", create_keyvalue(BF), "}}"]).
-
 response_to_binary(Json) 
   when is_list(Json) ->
   list_to_binary(Json);
 response_to_binary(Json) 
   when is_binary(Json) -> 
     Json.
+
+create_json(List1, List2, Token, Mode, ViopStatus,Expiration, PushType) ->
+  if Expiration =:= 0 ->
+    if PushType =:= <<"fcm">> ->
+    lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), 
+                  "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{",  create_keyvalue(List2), "}}"]);
+
+    true ->
+      lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), 
+      "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{\"aps\":{", create_keyvalue(List1),
+      "}, ", create_keyvalue(List2), "}}"])
+    end;
+  true ->
+      lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), 
+      "\",\"expiration\":\"", integer_to_list(Expiration), "\",\"mode\":\"", binary_to_list(Mode), 
+      "\",\"data\":{\"aps\":{", create_keyvalue(List1), "}, ", create_keyvalue(List2), "}}"])
+  end.
+
+create_android_json(DeviceToken, BF) ->
+  RandomId = fly_mod_utils:get_iq_message_id(7),
+  Expiry = get_timestamp(),
+  lists:append(["{\"deviceToken\":\"", binary_to_list(DeviceToken), "\",\"expiration\":\"", integer_to_list(Expiry), 
+  "\",\"collapse_key\":\"", binary_to_list(RandomId),  "\",\"data\":{", create_keyvalue(BF), "}}"]).
+
+
+send_payload(Payload, ChatType, _, Packet, android) ->
+  RoutingKey =
+  if ChatType =:= <<"call">>; 
+     ChatType =:= <<"mediacall">> ->
+      <<"android_call">>;
+  ChatType =:= <<"group_reaction">> ->
+      <<"aos_grp_react_push">>;
+  true ->
+      <<"android_message">>
+  end,
+  publish(RoutingKey, {Payload, Packet});
+send_payload(Payload, ChatType, _, Packet, web) ->
+  RoutingKey =
+  if ChatType =:= <<"call">>; 
+     ChatType =:= <<"mediacall">> ->
+      <<"web_call">>;
+  true ->
+      <<"web_message">>
+  end,
+  publish(RoutingKey, {Payload, Packet});
+send_payload(Payload, ChatType, PushType, Packet, ios) ->
+  RoutingKey =
+  if ChatType =:= <<"mediacall">> ->
+    <<"ios_call">>;
+  true ->
+    case {PushType, ChatType} of
+      {<<"fcm">>, _} ->
+          <<"ios_message_fcm">>;
+      {_, <<"group_reaction">>} ->
+          <<"ios_grp_react_push">>;
+      {_, _} ->
+          <<"ios_message">>
+    end
+  end,
+  publish(RoutingKey, {Payload, Packet}).
+
+publish(RoutingKey, PayPac) ->
+  Args = [?MOD_PURPOSE, RoutingKey, PayPac],
+  apply(?MOD_AMQP, ?MOD_AMQP_FUN, Args).
   
 mod_opt_type(rabbitmq_host) -> fun iolist_to_binary/1;
 mod_opt_type(rabbitmq_username) -> fun iolist_to_binary/1;
