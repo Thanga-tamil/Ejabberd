@@ -4,30 +4,25 @@
 
 -behaviour(gen_mod).
 
--define(TIMEOUT_MPNS_ON_ERROR, 2000).
-
--define(TIMEOUT, 10000).
-
--define(BASEURL, "https://fcm.googleapis.com/fcm/send").
-
 -define(PROCNAME, fly_mod_offline_push).
--define(EJABBERD_DEBUG, true).
+-define(MOD_PURPOSE, publication).
+-define(MOD_AMQP, ejabberd_rabbitmq).
+-define(MOD_AMQP_F, publish).
 
 %% gen_mod callbacks
--export([send_offline_message/1, groupcreationfunction/9, queryexecfunction/5, queryfunction/6, groupcreationfunction/10, has_more_resources/2, send_bulk_group_push/7, send_own_offline_message/3, start/2, start_link/2, depends/2,
-  stop/1]).
+-export([start/2, start_link/2, depends/2, stop/1, send_offline_message/1, 
+         queryexecfunction/5, queryfunction/6, groupcreationfunction/8, 
+         has_more_resources/2, send_bulk_group_push/7, send_own_offline_message/3]).
 
--export([code_change/3, handle_call/3, handle_cast/2, handle_info/2, init/1, mod_opt_type/1, terminate/2, mod_options/1]).
+-export([init/1, code_change/3, handle_call/3, handle_cast/2,
+         handle_info/2, mod_opt_type/1, terminate/2, mod_options/1,
+         mod_doc/0]).
 
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
-
 -include_lib("amqp_client/include/amqp_client.hrl").
 
-
--record(state,
-
-{host = <<"">>, rabbitmq_host = <<"">>, rabbitmq_exchange = <<"">>, rabbitmq_username = <<"">>, rabbitmq_password = <<"">>, rabbitmq_connection = <<"">>}).
+-record(state, {host = <<"">>}).
 
 
 %%%===================================================================
@@ -43,12 +38,6 @@ start(Host, Opts) ->
   inets:start(),
   crypto:start(),
   ssl:start(),
-  case ets:info(rabbit_mq_connection, size) of
-    undefined ->
-  ets:new(rabbit_mq_connection,[set, public, named_table ,{write_concurrency, false}, {read_concurrency, true}]);
-  _ ->
-  ok
-  end,
   [_Node, _] = binary:split(atom_to_binary(node(),utf8), <<"@">>),
   Proc = gen_mod:get_module_proc(Host, ?PROCNAME),
   ejabberd_hooks:add(offline_message_hook, Host, ?MODULE,
@@ -70,16 +59,8 @@ stop(Host) ->
 %% gen_server callbacks
 %%====================================================================
 init([Host, _Opts]) ->
-  case create_rabbit_mq_create_connection(Host) of
-    [Channel,RabbitMQExchange] ->
-      [[RabbitMQConnectionPid]] = ets:match(rabbit_mq_connection, {pid, '$1'}),
-      ?INFO_MSG("RabbitMQConnectionPid: ~p",[RabbitMQConnectionPid]),
-      {ok,
-        #state{host = Host, rabbitmq_connection = Channel, rabbitmq_exchange = RabbitMQExchange}};
-    _ERROR ->
-      ?ERROR_MSG("RabbitMQ Server Connection failed: ~p",[_ERROR])
-  end.
-
+    {ok, #state{host = Host}}.
+    
 %%=========================================================================
 %% Function: terminate(Reason, State) -> void()
 %% Description: This function is called by a gen_server when it is about to
@@ -133,7 +114,7 @@ handle_cast({pushnotification, <<"chat">>,
       end
       end,
       if Call =:= true ->
-        case catch send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) of
+        case catch send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) of
           {ok, _Result} -> ok;
           {error, Error} ->
             ?INFO_MSG("push error ~p", [Error]), ok;
@@ -159,7 +140,7 @@ handle_cast({pushnotification, <<"normal">>, {Sender, Recipient, ChatType, SubEl
 			end
 	end,
 	if Call =:= true ->
-		   case catch send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) of
+		   case catch send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) of
 			   {ok, _Result} -> ok;
 			   {error, Error} ->
 				   ?INFO_MSG("push error ~p", [Error]), ok;
@@ -175,25 +156,25 @@ handle_cast({queryexecution, <<"clear_all">>,
   {From, Last_Msg_Id, Delete_Type, XMLBody}},
     State) ->
 
-  clear_all_query(From, Last_Msg_Id, Delete_Type, XMLBody, State),
+  clear_all_query(From, Last_Msg_Id, Delete_Type, XMLBody),
 
   {noreply, State};
 handle_cast({queryexecution, <<"call_log">>,
   {From, Chat_Type, Delete_Type, XMLBody}},
     State) ->
-  clear_call_log(From, Chat_Type, Delete_Type, XMLBody, State),
+  clear_call_log(From, Chat_Type, Delete_Type, XMLBody),
   {noreply, State};
 handle_cast({groupcreationexecutions, <<"group_creation">>,
-  {From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes}},State) ->
-  group_create_query(From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes, State),
-
+  {From, Participants,  GroupJID, SubEl, IQ, MessageId1, CustomAttributes}},State) ->
+  group_create_query(From, Participants,  GroupJID, SubEl, IQ, MessageId1, CustomAttributes),
   {noreply, State};
+
 handle_cast({own_pushnotification, <<"chat">>,
   {Sender, Recipient, ChatType, SubEl, Packet}},
     State) ->
 
   case catch send_own_push_notifications(Sender, Recipient,
-    ChatType, SubEl, Packet, State)
+    ChatType, SubEl, Packet)
   of
     {ok, _Result} -> ok;
     {error, _Error} ->
@@ -252,7 +233,7 @@ owngroup_push(Proc, Type, Sender, Recipient, ChatType,
       {Sender, Recipient, ChatType, SubEl, Packet,
         GroupName}}).
 
-send_bulk_group_push(From, Server,MessageContent, Members, Node, Stanza, Type) ->
+send_bulk_group_push(From, Server, MessageContent, Members, Node, Stanza, Type) ->
   Proc = gen_mod:get_module_proc(Server,
     ?PROCNAME),
   gen_server:cast(Proc,
@@ -265,10 +246,13 @@ queryfunction(Proc, Type, From, Chat_Type, Delete_Type, XMLBody) ->
     {queryexecution, Type,
       { From, Chat_Type, Delete_Type,XMLBody}}).
 
-groupcreationfunction(Proc, Type, From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes) ->
-  gen_server:cast(Proc,
-    {groupcreationexecutions, Type,
-      {From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes}}).
+groupcreationfunction(From, Type, Participants, 
+  GroupJID, SubEl, IQ, MessageId1, CustomAttributes) ->
+
+    Proc = gen_mod:get_module_proc(From#jid.lserver, ?PROCNAME),
+    gen_server:cast(Proc,
+      {groupcreationexecutions, Type, {From, Participants,  
+       GroupJID, SubEl, IQ, MessageId1,CustomAttributes}}).
 
 %% Hook lisenter to for offline message hook
 %%
@@ -405,7 +389,7 @@ send_offline_message(({_Action, #message{from = Sender, to = Recipient, type = C
   end,
   Acc.
 
-clear_all_query(From, Last_Msg_Id, Delete_Type, XmlBody, State) ->
+clear_all_query(From, _, Delete_Type, XmlBody) ->
 
     fly_mod_utils:clear_all(From, Delete_Type),
     #jid{luser = User, lserver = Server, lresource = _Resource} = From,
@@ -418,7 +402,7 @@ clear_all_query(From, Last_Msg_Id, Delete_Type, XmlBody, State) ->
           ok
   end.
 
-clear_call_log(From, Chat_Type, RoomId , XmlBody, State) ->
+clear_call_log(From, _, RoomId , XmlBody) ->
 
     fly_mod_utils:clear_call_log(From,RoomId),
     #jid{luser = User, lserver = Server, lresource = _Resource} = From,
@@ -432,32 +416,59 @@ clear_call_log(From, Chat_Type, RoomId , XmlBody, State) ->
       end.
 
 get_string() ->
-  R = crypto:rand_uniform(0, 16#10000000000000000),
+  R = rand:uniform(16#10000000000000000) - 1,
   integer_to_binary(R).
 
-  group_create_query(From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes, State)->
+group_create_query(From, Participants,  GroupJID, SubEl, IQ, MessageId1, CustomAttributes)->
 
   #jid{user = FUser, lserver = FServer} = From,
   Profile = fxml:get_subtag(SubEl, <<"profile">>),
   VCard = fxml:get_subtag(Profile, <<"vCard">>),
   NickName = fxml:get_subtag(VCard, <<"nickName">>),
   GroupName = fxml:get_tag_cdata(NickName),
-  fly_mod_utils:group_notify_message(From, From, FUser, Channel, <<"1">>, <<"create_group">>, MessageId1,<<"">>,<<"">>),
+  fly_mod_utils:group_notify_message(From, From, FUser,  <<"1">>, <<"create_group">>, MessageId1,<<"">>, <<"">>, <<"">>),
   % Adds Participant
   lists:foreach(fun(Participant) ->
-    ParticipantData = fxml:get_tag_cdata(Participant),
-    FromJID = jid:make(fly_mod_utils:get_user_from_string_jid(ParticipantData),FServer,<<"">>),
-    MessageID = <<(get_string()) / binary>>,
-    GroupCreateID = <<(get_string()) / binary>>,
-    #jid{user = PUser} = FromJID,
-    fly_mod_utils:group_notify_message(From, FromJID, PUser, Channel, <<"1">>, <<"create_group">>, GroupCreateID,<<"">>,<<"">>),
-    timer:sleep(50),
-    mod_mix_pam:process_iq(#iq{from = FromJID, to = FromJID,type = set,id = MessageID,
-      sub_els = [#mix_client_join{channel = GroupJID,  xmlns = <<"urn:xmpp:mix:pam:0">>,affiliation = <<"n">>,
-      join = #mix_join{owner = jid:to_string(From),message_id = MessageID, nick = GroupName, group_create = <<"y">>, custom_attributes = #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, xmlns = <<"urn:xmpp:mix:core:0">>, subscribe = [<<"urn:xmpp:mix:nodes:messages">>,<<"urn:xmpp:mix:nodes:presence">>,
-      <<"urn:xmpp:mix:nodes:participants">>,<<"urn:xmpp:mix:nodes:info">>,<<"urn:xmpp:mix:nodes:config">>]}}]}),
-    fly_mix_group_chat:update_group_status(From, GroupJID, SubEl, IQ, <<"2">>, Participant, MessageID)
+
+      ParticipantData = fxml:get_tag_cdata(Participant),
+      FromJID = jid:make(fly_mod_utils:get_user_from_string_jid(ParticipantData),FServer,<<"">>),
+      MessageID = <<(get_string()) / binary>>,
+      GroupCreateID = <<(get_string()) / binary>>,
+      #jid{user = PUser} = FromJID,
+      fly_mod_utils:group_notify_message(From, FromJID, PUser,  <<"1">>, <<"create_group">>, GroupCreateID, <<"">>, <<"">>, <<"">>),
+
+      mod_mix_pam:process_iq(
+                    #iq{
+                    from = FromJID, 
+                    to = FromJID,type = set,
+                    id = MessageID,
+                    sub_els = [build_mix_client_join_record(GroupJID, {From, MessageID, GroupName, CustomAttributes})]
+                    }),
+
+      fly_mix_group_chat:update_group_status(From, GroupJID, SubEl, IQ, <<"2">>, Participant, MessageID)
+
   end, Participants#xmlel.children).
+
+build_mix_client_join_record(GroupJID, {From, MessageID, GroupName, CustomAttributes}) ->
+  #mix_client_join{channel = GroupJID,  
+                   xmlns = <<"urn:xmpp:mix:pam:0">>, 
+                   affiliation = <<"n">>,
+                   join = build_join_record(From, MessageID, GroupName, CustomAttributes)}.
+
+build_join_record(_From, _MessageID, GroupName, _Attrs) ->
+#mix_join{owner = jid:to_string(_From),
+          message_id = _MessageID, 
+          nick = GroupName, 
+          group_create = <<"y">>, 
+          custom_attributes = 
+          #xmlel{name = <<"custom_attributes">>, 
+                 children = [{xmlcdata, _Attrs}]}, 
+                 xmlns = <<"urn:xmpp:mix:core:0">>, 
+                 subscribe = [<<"urn:xmpp:mix:nodes:messages">>,
+                              <<"urn:xmpp:mix:nodes:presence">>,
+                              <<"urn:xmpp:mix:nodes:participants">>,
+                              <<"urn:xmpp:mix:nodes:info">>,
+                              <<"urn:xmpp:mix:nodes:config">>]}.
 
 %% send_push_notifications
 %%
@@ -466,7 +477,7 @@ get_string() ->
 %% @param binary ChatType
 %% @param record SubEl
 %% @return atom
-send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
+send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) ->
   MsgId = fxml:get_attr_s(<<"id">>,Packet#xmlel.attrs),
   Rs = if ChatType == <<"meeting_reminder">> -> "";
     true -> has_more_resources(Recipient#jid.luser,Recipient#jid.server)
@@ -526,7 +537,8 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
               ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #poll{}),
               {poll,_,_,_,_,Chattype,_,_} = ElementAcknowledge,
               if Chattype =:=<<"normal">> ->
-                call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType, SubEl, Packet,TimestampValue,State);
+                call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,
+                PushType,Sender, Recipient, ChatType, SubEl, Packet,TimestampValue);
                 true ->
                   fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
                   user_blocked
@@ -539,7 +551,7 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
             ok;
           {selected, _, []} ->
             call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType,
-            SubEl, Packet,TimestampValue,State)
+            SubEl, Packet,TimestampValue)
         end
 
        end,Tokens);
@@ -549,18 +561,17 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
       database_error
   end.
 
-call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType, SubEl, Packet,TimestampValue,State)->
+call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,
+Sender, Recipient, ChatType, SubEl, Packet,TimestampValue)->
   case DeviceType of
             <<"">> -> ?INFO_MSG("push_message user device is empty error is ~p", [Recipient#jid.luser]),
               device_type_is_empty;
             <<"android">> ->
               gcm_single_push(DeviceType,DeviceToken, UserType, ChatType, Sender,
-                Recipient, SubEl, TimestampValue, Packet,
-                State#state.rabbitmq_connection, State#state.rabbitmq_exchange);
+                Recipient, SubEl, TimestampValue, Packet);
               <<"web">> ->
                   gcm_single_push(DeviceType, DeviceToken, UserType, ChatType, Sender,
-                    Recipient, SubEl, TimestampValue, Packet,
-                    State#state.rabbitmq_connection, State#state.rabbitmq_exchange);
+                    Recipient, SubEl, TimestampValue, Packet);
               <<"ios">> ->
                 case ChatType of 
                   <<"mediacall">> when VoipDeviceToken == <<>> ->
@@ -568,7 +579,8 @@ call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, User
                   <<"recall">> ->
                     ?INFO_MSG("(ios) recall restricted ~p", [Recipient#jid.luser]);
                   _ ->
-                    apns_single_push(DeviceToken, UserType, VoipDeviceToken, IOSVersion, ChatType, Sender, Recipient, SubEl, TimestampValue,Packet, State, Mode,PushType)
+                    apns_single_push(DeviceToken, UserType, VoipDeviceToken, IOSVersion, ChatType, Sender, 
+                    Recipient, SubEl, TimestampValue,Packet, Mode,PushType)
                 end;
             _ -> ?INFO_MSG("push_message user device not found error is ~p", [Recipient#jid.luser]),
               database_error
@@ -579,8 +591,8 @@ call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, User
 %% @param record Recipient
 %% @param record Packet
 %% @return atom
-gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
-    TimestampValue, Packet, Channel, RMExchange) ->
+gcm_single_push(DeviceType, DeviceToken, PushType, ChatType, 
+  From, To, _Message, TimestampValue, Packet) ->
 
   if ChatType == <<"chat">> ->
     FromUser = From#jid.luser,
@@ -590,13 +602,13 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     ContentAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #chatcontent{}),
   if ContentAcknowledge =:= false ->
     MessageType = <<"">>,
-    MentionList = <<"">>,
+    _MentionList = <<"">>,
     EditMsgId = MessageId;
     true ->
-    {_,_,_,_,MessageType,_,_,EditMsgId,MentionList,DisappearAt,_} = ContentAcknowledge
+    {_,_,_,_,MessageType,_,_,EditMsgId,_MentionList,_DisappearAt,_} = ContentAcknowledge
     end,
     % DecryptedMessage = fly_mod_security:aes_decrpyt(binary_to_list(MessageId), Message),
-    % ParsedMessageJson = jiffy:decode(http_uri:decode(binary_to_list(DecryptedMessage))),
+    % ParsedMessageJson = jiffy:decode(uri_string:unquote(binary_to_list(DecryptedMessage))),
     % MessageType = proplists:get_value(<<"message_type">>,
     %   element(1, ParsedMessageJson)),
     SendFrom = list_to_binary(binary_to_list(FromUser) ++
@@ -631,9 +643,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     Payload = create_android_json(DeviceToken, BF),
     if (EditMsgId =:= MessageId) or (EditMsgId =:= <<"">>) ->
       if DeviceType ==  <<"android">> ->
-        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet);
+        send_payload(Payload, ChatType, false, Packet, android);
       true ->
-        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet)
+        send_payload(Payload, ChatType, false, Packet, web)
       end;
     true ->
       ok
@@ -689,9 +701,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
                             true -> 
                             ok
                           end,
-                        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet);
+                          send_payload(Payload, ChatType, false, Packet, android);
                     _ ->
-                      send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet)
+                      send_payload(Payload, ChatType, false, Packet, web)
                 end;
               false ->
                 ?LOG_INFO("skipping push, reaction should only route for message sender ~p but got ~p",[MsgSender, ToUser]),
@@ -710,9 +722,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
 
                   case DeviceType of
                     <<"android">> ->
-                      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet);
+                      send_payload(Payload, ChatType, false, Packet, android);
                     _ ->
-                      send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet)
+                      send_payload(Payload, ChatType, false, Packet, web)
                   end;
                 true -> 
                   ok
@@ -728,7 +740,6 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
     ChatType == <<"poll">> ->
     FromUser = From#jid.luser,
     Server = To#jid.server,
-    ToUser = To#jid.luser,
     MessageId = fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs),
     SendFrom = list_to_binary(binary_to_list(FromUser) ++
       "@" ++ binary_to_list(Server)),
@@ -752,9 +763,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
         {<<"title">>, "Poll"}],
       Payload = create_android_json(DeviceToken, BF),
       if DeviceType ==  <<"android">> ->
-        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet);
+        send_payload(Payload, ChatType, false, Packet, android);
       true ->
-        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet)
+        send_payload(Payload, ChatType, false, Packet, web)
       end;
     ChatType == <<"seen">> ->
     FromUser = From#jid.luser,
@@ -781,9 +792,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
       {<<"type">>, binary_to_list(ChatType)}],
     Payload = create_android_json(DeviceToken, BF),
     if DeviceType ==  <<"android">> ->
-      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet);
+      send_payload(Payload, ChatType, false, Packet, android);
       true ->
-        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet)
+        send_payload(Payload, ChatType, false, Packet, web)
       end;
     ChatType == <<"recall">> ->
       FromUser = From#jid.luser,
@@ -806,9 +817,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
         {<<"title">>, "This message was deleted"}],
       Payload = create_android_json(DeviceToken, BF),
       if DeviceType ==  <<"android">> ->
-        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet);
+        send_payload(Payload, ChatType, false, Packet, android);
         true ->
-          send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet)
+          send_payload(Payload, ChatType, false, Packet, web)
         end;
 
     ChatType == <<"mediacall">> ->
@@ -957,19 +968,15 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
           end,
           Payload = create_android_json(DeviceToken, BF),
           if DeviceType ==  <<"android">> ->
-            send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet);
+            send_payload(Payload, ChatType, false, Packet, android);
       true ->
-        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet)
+        send_payload(Payload, ChatType, false, Packet, web)
       end
       end;
     ChatType == <<"adminblock">> ->
-      FromUser = From#jid.luser,
       Server = To#jid.server,
       AdminBlock = fxml:get_subtag_with_xmlns(Packet, <<"admin_block">>,
         <<"urn:xmpp:receipts">>),
-
-      SendFrom = list_to_binary(binary_to_list(FromUser) ++
-        "@" ++ binary_to_list(Server)),
 
       BlockStatus = case fxml:get_tag_attr(<<"block_status">>, AdminBlock) of
         {value, Blockstatus} ->
@@ -994,9 +1001,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
 
           Payload = create_android_json(DeviceToken, BF),
           if DeviceType ==  <<"android">> ->
-            send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet);
+            send_payload(Payload, ChatType, false, Packet, android);
             true ->
-              send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Server, Packet)
+              send_payload(Payload, ChatType, false, Packet, web)
             end;
     ChatType == <<"meeting_reminder">> ->
       Server = To#jid.server,
@@ -1038,9 +1045,9 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
       ],
       Payload = create_android_json(DeviceToken, BF),
       if DeviceType == <<"android">> ->
-        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet);
+        send_payload(Payload, ChatType, false, Packet, android);
       true ->
-        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet)
+        send_payload(Payload, ChatType, false, Packet, web)
       end;
     true -> {ok, <<"chat type is different gcm">>}
   end.
@@ -1053,8 +1060,7 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
 %% @return atom
 
 gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
-    FromUser, ToUser, Message, Packet, TimestampValue,
-    Channel, RMExchange) ->
+    FromUser, ToUser, Message, Packet, TimestampValue) ->
   if ChatType == <<"normal">> ->
     Event = fxml:get_subtag(Packet, <<"event">>),
     Items = fxml:get_subtag(Event, <<"items">>),
@@ -1074,7 +1080,7 @@ gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
       MessageContent = fxml:get_tag_cdata(Message),
       DecryptedMessage = fly_mod_security:aes_decrpyt(binary_to_list(MessageId),
           MessageContent),
-      ParsedMessageJson = jiffy:decode(http_uri:decode(binary_to_list(DecryptedMessage))),
+      ParsedMessageJson = jiffy:decode(uri_string:unquote(binary_to_list(DecryptedMessage))),
       MessageType = proplists:get_value(<<"message_type">>,
         element(1,
           ParsedMessageJson)),
@@ -1102,7 +1108,7 @@ gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
         {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
         {<<"type">>, binary_to_list(MessageType)}],
       Payload = create_android_json(DeviceToken, BF),
-      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, LServer, Packet);
+      send_payload(Payload, ChatType, false, Packet, android);
       (Items =/= false) and
         (NameSpace =:= <<"urn:xmpp:mix:nodes:participants">>) ->
         #jid{luser = LUser, lserver = LServer} = ToUser,
@@ -1184,7 +1190,7 @@ gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
             {<<"type">>, "normal"}],
           Payload = create_android_json(DeviceToken, BF),
           
-          send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, LServer, Packet);
+          send_payload(Payload, ChatType, false, Packet, android);
           
           true -> {ok, <<"ParticipantJid =/= SendFrom gcm">>}
         end;
@@ -1193,350 +1199,61 @@ gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
     true -> {ok, <<"chat type is different gcm">>}
   end.
 
-%%%===================================================================
-%%% RabbitMQ Connection Management with Safe Channel Lifecycle
-%%%===================================================================
-
-create_rabbit_mq_create_connection(Host) ->
-    maybe_cleanup_old_connection(),
-    RabbitMQHost = gen_mod:get_module_opt(Host, ?PROCNAME, rabbitmq_host),
-    RabbitMQExchange = gen_mod:get_module_opt(Host, ?PROCNAME, rabbitmq_exchange),
-    RabbitMQUsername = gen_mod:get_module_opt(Host, ?PROCNAME, rabbitmq_username),
-    RabbitMQPassWord = gen_mod:get_module_opt(Host, ?PROCNAME, rabbitmq_password),
-
-    case amqp_connection:start(
-        #amqp_params_network{
-            host = binary_to_list(RabbitMQHost),
-            username = RabbitMQUsername,
-            password = RabbitMQPassWord
-        }) of
-        {ok, RMQConnection} ->
-            ?INFO_MSG("RabbitMQ connection established: ~p", [RMQConnection]),
-            Channel = create_rabbit_mq_channel_connection(RMQConnection, Host),
-            case check_rabbit_mq_connection_table(rabbit_mq_connection) of
-                true -> ets:delete_all_objects(rabbit_mq_connection);
-                _ -> ok
-            end,
-            ets:insert(rabbit_mq_connection, {pid, RMQConnection}),
-            ets:insert(rabbit_mq_connection, {channel, Channel}),
-            [Channel, RabbitMQExchange];
-        Error ->
-            ?ERROR_MSG("RabbitMQ connection failed: ~p", [Error]),
-            Error
-    end.
-
-%%%-------------------------------------------------------------------
-%%% Safely close old RabbitMQ connections and channels
-%%%-------------------------------------------------------------------
-maybe_cleanup_old_connection() ->
-    maybe_close_old_channel(),
-    case ets:lookup(rabbit_mq_connection, pid) of
-        [{pid, OldConn}] when is_pid(OldConn) ->
-            catch amqp_connection:close(OldConn),
-            ets:delete_all_objects(rabbit_mq_connection),
-            ?INFO_MSG("Closed old RabbitMQ connection: ~p", [OldConn]);
-        _ ->
-            ok
-    end.
-
-%%%-------------------------------------------------------------------
-%%% Safely create a new channel for an existing connection
-%%%-------------------------------------------------------------------
-create_rabbit_mq_channel_connection(RMQConnection, Host) ->
-    maybe_close_old_channel(),
-    case amqp_connection:open_channel(RMQConnection) of
-        {ok, Channel} ->
-            case check_rabbit_mq_connection_table(rabbit_mq_connection) of
-                true -> ets:delete_all_objects(rabbit_mq_connection);
-                _ -> ok
-            end,
-            ets:insert(rabbit_mq_connection, {pid, RMQConnection}),
-            ets:insert(rabbit_mq_connection, {channel, Channel}),
-            ?INFO_MSG("Created new RabbitMQ channel: ~p", [Channel]),
-            Channel;
-        {error, Reason} ->
-            io:format("Failed to open channel: ~p~n", [Reason]),
-            catch amqp_connection:close(RMQConnection),
-            [ChannelNewPid, _] = create_rabbit_mq_create_connection(Host),
-            ChannelNewPid
-    end.
-
-%%%-------------------------------------------------------------------
-%%% Close old channel if it exists
-%%%-------------------------------------------------------------------
-maybe_close_old_channel() ->
-    case ets:lookup(rabbit_mq_connection, channel) of
-        [{channel, OldChannel}] when is_pid(OldChannel) ->
-            catch amqp_channel:close(OldChannel),
-            ets:delete(rabbit_mq_connection, channel),
-            ?INFO_MSG("Closed old RabbitMQ channel: ~p", [OldChannel]);
-        _ -> ok
-    end.
-
-%%%-------------------------------------------------------------------
-%%% Check ETS table for active RabbitMQ connection
-%%%-------------------------------------------------------------------
-check_rabbit_mq_connection_table(Table) ->
-    case ets:lookup(Table, pid) of
-        [{pid, _}] -> true;
-        _ -> false
-    end.
-
-%%%-------------------------------------------------------------------
-%%% Ensure channel and connection are alive, recreate if not
-%%%-------------------------------------------------------------------
-check_rabbit_mq_connection_is_alive(ChannelPid, Host) ->
-    ChannelConnection =
-        case is_pid(ChannelPid) of
-            true ->
-                case is_process_alive(ChannelPid) of
-                    true ->
-                        ChannelPid;
-                    false ->
-                        catch amqp_channel:close(ChannelPid),
-                        handle_connection_recovery(Host)
-                end;
-            false ->
-                handle_connection_recovery(Host)
-        end,
-    ChannelConnection.
-
-%%%-------------------------------------------------------------------
-%%% Helper: Recover connection and channel
-%%%-------------------------------------------------------------------
-handle_connection_recovery(Host) ->
-    case ets:match(rabbit_mq_connection, {pid, '$1'}) of
-        [[RabbitMQConnectionPid]] ->
-            case is_pid(RabbitMQConnectionPid) of
-                true ->
-               case is_process_alive(RabbitMQConnectionPid) of
-                  true ->
-                      ChannelNewPid = create_rabbit_mq_channel_connection(RabbitMQConnectionPid, Host),
-                      ?INFO_MSG("Recovered alive RabbitMQ connection, new channel pid: ~p", [ChannelNewPid]),
-                      ChannelNewPid;
-                  false ->
-                      [ChannelNewPid, _] = create_rabbit_mq_create_connection(Host),
-                      ?INFO_MSG("Recreated dead RabbitMQ connection, new channel pid: ~p", [ChannelNewPid]),
-                      ChannelNewPid
-              end
-            end;
-        _ ->
-            [ChannelNewPid, _] = create_rabbit_mq_create_connection(Host),
-            ?INFO_MSG("No RabbitMQ connection found, new channel pid: ~p", [ChannelNewPid]),
-            ChannelNewPid
-    end.
-
-%% Send Android push payloads to the rabbit mq server
-send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host) ->
-  send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Host, undefined).
-
-send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host) ->
-  send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Host, undefined).
-
-send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host, Packet) ->
-  ?LOG_INFO("send_android_payload_to_rabbitmq ChatType: ~p, Payload: ~s", [ChatType, Payload]),
-
-  ChannelPid = check_rabbit_mq_connection_is_alive(Channel,Host),
-  if (ChatType =:= <<"call">>)  or (ChatType =:= <<"mediacall">>)->
-    RKey = <<"android_call">>,
-    %% extract stanza info
-    StanzaId = safe_get_msg_id(Packet),
-    Type = safe_get_msg_type(Packet),
-    {FUserId, _, FResource} = safe_get_from_parts(Packet),
-    {TUserId, _, TResource} = safe_get_to_parts(Packet),
-    ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
-      #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-    case amqp_channel:cast(ChannelPid,
-      #'basic.publish'{
-        exchange = RMExchange,
-        routing_key = RKey},
-      #amqp_msg{payload = list_to_binary(Payload)}) of
-      ok ->
-        ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
-          #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-        {ok, <<"success">>};
-      Error ->
-        ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, RKey,
-          #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
-        ?ERROR_MSG("Android: Unable to send call push notification to the rabbitmq server server: ~p", [Error])
-    end;
-     ChatType =:= <<"group_reaction">> ->
-    RKey = <<"aos_grp_react_push">>,
-    StanzaId = safe_get_msg_id(Packet),
-    Type = safe_get_msg_type(Packet),
-    {FUserId, _, FResource} = safe_get_from_parts(Packet),
-    {TUserId, _, TResource} = safe_get_to_parts(Packet),
-    ?LOG_INFO("chat type group_reaction, publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
-      #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-      case amqp_channel:cast(ChannelPid,
-        #'basic.publish'{
-          exchange = RMExchange,
-          routing_key = RKey},
-        #amqp_msg{payload = list_to_binary(Payload)}) of
-        ok ->
-          ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
-            #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-          {ok, <<"success">>};
-          Error ->
-            ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, RKey,
-              #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
-            ?ERROR_MSG("Android: Unable to send push messages to the rabbitmq server Q[aos_grp_react_push] server: ~p", [Error])
-      end;
-    true ->
-      RKey = <<"android_message">>,
-      StanzaId = safe_get_msg_id(Packet),
-      Type = safe_get_msg_type(Packet),
-      {FUserId, _, FResource} = safe_get_from_parts(Packet),
-      {TUserId, _, TResource} = safe_get_to_parts(Packet),
-      ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
-        #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-      case amqp_channel:cast(ChannelPid,
-        #'basic.publish'{
-          exchange = RMExchange,
-          routing_key = RKey},
-        #amqp_msg{payload = list_to_binary(Payload)}) of
-        ok ->
-          ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey,
-            #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-          {ok, <<"success">>};
-          Error ->
-            ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, RKey,
-              #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
-            ?ERROR_MSG("Android: Unable to send push messages to the rabbitmq server server: ~p", [Error])
-      end
-  end.
-
-%% Send Android push payloads to the rabbit mq server
-send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange,Host, Packet) ->
-  ?LOG_INFO("send_web_payload_to_rabbitmq ChatType: ~p, Payload: ~s", [ChatType, Payload]),
-
-  ChannelPid = check_rabbit_mq_connection_is_alive(Channel,Host),
-  if (ChatType =:= <<"call">>)  or (ChatType =:= <<"mediacall">>)->
-    RKey = <<"web_call">>,
-    StanzaId = safe_get_msg_id(Packet),
-    Type = safe_get_msg_type(Packet),
-    {FUserId, _, FResource} = safe_get_from_parts(Packet),
-    {TUserId, _, TResource} = safe_get_to_parts(Packet),
-    ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-    ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p payload_len=~p", [TUserId, RMExchange, RKey, byte_size(list_to_binary(Payload))]),
-    case amqp_channel:cast(ChannelPid,
-      #'basic.publish'{
-        exchange = RMExchange,
-        routing_key = RKey},
-      #amqp_msg{payload = list_to_binary(Payload)}) of
-      ok ->
-        ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-        {ok, <<"success">>};
-      Error ->
-        ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
-        ?ERROR_MSG("Android: Unable to send call push notification to the rabbitmq server server: ~p", [Error])
-    end;
-    true ->
-      RKey = <<"web_message">>,
-      StanzaId = safe_get_msg_id(Packet),
-      Type = safe_get_msg_type(Packet),
-      {FUserId, _, FResource} = safe_get_from_parts(Packet),
-      {TUserId, _, TResource} = safe_get_to_parts(Packet),
-      ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, RKey, #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-      ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p payload_len=~p", [TUserId, RMExchange, RKey, byte_size(list_to_binary(Payload))]),
-      case amqp_channel:cast(ChannelPid,
-        #'basic.publish'{
-          exchange = RMExchange,
-          routing_key = RKey},
-        #amqp_msg{payload = list_to_binary(Payload)}) of
-        ok ->
-          ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p", [TUserId, RMExchange, RKey]),
-          {ok, <<"success">>};
-        Error ->
-          ?ERROR_MSG("Android: Unable to send push messages to the rabbitmq server server: ~p", [Error])
-      end
-  end.
-%% Send IOS push payloads to the rabbit mq server
-send_payload(Payload, ChatType, RMQConnection, RMExchange,Host, PushType) ->
-  %% wrapper for backward compatibility; delegate to 7-arg version with undefined Packet
-  send_payload(Payload, ChatType, RMQConnection, RMExchange, Host, PushType, undefined).
-
-send_payload(Payload, ChatType, RMQConnection, RMExchange,Host, PushType, Packet) ->
-  ?LOG_INFO("send_payload (IOS) ChatType: ~p, PushType: ~p, Payload: ~s", [ChatType, PushType, Payload]),
-  ChannelPid = check_rabbit_mq_connection_is_alive(RMQConnection,Host),
-
+send_payload(Payload, ChatType, _, Packet, android) ->
+  RoutingKey =
+  if ChatType =:= <<"call">>; 
+     ChatType =:= <<"mediacall">> ->
+      <<"android_call">>;
+  ChatType =:= <<"group_reaction">> ->
+      <<"aos_grp_react_push">>;
+  true ->
+      <<"android_message">>
+  end,
+  publish(RoutingKey, {Payload, Packet});
+send_payload(Payload, ChatType, _, Packet, web) ->
+  RoutingKey =
+  if ChatType =:= <<"call">>; 
+     ChatType =:= <<"mediacall">> ->
+      <<"web_call">>;
+  true ->
+      <<"web_message">>
+  end,
+  publish(RoutingKey, {Payload, Packet});
+send_payload(Payload, ChatType, PushType, Packet, ios) ->
+  RoutingKey =
   if ChatType =:= <<"mediacall">> ->
+    <<"ios_call">>;
+  true ->
+    if
+      PushType =:= <<"fcm">> ->
+          <<"ios_message_fcm">>;
+      ChatType =:= <<"group_reaction">> ->
+          <<"ios_grp_react_push">>;
+      true ->
+          <<"ios_message">>
+    end
+  end,
+  publish(RoutingKey, {Payload, Packet}).
 
-    Queue = <<"ios_call">>,
-
-    StanzaId = safe_get_msg_id(Packet),
-    Type = safe_get_msg_type(Packet),
-    {FUserId, _, FResource} = safe_get_from_parts(Packet),
-    {TUserId, _, TResource} = safe_get_to_parts(Packet),
-    ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, Queue,
-      #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-    case amqp_channel:cast(ChannelPid,
-      #'basic.publish'{
-        exchange = RMExchange,
-        routing_key = Queue},
-      #amqp_msg{payload = list_to_binary(Payload)}) of
-      ok ->
-        ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, Queue,
-          #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-        {ok, <<"success">>};
-      Error ->
-        ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, Queue,
-          #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
-        ?ERROR_MSG("IOS: Unable to send call push to the rabbitmq server server: ~p", [Error])
-    end;
-    true ->
-      Queue =
-      if
-          PushType =:= <<"fcm">> ->
-              <<"ios_message_fcm">>;
-          ChatType =:= <<"group_reaction">> ->
-              <<"ios_grp_react_push">>;
-          true ->
-              <<"ios_message">>
-      end,
-      StanzaId = safe_get_msg_id(Packet),
-      Type = safe_get_msg_type(Packet),
-      {FUserId, _, FResource} = safe_get_from_parts(Packet),
-      {TUserId, _, TResource} = safe_get_to_parts(Packet),
-      ?LOG_INFO("publishing to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, Queue,
-        #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-      case amqp_channel:cast(ChannelPid,
-        #'basic.publish'{
-          exchange = RMExchange,
-          routing_key = Queue},
-        #amqp_msg{payload = list_to_binary(Payload)}) of
-        ok ->
-          ?LOG_INFO("published to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p", [TUserId, RMExchange, Queue,
-            #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}]),
-          {ok, <<"success">>};
-        Error ->
-          ?LOG_INFO("publish_failed to rabbitmq for user=~p with exchange=~p routing_key=~p stanza: ~p error=~p", [TUserId, RMExchange, Queue,
-            #{stanza_id => StanzaId, type => Type, from_user_id => FUserId, from_resource => FResource, to_user_id => TUserId, to_resource => TResource}, Error]),
-          ?ERROR_MSG("IOS: Unable to send push messages to the rabbitmq server server: ~p", [Error])
-      end
-  end.
-
-response_to_binary(Json) when is_binary(Json) -> Json;
-response_to_binary(Json) when is_list(Json) ->
-  list_to_binary(Json).
+publish(RoutingKey, PayPac) ->
+  Args = [?MOD_PURPOSE, RoutingKey, PayPac],
+  apply(?MOD_AMQP, ?MOD_AMQP_F, Args).
 
 create_json(List1, List2, Token, Mode, ViopStatus,Expiration, PushType) ->
   if Expiration =:= 0 ->
     if PushType =:= <<"fcm">> ->
-    lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{",  create_keyvalue(List2), "}}"]);
+    lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), 
+                  "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{",  create_keyvalue(List2), "}}"]);
 
     true ->
-      lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{\"aps\":{", create_keyvalue(List1),
-    "}, ", create_keyvalue(List2), "}}"])
+      lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), 
+      "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{\"aps\":{", create_keyvalue(List1),
+      "}, ", create_keyvalue(List2), "}}"])
     end;
   true ->
-  % if PushType =:= <<"fcm">> ->
-  %   lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), "\",\"expiration\":\"", integer_to_list(Expiration), "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{",  create_keyvalue(List2), "}}"]);
-
-  %   true ->
-      lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), "\",\"expiration\":\"", integer_to_list(Expiration), "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{\"aps\":{", create_keyvalue(List1),
-    "}, ", create_keyvalue(List2), "}}"])
-    % end
+      lists:append(["{\"deviceToken\":\"", Token, "\",\"isVoip\":\"", integer_to_list(ViopStatus), 
+      "\",\"expiration\":\"", integer_to_list(Expiration), "\",\"mode\":\"", binary_to_list(Mode), 
+      "\",\"data\":{\"aps\":{", create_keyvalue(List1), "}, ", create_keyvalue(List2), "}}"])
   end.
 
 
@@ -1558,21 +1275,8 @@ create_pair({Key, Value}) ->
 add_quotes(String) ->
   lists:append(["\"", String, "\""]).
 
-safe_get_msg_id(Packet) ->
-  try xmpp:get_id(Packet) catch _:_ -> <<>> end.
-
-safe_get_msg_type(Packet) ->
-  try xmpp:get_type(Packet) catch _:_ -> <<>> end.
-
-safe_get_from_parts(Packet) ->
-  try jid:tolower(xmpp:get_from(Packet)) catch _:_ -> {<<>>, <<>>, <<>>} end.
-
-safe_get_to_parts(Packet) ->
-  try jid:tolower(xmpp:get_to(Packet)) catch _:_ -> {<<>>, <<>>, <<>>} end.
-
-    apns_single_push(DeviceToken, UserType, VoipDeviceToken, _IOSVersion, ChatType, Sender,
-    Recipient, SubEl, TimestampValue, Packet,
-    #state{host = _Host, rabbitmq_connection = Channel, rabbitmq_exchange = RMExchange}, Mode, PushType) ->
+apns_single_push(DeviceToken, UserType, VoipDeviceToken, _IOSVersion, ChatType, Sender,
+Recipient, SubEl, TimestampValue, Packet, Mode, PushType) ->
 
   if ChatType == <<"chat">> ->
     MessageId = fxml:get_attr_s(<<"id">>,
@@ -1582,18 +1286,12 @@ safe_get_to_parts(Packet) ->
 
       if ContentAcknowledge =:= false ->
         MessageType = <<"">>,
-        EditMsgId = MessageId,
-        MentionList = <<"">>;
+        EditMsgId = MessageId;
         true ->
-        {_,_,_,_,MessageType,_,_,EditMsgId,MentionList,DisappearAt,_} = ContentAcknowledge
+        {_,_,_,_,MessageType,_,_,EditMsgId,_,_,_} = ContentAcknowledge
         end,
 
     Server = Recipient#jid.server,
-    % DecryptedMessage = fly_mod_security:aes_decrpyt(binary_to_list(MessageId),
-    %     SubEl),
-    % Message1 = http_uri:decode(binary_to_list(DecryptedMessage)),
-    % ParsedMessageJson = jiffy:decode(response_to_binary(Message1)),
-    % MessageType = proplists:get_value(<<"message_type">>, element(1, ParsedMessageJson)),
     FromUser = Sender#jid.luser,
   case catch
   fly_mod_utils:get_nickname(Recipient#jid.server, FromUser)
@@ -1648,7 +1346,6 @@ end,
       "@" ++ binary_to_list(Server)),
     SendTo = list_to_binary(binary_to_list(ToUser) ++
       "@" ++ binary_to_list(Server)),
-    Expiry = 0,
 
     Args = [{message_id, binary_to_list(MessageId)},
       {message_time, binary_to_list(TimestampValue)},
@@ -1668,7 +1365,7 @@ end,
         {sound, binary_to_list(<<"default">>)}],
       JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
       if (EditMsgId =:= MessageId) or (EditMsgId =:= <<"">>) ->
-      send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType, Packet);
+      send_payload(JSON, ChatType, PushType, Packet, ios);
       true ->
         ok
       end;
@@ -1690,10 +1387,6 @@ end,
         {selected, _, [[Nick]]} -> UserNickName = Nick
       end,
       FromUser = Sender#jid.luser,
-      Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
-      FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
-      SendFrom = list_to_binary(binary_to_list(FromUser) ++
-        "@" ++ binary_to_list(Server)),
       AdminBlock = fxml:get_subtag_with_xmlns(Packet, <<"admin_block">>,
         <<"urn:xmpp:receipts">>),
       {value, BlockStatus} = fxml:get_tag_attr(<<"block_status">>,
@@ -1716,7 +1409,7 @@ end,
           {mode, binary_to_list(Mode)},
           {sound, binary_to_list(<<"default">>)}],
         JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
-        send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType, Packet);
+        send_payload(JSON, ChatType, PushType, Packet, ios);
 
     ChatType == <<"recall">> ->
       RecallChattype = fxml:get_attr_s(<<"type">>, Packet#xmlel.attrs),
@@ -1765,7 +1458,7 @@ end,
           {sound, binary_to_list(<<"default">>)}],
         JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
 
-        send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType, Packet)
+        send_payload(JSON, ChatType, PushType, Packet, ios)
                       end, Range);
       ChatType == <<"reaction">>; ChatType == <<"group_reaction">> ->
 
@@ -1844,7 +1537,7 @@ end,
                              true -> 
                               ok
                             end,
-                            send_payload(JSON, ChatType, Channel, RMExchange, Server, PushType, Packet);
+                            send_payload(JSON, ChatType, PushType, Packet, ios);
                         false ->
                           ?LOG_INFO("skipping ios group push, reaction should only route for message sender ~p but got ~p",[MsgSender, ToUser]),
                           ok
@@ -1859,7 +1552,7 @@ end,
                             JSON = create_json(Msg, Args0, binary_to_list(DeviceToken), Mode, 0, 0, PushType),
 
                             ?LOG_INFO("[ios_push]] reaction payload: ~p", [JSON]),
-                            send_payload(JSON, ChatType, Channel, RMExchange, Server, PushType, Packet);
+                            send_payload(JSON, ChatType, PushType, Packet, ios);
                           true ->
                             ?LOG_INFO("skipping ios push, reaction is from message sender ~p",[FromUser]),
                             ok
@@ -1923,7 +1616,7 @@ end,
                             {mode, binary_to_list(Mode)},
                             {sound, binary_to_list(<<"default">>)}],
                           JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
-                          send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType, Packet);
+                          send_payload(JSON, ChatType, PushType, Packet, ios);
     ChatType == <<"mediacall">> ->
       Server = Recipient#jid.server,
       FromUser = Sender#jid.luser,
@@ -2092,7 +1785,7 @@ end,
                 {sound, binary_to_list(<<"default">>)}],
                 JSON = create_json(Msg, Args, binary_to_list(VoipDeviceToken), Mode,1,Expiry,PushType),
 
-          send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType, Packet)
+          send_payload(JSON, ChatType, PushType, Packet, ios)
       end;
     ChatType == <<"meeting_reminder">> ->
       Server = Recipient#jid.server,
@@ -2140,16 +1833,15 @@ end,
         {sound, binary_to_list(<<"default">>)}
       ],
       JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode, 0, 0, PushType),
-      send_payload(JSON, ChatType, Channel, RMExchange, Server, PushType, Packet);
+      send_payload(JSON, ChatType, PushType, Packet, ios);
     true -> {ok, <<"chat type is different in ios">>,ChatType}
   end.
 
 apns_group_push(DeviceToken, UserType, ChatType, Sender,
     Recipient, GroupName, SubEl, TimestampValue, Packet,
-    #state{rabbitmq_connection = Channel, rabbitmq_exchange = RMExchange}, Mode, PushType) ->
+    Mode, PushType) ->
   #jid{luser = LUser, lserver = LServer} = Recipient,
   #jid{luser = FUser, lserver = FServer} = Sender,
-  {MSeconds, Seconds, _} = erlang:now(),
   Expiry = 0,
   if (ChatType == <<"normal">>) and (Packet =/= "") ->
     Event = fxml:get_subtag(Packet, <<"event">>),
@@ -2166,8 +1858,9 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
         SubEl),
       Message = fxml:get_tag_cdata(SubEl),
       DecryptedMessage = fly_mod_security:aes_decrpyt(binary_to_list(MessageId), Message),
-      Message1 = http_uri:decode(binary_to_list(DecryptedMessage)),
-      ParsedMessageJson = jiffy:decode(response_to_binary(Message1)),
+      Message1 = uri_string:unquote(binary_to_list(DecryptedMessage)),
+      BinaryMsg = response_to_binary(Message1),
+      ParsedMessageJson = jiffy:decode(BinaryMsg),
       MessageType = proplists:get_value(<<"message_type">>,
         element(1,
           ParsedMessageJson)),
@@ -2239,7 +1932,7 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
         {sent_from, binary_to_list(MsgFrom)},
         {type, binary_to_list(MessageType)}],
       JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
-      send_payload(JSON, ChatType, Channel, RMExchange, LServer, PushType, Packet);
+      send_payload(JSON, ChatType, PushType, Packet, ios);
       (Items =/= false) and
         (NameSpace =:= <<"urn:xmpp:mix:nodes:participants">>) ->
         Item = fxml:get_subtag(Items, <<"item">>),
@@ -2285,7 +1978,7 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
             {group_id, binary_to_list(GroupId)}],
           JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,Expiry,PushType),
          
-          send_payload(JSON, ChatType, Channel, RMExchange, LServer, PushType, Packet);
+          send_payload(JSON, ChatType, PushType, Packet, ios);
          
           true -> {ok, <<"ParticipantJid =/= SendFrom ios">>}
         end;
@@ -2313,12 +2006,7 @@ queryexecfunction(From, calllog, Chat_Type, Delete_Type, XMLBody)->
   Server = gen_mod:get_module_proc(From#jid.lserver,
     ?PROCNAME),
 
-  queryfunction(Server,<<"call_log">>, From, Chat_Type, Delete_Type, XMLBody).
-
-groupcreationfunction(From, groupcreation, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes)->
-  Server = gen_mod:get_module_proc(From#jid.lserver,
-    ?PROCNAME),
-groupcreationfunction(Server,<<"group_creation">>, From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes).
+queryfunction(Server,<<"call_log">>, From, Chat_Type, Delete_Type, XMLBody).
 
 send_own_offline_message(Sender, Recipient, Packet) ->
   ChatType = fxml:get_attr_s(<<"type">>, Packet#xmlel.attrs),
@@ -2373,7 +2061,7 @@ end,
 %% @param binary ChatType
 
 send_own_push_notifications(Sender, Recipient, ChatType,
-    SubEl, Packet, State) ->
+    SubEl, Packet) ->
   %% if Sender#jid.luser =/= Recipient#jid.luser ->
   Rs = has_more_resources(Sender#jid.luser,Sender#jid.server),
   case catch
@@ -2383,8 +2071,8 @@ send_own_push_notifications(Sender, Recipient, ChatType,
     {selected, _, []} ->
       device_token_is_empty;
     {selected, _, Tokens} ->
-    SubEls1 = lists:map(fun(G) ->
-        [DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, DeviceId, UserType, PushType] = G,
+    lists:foreach(fun(G) ->
+        [DeviceType, DeviceToken, _VoipDeviceToken, _Mode, _IOSVersion, _DeviceId, UserType, _PushType] = G,
 
                     if ChatType =:= <<"call">> ->
                       TimestampValue = <<"">>;
@@ -2397,10 +2085,7 @@ send_own_push_notifications(Sender, Recipient, ChatType,
                     <<"">> -> device_type_is_empty;
                     <<"android">> ->
                       gcm_single_push(DeviceType, DeviceToken, UserType,  ChatType, Sender,
-                        Recipient, SubEl, TimestampValue, Packet,
-                        State#state.rabbitmq_connection, State#state.rabbitmq_exchange);
-                    % <<"ios">> ->
-                    %   apns_single_push(DeviceToken,VoipDeviceToken,IOSVersion, ChatType, Sender, Recipient, SubEl, TimestampValue, Packet, State, Mode);
+                        Recipient, SubEl, TimestampValue, Packet);
                     _ -> database_error
                   end
 
@@ -2408,17 +2093,14 @@ send_own_push_notifications(Sender, Recipient, ChatType,
     _Error ->
       ?INFO_MSG("push_message get_user_device_details error is ~p", [_Error]),
       ok
-    %    end;
-    %    true -> ok
   end.
 
 % gets a timestamp in ms from the epoch
 get_timestamp() ->
-    {Mega,Sec,Micro} = erlang:now(),
-    (Mega * 1000000 + Sec + 30) * 1000000 + Micro.
+    erlang:system_time(microsecond) + 30_000_000.
 
 send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Node, Stanza, Type,  State) ->
-  Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
+  Timestamp = erlang:system_time(microsecond),
   FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
   ChatType = <<"normal">>,
   #jid{luser = Group, lserver = GroupHost} = FromUser,
@@ -2437,7 +2119,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
     ok;
       {selected, _, ATokens} ->
         lists:map(fun(G) ->
-          [Touser, AndroidDeviceToken, UserType, PushType] = G,
+          [Touser, AndroidDeviceToken, UserType, _PushType] = G,
         ChangedMessage = case MessageType of
                             <<"image">> -> binary_to_list(<<"Image">>);
                             <<"audio">> -> binary_to_list(<<"Audio">>);
@@ -2462,7 +2144,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
           {<<"title">>, ChangedMessage},
           {<<"type">>, binary_to_list(MessageType)}],
         AndPayload = create_android_json(AndroidDeviceToken, Load),
-        send_android_payload_to_rabbitmq(State#state.rabbitmq_connection, <<"normal">>, AndPayload, State#state.rabbitmq_exchange, Server)
+        send_payload(AndPayload, <<"normal">>, false, Stanza, android)
       end,ATokens)
     end,
     case catch fly_mod_utils:get_bulk_user_device(Server,
@@ -2471,7 +2153,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
       {selected, _, ITokens} ->
         lists:map(fun(G) ->
           [Touser, IOSDevice, IOSDeviceUserType, IOSDevicePushType] = G,
-        ios_send_bulk_push(Server, Touser, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"0">>, IOSDevice, Expiry, State,<<"13above">>,IOSDeviceUserType, IOSDevicePushType)
+        ios_send_bulk_push(Server, Stanza, Touser, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"0">>, IOSDevice, Expiry, State,<<"13above">>,IOSDeviceUserType, IOSDevicePushType)
         end,ITokens)
     end,
     case catch fly_mod_utils:get_bulk_voip_user_device(Server,
@@ -2480,7 +2162,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
     {selected, _, VTokens} ->
       lists:map(fun(G) ->
       [Touser, IOSVoipDevice, IOSVoipDeviceUserType, IOSVoipDevicePushType] = G,
-        ios_send_bulk_push(Server, Touser,  MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"0">>, IOSVoipDevice, Expiry, State,<<"13below">>,IOSVoipDeviceUserType, IOSVoipDevicePushType)
+        ios_send_bulk_push(Server, Stanza, Touser,  MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"0">>, IOSVoipDevice, Expiry, State,<<"13below">>,IOSVoipDeviceUserType, IOSVoipDevicePushType)
         end,VTokens)
     end,
     case catch fly_mod_utils:get_bulk_user_device(Server,
@@ -2489,7 +2171,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
     {selected, _, IOTokens} ->
       lists:map(fun(G) ->
       [Touser, IOSDevices, IOSDevicesUserType, IOSDevicesPushType] = G,
-        ios_send_bulk_push(Server, Touser, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"1">>, IOSDevices, Expiry, State,<<"13above">>,IOSDevicesUserType, IOSDevicesPushType)
+        ios_send_bulk_push(Server, Stanza, Touser, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"1">>, IOSDevices, Expiry, State,<<"13above">>,IOSDevicesUserType, IOSDevicesPushType)
         end,IOTokens)
     end,
     case catch fly_mod_utils:get_bulk_voip_user_device(Server,
@@ -2498,7 +2180,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
         {selected, _, VITokens} ->
         lists:map(fun(G) ->
         [Touser, IOSVoipDevices, IOSVoipDevicesUserType, IOSVoipDevicesPushType] = G,
-        ios_send_bulk_push(Server, Touser, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"1">>, IOSVoipDevices, Expiry, State,<<"13below">>,IOSVoipDevicesUserType, IOSVoipDevicesPushType)
+        ios_send_bulk_push(Server, Stanza, Touser, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"1">>, IOSVoipDevices, Expiry, State,<<"13below">>,IOSVoipDevicesUserType, IOSVoipDevicesPushType)
         end,VITokens)
     end;
     Node =:= <<"urn:xmpp:mix:nodes:participants">> ->
@@ -2512,7 +2194,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
         ok;
           {selected, _, ATokens} ->
           lists:map(fun(G) ->
-          [Touser, AndroidDeviceToken, UserType, PushType] = G,
+          [Touser, AndroidDeviceToken, UserType, _PushType] = G,
         {selected, [{UserName}]} = fly_mod_utils:get_nickname(Server, Owner),
           [NewUser, _] = binary:split(ParticipantJid, <<"@">>),
           {selected, [{ReceiverUserName}]} = fly_mod_utils:get_nickname(Server, NewUser),
@@ -2645,8 +2327,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
           end,
           AndPayload = create_android_json(AndroidDeviceToken, Load),
           
-          send_android_payload_to_rabbitmq(State#state.rabbitmq_connection, <<"normal">>, AndPayload, State#state.rabbitmq_exchange, Server)
-          
+        send_payload(AndPayload, <<"normal">>, false, Stanza, android)          
         end,
         ATokens)
       end,
@@ -2670,8 +2351,8 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
       ok
   end.
 
-ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeStamp, ChatType, Mode, IOSDeviceToken, Expiry, _Stanza, State, IOSPushType, Type, UserType, PushType) ->
-  [Chan,MsgFrom,ParticipantJid,NodeId,UserNickName,NotifyId] = MessageContent,
+ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeStamp, ChatType, Mode, IOSDeviceToken, _Expiry, Packet, _State, IOSPushType, Type, UserType, PushType) ->
+  [Chan,MsgFrom,ParticipantJid,NodeId,_UserNickName,NotifyId] = MessageContent,
   [Owner, _] = binary:split(MsgFrom, <<"@">>),
   [NewUser, _] = binary:split(ParticipantJid, <<"@">>),
   {selected, [{NewUserName}]} = fly_mod_utils:get_nickname(Server, NewUser),
@@ -2748,14 +2429,14 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
   if  IOSPushType =:= <<"13above">> ->
     Msg = [{<<"mutable-content">>, integer_to_list(1)}, {alert, binary_to_list(Message)}, {mode, binary_to_list(Mode)}, {sound, binary_to_list(<<"default">>)}],
     IOSPayLoad = create_json(Msg, Args, binary_to_list(IOSDeviceToken),Mode,0,0,PushType),
-    send_payload(IOSPayLoad, ChatType, State#state.rabbitmq_connection, State#state.rabbitmq_exchange,Server, PushType);
+    send_payload(IOSPayLoad, ChatType, PushType, Packet, ios);
     true ->
       Msg = [{<<"content-available">>, integer_to_list(1)},{is_voip, integer_to_list(1)},{alert, binary_to_list(Message)}, {mode, binary_to_list(Mode)}, {sound, binary_to_list(<<"default">>)}],
       IOSPayLoad = create_json(Msg, Args, binary_to_list(IOSDeviceToken),Mode,1,0,PushType),
-      send_payload(IOSPayLoad, ChatType, State#state.rabbitmq_connection, State#state.rabbitmq_exchange,Server, PushType)
+      send_payload(IOSPayLoad, ChatType, PushType, Packet, ios)
 
 end.
-ios_send_bulk_push(Server, ToUser, MessageContent, _FromUser, FlatTimeStamp, ChatType, GroupID, Mode, IOSDeviceToken, _Expiry, State,IOSPushType, UserType, PushType) ->
+ios_send_bulk_push(Server, Stanza, ToUser, MessageContent, _FromUser, FlatTimeStamp, ChatType, GroupID, Mode, IOSDeviceToken, _Expiry, _State, IOSPushType, UserType, PushType) ->
 [MessageType, MessageId, MesssageSend,GroupName, MSGBody, _EditMsg,_MentionList, _DisappearAt, _MetaData] = MessageContent,
   ChangedMessage = case MessageType of
                     <<"image">> ->
@@ -2787,11 +2468,11 @@ ios_send_bulk_push(Server, ToUser, MessageContent, _FromUser, FlatTimeStamp, Cha
   if IOSPushType =:= <<"13above">> ->
     Msg = [{<<"mutable-content">>, integer_to_list(1)}, {alert, ChangedMessage},{mode, binary_to_list(Mode)}, {sound, binary_to_list(<<"default">>)}],
     IOSPayLoad = create_json(Msg, Args, binary_to_list(IOSDeviceToken), Mode,0,0,PushType),
-    send_payload(IOSPayLoad, ChatType, State#state.rabbitmq_connection, State#state.rabbitmq_exchange,Server, PushType);
+    send_payload(IOSPayLoad, ChatType, PushType, Stanza, ios);
     true ->
       Msg = [{<<"content-available">>, integer_to_list(1)},{is_voip, integer_to_list(1)}, {alert, ChangedMessage}, {mode, binary_to_list(Mode)},{sound, binary_to_list(<<"default">>)}],
       IOSPayLoad = create_json(Msg, Args, binary_to_list(IOSDeviceToken), Mode, 1,0,PushType),
-      send_payload(IOSPayLoad, ChatType, State#state.rabbitmq_connection, State#state.rabbitmq_exchange,Server, PushType)
+      send_payload(IOSPayLoad, ChatType, PushType, Stanza, ios)
   end.
 
 get_status(Members) ->
@@ -2802,7 +2483,7 @@ get_resources(Members) ->
   lists:flatmap(fun(#jid{luser = User, lserver = Server}) ->
     [has_more_resources(User, Server)] end, Members).
 
-get_data(TUser, TServer) ->
+get_data(TUser, _TServer) ->
   binary_to_list(TUser) ++ "','".
 
 has_more_resources(User,LServer) ->
@@ -2823,7 +2504,7 @@ has_more_resources(User,LServer) ->
   Rs.
 
 send_own_group_push_notifications(FromUser, ToUser,
-    ChatType, SubEl, Packet, GroupName, State) ->
+    ChatType, SubEl, Packet, GroupName, _State) ->
     Rs = has_more_resources(FromUser#jid.luser,FromUser#jid.server),
   case catch fly_mod_utils:get_user_device(FromUser#jid.server,
     FromUser#jid.luser,Rs,ChatType)
@@ -2833,18 +2514,13 @@ send_own_group_push_notifications(FromUser, ToUser,
       Timestamp = fxml:get_subtag(Packet, <<"timestamp">>),
       TimestampValue = fxml:get_attr_s(<<"time">>,
       Timestamp#xmlel.attrs),
-      SubEls1 = lists:map(fun(G) ->
-        [DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion,DeviceId, UserType, PushType] = G,
+      lists:foreach(fun(G) ->
+        [DeviceType, DeviceToken, _VoipDeviceToken, _Mode, _IOSVersion, _DeviceId, UserType, _PushType] = G,
         case DeviceType of
                   <<"">> -> ok;
                   <<"android">> ->
                     gcm_group_push(DeviceToken, UserType, ChatType, GroupName,
-                      FromUser, ToUser, SubEl, Packet, TimestampValue,
-                      State#state.rabbitmq_connection, State#state.rabbitmq_exchange);
-                  % <<"ios">> ->
-                    % apns_group_push(DeviceToken, UserType, ChatType, FromUser, ToUser,
-                    %   GroupName, SubEl, TimestampValue, Packet,
-                    %   State, Mode, PushType);
+                      FromUser, ToUser, SubEl, Packet, TimestampValue);
                   _ -> ok
                 end
           end,Tokens);
@@ -2856,15 +2532,16 @@ send_own_group_push_notifications(FromUser, ToUser,
 create_android_json(DeviceToken, BF) ->
   RandomId = fly_mod_utils:get_iq_message_id(7),
   Expiry = get_timestamp(),
-  lists:append(["{\"deviceToken\":\"", binary_to_list(DeviceToken), "\",\"expiration\":\"", integer_to_list(Expiry), "\",\"collapse_key\":\"", binary_to_list(RandomId),  "\",\"data\":{", create_keyvalue(BF), "}}"]).
+  lists:append(["{\"deviceToken\":\"", binary_to_list(DeviceToken), "\",\"expiration\":\"", integer_to_list(Expiry), 
+  "\",\"collapse_key\":\"", binary_to_list(RandomId),  "\",\"data\":{", create_keyvalue(BF), "}}"]).
 
-create_bulk_push_json(DeviceTokens, BF) ->
-  lists:append(["{\"deviceTokens\":", "[\"", DeviceTokens, "\"],\"data\":{", create_keyvalue(BF), "}}"]).
-
-create_bulk_ios_json(List1, List2, Tokens, Mode,VoipStatus,Expiration) ->
-  lists:append(["{\"deviceTokens\":", "[\"", Tokens, "\"],\"isVoip\":\"", integer_to_list(VoipStatus), "\",\"expiration\":\"", integer_to_list(Expiration), "\",\"mode\":\"", binary_to_list(Mode), "\",\"data\":{\"aps\":{", create_keyvalue(List1),
-    "}, ", create_keyvalue(List2), "}}"]).
-
+response_to_binary(Json) 
+  when is_list(Json) ->
+  list_to_binary(Json);
+response_to_binary(Json) 
+  when is_binary(Json) -> 
+    Json.
+  
 mod_opt_type(rabbitmq_host) -> fun iolist_to_binary/1;
 mod_opt_type(rabbitmq_username) -> fun iolist_to_binary/1;
 mod_opt_type(rabbitmq_exchange) -> fun iolist_to_binary/1;
@@ -2887,3 +2564,5 @@ mod_options(_Host) ->
     {rabbitmq_password, undefined},
     {restricted_country_code, []}].
 
+mod_doc() -> 
+  #{}.

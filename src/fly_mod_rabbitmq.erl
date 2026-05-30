@@ -19,6 +19,7 @@
 -define(LISTENER_FUN, proc_listener_payload).
 
 -include("logger.hrl").
+-include_lib("xmpp/include/xmpp.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -define(Q_API_DATA, <<"api_data">>).
@@ -144,11 +145,11 @@ handle_call(Key, _From, State) ->
             {reply, ChannelVal, State}
     end.
 
-handle_cast({Type, RoutingKey, Payload}, State) ->
+handle_cast({Type, RoutingKey, PayPac}, State) ->
     Key = channel_name(Type),
     case State#state.channels of
         #{Key := Channel} ->
-            publication(RoutingKey, Payload, Channel, State#state.ex)
+            publication(RoutingKey, PayPac, Channel, State#state.ex)
     end,
     {noreply, State};
 handle_cast(_, State) -> 
@@ -270,15 +271,18 @@ close_channels({_Mod, Channel}) when is_pid(Channel) ->
 close_channels(_) ->
     bad_return.
 
-publish(Type, RoutingKey, Payload) -> 
-    gen_server:cast(?MODULE, {Type, RoutingKey, Payload}).
+publish(Type, RoutingKey, PacPay) -> 
+    gen_server:cast(?MODULE, 
+        {Type, RoutingKey, PacPay}).
 
-publication(RoutingKey, Payload, Channel, Exchange)  ->
+publication(RoutingKey, {Payload, Packet}, Channel, Exchange)  ->
     BinPayload =
     case is_binary(Payload) of
         true -> Payload;
         false -> iolist_to_binary(Payload)
     end,
+    logger(Packet, Exchange, RoutingKey, "publishing"),
+
     ActiveChannel = is_channel_alive(Channel, publication),
     case amqp_channel:cast(ActiveChannel, 
         #'basic.publish'{exchange = Exchange, routing_key = RoutingKey},
@@ -286,11 +290,32 @@ publication(RoutingKey, Payload, Channel, Exchange)  ->
         ok ->
             ?LOG_INFO("publication success in routingkey=> ~p",
             [RoutingKey]),
+            logger(Packet, Exchange, RoutingKey, "published"),
+            
             {ok, <<"success">>};
         Error ->
+            logger(Packet, Exchange, RoutingKey, "publish_failed"),
             ?LOG_ERROR("Unable to send push messages to 
                         the rabbitmq: ~p", [Error])
     end.
 
 subscription(Mod, Fun, Args) ->
     apply(Mod, Fun, Args).
+
+logger(Pkt, Exchange, RoutingKey, Msg) ->
+    MsgId = Pkt#message.id,
+    Type = Pkt#message.type,
+    {FUser, _, FRes} = jid:tolower(Pkt#message.from),
+    {TUser, _, TRes} = jid:tolower(Pkt#message.to),
+        
+    Map = #{ message_id => MsgId, 
+             type => Type,
+             from_user_id => FUser, 
+             from_resource => FRes,
+             to_user_id => TUser, 
+             to_resource => TRes },
+
+    ?LOG_INFO(Msg ++ " to rabbitmq  
+               for user=~p with exchange=~p routing_key=~p 
+               stanza details: ~p",
+        [TUser, Exchange, RoutingKey, Map]).
