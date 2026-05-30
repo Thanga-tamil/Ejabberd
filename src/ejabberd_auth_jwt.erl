@@ -29,15 +29,15 @@
 
 -behaviour(ejabberd_auth).
 
--export([start/1, stop/1, check_password/4,
-	 store_type/1, plain_password_required/1,
-         user_exists/2, use_cache/1
-        ]).
+-export([start/1, stop/1, check_password/4, 
+         store_type/1, plain_password_required/1,
+         user_exists/2, use_cache/1]).
+
 %% 'ejabberd_hooks' callback:
 -export([check_decoded_jwt/5]).
 
--include_lib("xmpp/include/xmpp.hrl").
 -include("logger.hrl").
+-include_lib("xmpp/include/xmpp.hrl").
 
 %%%----------------------------------------------------------------------
 %%% API
@@ -64,7 +64,8 @@ plain_password_required(_Host) -> true.
 
 store_type(_Host) -> external.
 
--spec check_password(binary(), binary(), binary(), binary()) -> {ets_cache:tag(), boolean() | {stop, boolean()}}.
+-spec check_password(binary(), binary(), binary(), binary()) -> 
+    {ets_cache:tag(), boolean() | {stop, boolean()}}.
 check_password(User, AuthzId, Server, Token) ->
     %% MREMOND: Should we move the AuthzId check at a higher level in
     %%          the call stack?
@@ -87,10 +88,12 @@ check_password(User, AuthzId, Server, Token) ->
 
 user_exists(User, Host) ->
   %% Checking that the user has an active session
-  %% If the session was negociated by the JWT auth method then we define that the user exists
-  %% Any other cases will return that the user doesn't exist
+  %% If the session was negociated by the JWT auth method then 
+  %% we define that the user exists %% Any other cases will return 
+  %% that the user doesn't exist
   {nocache, case ejabberd_sm:get_user_info(User, Host) of
-              [{_, Info}] -> proplists:get_value(auth_module, Info) == ejabberd_auth_jwt;
+              [{_, Info}] -> 
+                proplists:get_value(auth_module, Info) == ejabberd_auth_jwt;
               _ -> false
             end}.
 
@@ -120,35 +123,54 @@ check_decoded_jwt(Acc, _, _, _, _) ->
 %%% Internal functions
 %%%----------------------------------------------------------------------
 check_jwt_token(User, Server, Token) ->
-    JWK = ejabberd_option:jwt_key(Server),
-    try jose_jwt:verify(JWK, Token) of
-        {true, {jose_jwt, Fields}, Signature} ->
-            Now = erlang:system_time(second),
-            ?DEBUG("jwt verify at system timestamp ~p: ~p - ~p~n", [Now, Fields, Signature]),
-	    case maps:find(<<"exp">>, Fields) of
-                error ->
-		    %% No expiry in token => We consider token invalid:
-		    false;
-                {ok, Exp} ->
-                    if
-                        Exp > Now ->
-                            ejabberd_hooks:run_fold(
-                                check_decoded_jwt,
-                                Server,
-                                true,
-                                [Fields, Signature, Server, User]
-                            );
-                        true ->
-                            %% return false, if token has expired
-                            false
-                    end
+    % validate is client is app user 
+    case verify_jwt_cache(Server, User, Token) of
+        true ->
+            JWK = ejabberd_option:jwt_key(Server),
+            try jose_jwt:verify(JWK, Token) of
+                {true, {jose_jwt, Fields}, Signature} ->
+                    Now = erlang:system_time(second),
+                    ?DEBUG("jwt verify at system timestamp ~p: ~p - ~p~n", [Now, Fields, Signature]),
+                    case maps:find(<<"exp">>, Fields) of
+                        error ->
+                            %% No expiry in token => We consider token invalid:
+                            false;
+                        {ok, Exp} ->
+                            if Exp > Now ->
+                                ejabberd_hooks:run_fold(
+                                                check_decoded_jwt,
+                                                Server,
+                                                true,
+                                                [Fields, Signature, Server, User]);
+                            true ->
+                                %% return false, if token has expired
+                                false
+                            end
+                    end;
+                {false, _, _} ->
+                    false
+            catch
+                A:B ->
+                    ?DEBUG("jose_jwt:verify failed ~n for account ~p@~p~n "
+                           " JWK and token: ~p~n with error: ~p",
+                           [User, Server, {JWK, Token}, {A, B}]),
+                           false
             end;
-        {false, _, _} ->
+        false -> 
             false
-    catch
-        A:B ->
-            ?DEBUG("jose_jwt:verify failed ~n for account ~p@~p~n "
-                   " JWK and token: ~p~n with error: ~p",
-                   [User, Server, {JWK, Token}, {A, B}]),
+    end.
+
+% Client should have jwt token in redis & db via gateway
+% if no jwt token in cache check sql for as a fallback
+% if not found::consider the token is invalid::unauth
+verify_jwt_cache(Server, User, Token) ->
+    case ejabberd_redis:get({jwt_cache, Server, Token}) of
+        {ok, ErUser} ->
+            if User =:= ErUser ->
+                true;
+            true ->
+                false
+            end;
+        _ ->
             false
     end.
