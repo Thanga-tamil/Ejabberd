@@ -308,14 +308,17 @@ logger(Pkt, Exchange, RoutingKey, Msg) ->
     {FUser, _, FRes} = jid:tolower(Pkt#message.from),
     {TUser, _, TRes} = jid:tolower(Pkt#message.to),
         
-    Map = #{ message_id => MsgId, 
-             type => Type,
-             from_user_id => FUser, 
-             from_resource => FRes,
-             to_user_id => TUser, 
-             to_resource => TRes },
+    Map = #{
+            message_id => MsgId,
+            type => Type,
+            from_user_id => FUser,
+            from_resource => FRes,
+            to_user_id => TUser,
+            to_resource => TRes,
+            exchange => Exchange,
+            routing_key => RoutingKey
+        },
 
-    ?LOG_INFO(Msg ++ " to rabbitmq  
-               for user=~p with exchange=~p routing_key=~p 
-               stanza details: ~p",
-        [TUser, Exchange, RoutingKey, Map]).
+    ?LOG_INFO(
+        Msg++" to rabbitmq for user=~p | rabbitmq_publish=~p", 
+    [Msg, Map]).

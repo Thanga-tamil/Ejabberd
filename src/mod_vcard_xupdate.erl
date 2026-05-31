@@ -36,6 +36,7 @@
 
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
+-include_lib("include/fly_log.hrl").
 -include("translate.hrl").
 
 -define(VCARD_XUPDATE_CACHE, vcard_xupdate_cache).
@@ -92,20 +93,7 @@ user_send_packet({#presence{type = available,
     %% want to call this multiple times for performance reasons
     Acc;
 user_send_packet({#message{} = Pkt, State}) ->
-    StanzaId = xmpp:get_id(Pkt),
-    From = xmpp:get_from(Pkt),
-    To = xmpp:get_to(Pkt),
-    Type = xmpp:get_type(Pkt),
-    {FUserId, _, FResource} = jid:tolower(From),
-    {TUserId, _, TResource} = jid:tolower(To),
-    ?LOG_INFO(
-        "user_send_packet:mod_vcard_xupdate for to_user=~p with message details: ~p",
-        [TUserId, #{stanza_id => StanzaId,
-            type => Type,
-            from_user_id => FUserId,
-            from_resource => FResource,
-            to_user_id => TUserId,
-            to_resource => TResource}]),
+    ?MSG_LOG(Pkt),
     update_presence({Pkt, State});
 user_send_packet(Acc) ->
     update_presence(Acc).

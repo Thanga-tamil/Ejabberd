@@ -45,6 +45,7 @@
 
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
+-include_lib("include/fly_log.hrl").
 -include("translate.hrl").
 
 -type direction() :: sent | received.
@@ -135,18 +136,7 @@ user_receive_packet({#message{meta = #{carbon_copy := true}}, _C2SState} = Acc) 
     %% message.
     {stop, Acc};
 user_receive_packet({#message{to = To} = Msg, #{jid := JID} = C2SState}) ->
-	StanzaId = xmpp:get_id(Msg),
-	From = xmpp:get_from(Msg),
-	Type = xmpp:get_type(Msg),
-	{FUserId, _, FResource} = jid:tolower(From),
-	{TUserId, _, TResource} = jid:tolower(To),
-	?LOG_INFO("user_receive_packet:mod_carboncopy for to_user=~p with message details: ~p",
-	  [TUserId, #{stanza_id => StanzaId,
-		 type => Type,
-		 from_user_id => FUserId,
-		 from_resource => FResource,
-		 to_user_id => TUserId,
-		 to_resource => TResource}]),
+	?MSG_LOG(Msg),
 	{check_and_forward(JID, To, Msg, received), C2SState};
 user_receive_packet(Acc) ->
     Acc.

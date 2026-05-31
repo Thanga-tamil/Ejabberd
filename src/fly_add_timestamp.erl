@@ -12,6 +12,7 @@
 
 %% included for writing to ejabberd log file
 -include("logger.hrl").
+-include_lib("include/fly_log.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
 
 start(Host, _Opt) ->
@@ -32,16 +33,7 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
   #jid{user = TUser, lserver = LServer} = To,
   #jid{user = FUser, lserver = _FServer} = From,
     Type = XML#message.type,
-    {FUserId, _, FResource} = jid:tolower(From),
-    {TUserId, _, TResource} = jid:tolower(To),
-    ?LOG_INFO(
-      "user_send_packet:fly_add_timestamp for to_user=~p with message details: ~p",
-      [TUserId, #{stanza_id => xmpp:get_id(XML),
-         type => Type,
-         from_user_id => FUserId,
-         from_resource => FResource,
-         to_user_id => TUserId,
-         to_resource => TResource}]),
+    ?MSG_LOG(XML),
     %% Add timestamp to chat message and where no DataTag exist
     case Type of
       chat ->
@@ -118,18 +110,8 @@ filter_packet(Acc) ->
   Acc.
 
 filter_packet_receive({#message{from = From,to = To} = XML, State} = _Acc) ->
-Type = XML#message.type,
-{FUserId, _, FResource} = jid:tolower(From),
-{TUserId, _, TResource} = jid:tolower(To),
-?LOG_INFO(
-  "user_send_packet:fly_add_timestamp for to_user=~p with message details: ~p",
-  [TUserId, #{stanza_id => xmpp:get_id(XML),
-     type => Type,
-     from_user_id => FUserId,
-     from_resource => FResource,
-     to_user_id => TUserId,
-      to_resource => TResource}]),
-#jid{user = TUser, lserver = LServer} = To,
+  Type = XML#message.type,
+  ?MSG_LOG(XML),
   case Type of
       normal ->
         if To =:= <<"">> ->
@@ -141,12 +123,6 @@ Type = XML#message.type,
           Return
       end;
     _ ->
-    %   Seen = fxml:get_subtag(xmpp:encode(XML),<<"seen">>),
-    %   if Seen =/= false andalso  LServer =:= <<"weiilla-xmpp.mirrorfly.com">> ->
-    %   ?INFO_MSG("Seen log ~p",[XML]);
-    % true ->
-    %   ok
-    % end,
       Return = XML
 end,
   {Return,State};
