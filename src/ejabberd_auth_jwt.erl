@@ -169,19 +169,19 @@ check_jwt_token(User, Server, Token) ->
 % if not found::consider the token is invalid::unauth
 verify_jwt(Server, User, Token, redis) ->
     Key = <<"jwt:", Server/binary, ":", Token/binary>>,
-    ?LOG_INFO("redis key: ~p", [Key]),
-    Result = ejabberd_redis:q([<<"GET">>, Key]),
-    ?LOG_INFO("redis result: ~p", [Result]),
-    case Result of
+    case ejabberd_redis:q([<<"GET">>, Key]) of
         {ok, ErUser} when is_binary(ErUser) ->
             User =:= ErUser;
         {_, Reason} -> 
-            % once server setup finished, no fallback should be here
-            ?LOG_INFO("404 in redis with reason: ~p ", [Reason]),
+            ?LOG_INFO(
+            "redis:: key=> ~p 404:reason=> ~p", 
+            [Key, Reason]),
             (fun verify_jwt/4)
             (Server, User, Token, db)
     end;
 verify_jwt(Server, User, Token, db) ->
+    ?LOG_INFO("verify token=> ~p in sql for user=> ~p",
+    [Token, User]),
     Q = ?SQL("SELECT @(username)s FROM chat_access_tokens
               WHERE token=%(Token)s"),
     case ejabberd_sql:sql_query(Server, Q) of
