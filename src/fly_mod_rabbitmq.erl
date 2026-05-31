@@ -271,9 +271,9 @@ close_channels({_Mod, Channel}) when is_pid(Channel) ->
 close_channels(_) ->
     bad_return.
 
-publish(Type, RoutingKey, PacPay) -> 
+publish(Type, RoutingKey, PayPac) -> 
     gen_server:cast(?MODULE, 
-        {Type, RoutingKey, PacPay}).
+        {Type, RoutingKey, PayPac}).
 
 publication(RoutingKey, {Payload, Packet}, Channel, Exchange)  ->
     BinPayload =
@@ -308,6 +308,8 @@ logger(Pkt, Exchange, RoutingKey, Msg) ->
     {FUser, _, FRes} = jid:tolower(Pkt#message.from),
     {TUser, _, TRes} = jid:tolower(Pkt#message.to),
         
+    ?LOG_INFO(Msg ++ " rabbitmq payload from=~p to=~p ", [Msg]),
+
     Map = #{
             message_id => MsgId,
             type => Type,
@@ -319,6 +321,5 @@ logger(Pkt, Exchange, RoutingKey, Msg) ->
             routing_key => RoutingKey
         },
 
-    ?LOG_INFO(
-        Msg++" to rabbitmq for user=~p | rabbitmq_publish=~p", 
-    [Msg, Map]).
+    
+    io:format("~p~n", [Map]).

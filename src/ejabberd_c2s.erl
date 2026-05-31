@@ -131,11 +131,11 @@ send(#{lserver := LServer} = State, Pkt) ->
 
     case ejabberd_hooks:run_fold(c2s_filter_send, LServer, {Pkt1, State}, []) of
 	{drop, State1} -> 
-		?MSG_LOG(Pkt1, "c2s_filter_send drop at user_receive_packet"),
+		?MSG_LOGX(Pkt1, "::drop pkt@c2s_filter_send::"),
 		State1;
 	{Pkt2, State1} ->
-		?MSG_LOG(Pkt1, "xmpp_stream_in send to reciever success"),
-	xmpp_stream_in:send(State1, Pkt2)
+		?MSG_LOGX(Pkt1, "sent to recipient"),
+		xmpp_stream_in:send(State1, Pkt2)
     end.
 
 -spec send_error(state(), xmpp_element(), stanza_error()) -> state().
@@ -243,20 +243,13 @@ process_info(#{lserver := LServer} = State, {route, Packet}) ->
 		     end,
 
     if Pass ->
-	StanzaId = xmpp:get_id(Packet),
-	From = xmpp:get_from(Packet),
-	To = xmpp:get_to(Packet),
-	Type = xmpp:get_type(Packet),
-	{FUserId, _, FResource} = jid:tolower(From),
-	{TUserId, _, TResource} = jid:tolower(To),
-	
-	?MSG_LOG(Packet, "start user_receive_packet hook"),
 	{Packet1, State2} = ejabberd_hooks:run_fold(
 			user_receive_packet, LServer,
 			{Packet, State1}, []),
 	case Packet1 of
 		drop -> 
-			?MSG_LOG(Packet, "after running c2s_filter_send drop at user_receive_packet"),
+			?MSG_LOGX(Packet, 
+			"::drop pkt@user_receive_packet::"),
 			State2;
 		_ -> send(State2, Packet1)
 	    end;
@@ -552,15 +545,9 @@ handle_authenticated_packet(Pkt, #{lserver := LServer, jid := JID,
 %% Contus code ended %%
     Pkt1 = xmpp:put_meta(Pkt, ip, IP),
 
-    % trace message packet
-    ?MSG_LOG(Pkt, "start c2s_authenticated_packet hook"),
-
     State1 = ejabberd_hooks:run_fold(c2s_authenticated_packet,
 				     LServer, State, [Pkt1]),
     #jid{luser = LUser} = JID,
-    
-    ?MSG_LOG(Pkt1, "start user_send_packet hook"),
-
     {Pkt2, State2} = ejabberd_hooks:run_fold(
 		       user_send_packet, LServer, {Pkt1, State1}, []),
     case Pkt2 of
@@ -977,6 +964,8 @@ check_privacy_then_route(#{lang := Lang} = State, Pkt) ->
 	    Err = xmpp:err_not_acceptable(ErrText, Lang),
 	    send_error(State, Pkt, Err);
         allow ->
+	    % trace message packet
+    	    ?MSG_LOGX(Pkt, "::dispatching packet to router::"),
 	    ejabberd_router:route(Pkt),
 	    State
     end.

@@ -397,7 +397,6 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
   #jid{user = FUser, lserver = FServer} = From,
   #jid{user = TUser, lserver = _TServer} = To,
   Type = XML#message.type,
-  ?MSG_LOG(XML),
   %% Add timestamp to chat message and where no DataTag exist
   case Type of
     chat ->

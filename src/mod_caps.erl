@@ -145,7 +145,6 @@ user_send_packet(Acc) ->
 -spec user_receive_packet({stanza(), ejabberd_c2s:state()}) -> {stanza(), ejabberd_c2s:state()}.
 user_receive_packet({#presence{from = From, type = available} = Pkt,
                          #{lserver := LServer, jid := To} = State}) ->
-        ?MSG_LOG(Pkt),
     IsRemote = case From#jid.lresource of
 		   % Don't store caps for presences sent by our muc rooms
 		   <<>> ->

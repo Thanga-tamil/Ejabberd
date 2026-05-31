@@ -438,7 +438,6 @@ user_send_packet({#iq{type = Type,
 %% For client with no active privacy list, see if there is
 %% one about to be activated in this packet and update client state
 user_send_packet({#message{} = Packet, State}) ->
-    ?MSG_LOG(Packet),
     {Packet, update_c2s_state_with_privacy_list(Packet, State)};
 user_send_packet({Packet, State}) ->
     {Packet, update_c2s_state_with_privacy_list(Packet, State)}.

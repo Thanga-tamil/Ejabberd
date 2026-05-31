@@ -47,7 +47,6 @@ stop(Host) ->
 %% Function triggers when receive message packets from sender
 on_user_send_packet({#message{from = From,to = To,type = Type, id = MessageId } = Pkt, _C2SState}) ->
     #jid{luser = FUser, lserver = FServer,lresource = FResource} = From,
-    ?MSG_LOG(Pkt),
     Packet = xmpp:encode(Pkt),
   IsValid = fly_mod_utils:validate_license(FServer, true, <<"chat">>),
   if IsValid =:= true ->
@@ -132,7 +131,8 @@ store_offline_user_send(Packet, _C2SState, #jid{luser = FUser, lserver = FServer
             end
 
           end,
-          mod_offline:store_packet({_C2SState,NewPacket});
+          ?MSG_LOGX(Packet, "::store 'sent' carbon copy in offline::"),
+          mod_offline:store_packet({_C2SState, NewPacket});
         true ->
           ok
       end;

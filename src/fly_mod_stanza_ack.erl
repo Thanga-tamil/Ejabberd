@@ -138,7 +138,6 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
   #jid{user = TUser, lserver = TServer} = To,
 
     MessageId = Packet#message.id,
-  ?MSG_LOG(Packet),
   ContentAcknowledge = xmpp:get_subtag(Packet, #chatcontent{}),
   if (ContentAcknowledge =:= false) or (Type =:= normal)  ->
     BlockUser = <<"0">>,
@@ -247,7 +246,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             end,
           store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, Metadata,BlockUser, EditMsgid, FlatTimeStamp),
           fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid,DisappearAt),
-          ?MSG_LOG(Packet, "store singlechat message in db")
+          ?MSG_LOGX(Packet, "store singlechat message in db")
        end;
       
         S when (S == false) ->
@@ -509,17 +508,7 @@ send_ack_response(From, To, ReceiptId, Type, DisappearAt) ->
   Proc = gen_mod:get_module_proc(ServerHost, ?MODULE),
   Msg = #message{from = To, to = From, type = chat, sub_els = [XmlBody]},
   
-    {FUserId, _, FResource} = jid:tolower(From),
-    {TUserId, _, TResource} = jid:tolower(To),
-    ?LOG_INFO(
-      "singlechat ack for message_sender=~p stanza details: ~p",
-      [FUserId, #{stanza_id => ReceiptId,
-         type => Type,
-         from_user_id => FUserId,
-         from_resource => FResource,
-         to_user_id => TUserId,
-         to_resource => TResource}]),
-    ?MSG_LOG(Msg, "singlechat ack"),
+  ?MSG_LOGX(Msg, "::send singlechat acknowledge receipt::"),
 
   gen_server:cast(Proc, {send_ack,Msg}).
 

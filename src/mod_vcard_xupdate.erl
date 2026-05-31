@@ -93,7 +93,6 @@ user_send_packet({#presence{type = available,
     %% want to call this multiple times for performance reasons
     Acc;
 user_send_packet({#message{} = Pkt, State}) ->
-    ?MSG_LOG(Pkt),
     update_presence({Pkt, State});
 user_send_packet(Acc) ->
     update_presence(Acc).

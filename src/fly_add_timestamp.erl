@@ -33,7 +33,7 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
   #jid{user = TUser, lserver = LServer} = To,
   #jid{user = FUser, lserver = _FServer} = From,
     Type = XML#message.type,
-    ?MSG_LOG(XML),
+    ?MSG_LOGX(XML),
     %% Add timestamp to chat message and where no DataTag exist
     case Type of
       chat ->
@@ -111,7 +111,6 @@ filter_packet(Acc) ->
 
 filter_packet_receive({#message{from = From,to = To} = XML, State} = _Acc) ->
   Type = XML#message.type,
-  ?MSG_LOG(XML),
   case Type of
       normal ->
         if To =:= <<"">> ->

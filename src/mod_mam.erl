@@ -400,7 +400,6 @@ sm_receive_packet(Acc) ->
 
 -spec user_receive_packet({stanza(), c2s_state()}) -> {stanza(), c2s_state()}.
 user_receive_packet({#message{from = Peer} = Pkt, #{jid := JID} = C2SState}) ->
-	?MSG_LOG(Pkt),
 	LUser = JID#jid.luser,
 	LServer = JID#jid.lserver,
     Pkt1 = case should_archive(Pkt, LServer) of

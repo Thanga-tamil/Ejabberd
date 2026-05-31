@@ -136,7 +136,6 @@ user_receive_packet({#message{meta = #{carbon_copy := true}}, _C2SState} = Acc) 
     %% message.
     {stop, Acc};
 user_receive_packet({#message{to = To} = Msg, #{jid := JID} = C2SState}) ->
-	?MSG_LOG(Msg),
 	{check_and_forward(JID, To, Msg, received), C2SState};
 user_receive_packet(Acc) ->
     Acc.
