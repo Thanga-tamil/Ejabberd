@@ -125,6 +125,8 @@ check_decoded_jwt(Acc, _, _, _, _) ->
 %%%----------------------------------------------------------------------
 check_jwt_token(User, Server, Token) ->
     % validate is client is app user 
+    ?LOG_INFO("jwt_auth: checking JWT token for account ~p@~p~n with token: ~p",
+              [User, Server, Token]),
     case verify_jwt(Server, User, Token, redis) of
         true ->
             JWK = ejabberd_option:jwt_key(Server),
