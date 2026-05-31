@@ -167,21 +167,19 @@ check_jwt_token(User, Server, Token) ->
 % Client should have jwt token in redis & db via gateway
 % if no jwt token in cache check sql as a fallback
 % if not found::consider the token is invalid::unauth
-verify_jwt(Server, User, Token, redis) ->
-    Key = <<"jwt:", Server/binary, ":", Token/binary>>,
+verify_jwt(Server, User, Key, redis) ->
     case ejabberd_redis:q([<<"GET">>, Key]) of
         {ok, ErUser} when is_binary(ErUser) ->
             User =:= ErUser;
         {_, Reason} -> 
-            ?LOG_INFO(
-            "redis:: key=> ~p 404:reason=> ~p", 
-            [Key, Reason]),
+            ?LOG_INFO("redis:: key=> ~p 404:reason=> ~p",
+                      [Key, Reason]),
             (fun verify_jwt/4)
-            (Server, User, Token, db)
+            (Server, User, Key, db)
     end;
 verify_jwt(Server, User, Token, db) ->
     ?LOG_INFO("verify token=> ~p in sql for user=> ~p",
-    [Token, User]),
+              [Token, User]),
     Q = ?SQL("SELECT @(username)s FROM chat_access_tokens
               WHERE token=%(Token)s"),
     case ejabberd_sql:sql_query(Server, Q) of
