@@ -464,9 +464,6 @@ connect(#state{num = Num}) ->
     DB = ejabberd_option:redis_db(),
     Pass = ejabberd_option:redis_password(),
     ConnTimeout = ejabberd_option:redis_connect_timeout(),
-    ?LOG_INFO("Connecting to Redis at ~ts:~p, db = ~p 
-    	       with password: ~p and connection timeout: ~p ms",
-	      [Server, Port, DB]),
     try case do_connect(Num, Server, Port, Pass, DB, ConnTimeout) of
 	    {ok, Client} ->
 		?DEBUG("Connection #~p established to Redis at ~ts:~p",
@@ -488,19 +485,14 @@ connect(#state{num = Num}) ->
 
 do_connect(1, Server, Port, Pass, _DB, _ConnTimeout) ->
     %% First connection in the pool is always a subscriber
-    ?LOG_INFO("do_connect(1)"),
     Res = eredis_sub:start_link(Server, Port, Pass, no_reconnect, infinity, drop),
-    ?LOG_INFO("do_connect(1) result: ~p", [Res]),
     case Res of
 	{ok, Pid} -> eredis_sub:controlling_process(Pid);
 	_ -> ok
     end,
     Res;
 do_connect(_, Server, Port, Pass, DB, ConnTimeout) ->
-    ?LOG_INFO("do_connect(_)"),
-    Res = eredis:start_link(Server, Port, DB, Pass, no_reconnect, ConnTimeout),
-    ?LOG_INFO("do_connect(_) result: ~p", [Res]),
-    Res.
+    eredis:start_link(Server, Port, DB, Pass, no_reconnect, ConnTimeout).
 
 -spec call(pos_integer(), {q, redis_command()}, integer()) ->
 		  {ok, redis_reply()} | redis_error();

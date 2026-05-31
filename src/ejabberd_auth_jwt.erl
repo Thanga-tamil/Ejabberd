@@ -168,10 +168,16 @@ check_jwt_token(User, Server, Token) ->
 % if no jwt token in cache check sql as a fallback
 % if not found::consider the token is invalid::unauth
 verify_jwt(Server, User, Token, redis) ->
-    case ejabberd_redis:get({jwt_cache, Server, Token}) of
-        {ok, ErUser} ->
+    Key = <<"jwt:", Server/binary, ":", Token/binary>>,
+    ?LOG_INFO("redis key: ~p", [Key]),
+    Result = ejabberd_redis:q([<<"GET">>, Key]),
+    ?LOG_INFO("redis result: ~p", [Result]),
+    case Result of
+        {ok, ErUser} when is_binary(ErUser) ->
             User =:= ErUser;
-        _ -> % once server setup finished, no fallback should be here
+        {_, Reason} -> 
+            % once server setup finished, no fallback should be here
+            ?LOG_INFO("404 in redis with reason: ~p ", [Reason]),
             (fun verify_jwt/4)
             (Server, User, Token, db)
     end;
