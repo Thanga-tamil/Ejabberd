@@ -36,7 +36,6 @@
 
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
--include_lib("include/fly_log.hrl").
 -include("translate.hrl").
 
 -define(VCARD_XUPDATE_CACHE, vcard_xupdate_cache).

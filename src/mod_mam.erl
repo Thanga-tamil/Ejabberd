@@ -51,7 +51,6 @@
 -include_lib("xmpp/include/xmpp.hrl").
 -include("logger.hrl").
 -include("mod_muc_room.hrl").
--include_lib("include/fly_log.hrl").
 -include("ejabberd_commands.hrl").
 -include("mod_mam.hrl").
 -include("translate.hrl").

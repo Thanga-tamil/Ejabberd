@@ -42,7 +42,6 @@
 
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
--include_lib("include/fly_log.hrl").
 -include("mod_privacy.hrl").
 -include("translate.hrl").
 
