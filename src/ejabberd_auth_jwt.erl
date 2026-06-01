@@ -159,16 +159,23 @@ check_jwt_token(User, Server, Token) ->
 check_claims(Fields, Signature, Server, User) ->
     Now = erlang:system_time(second),
 
-    logger:info("jwt verify at system timestamp ~p", 
-            [Now]),
-    logger:info("jwt_fields => ~p & sign => ~p", 
-            [Fields, Signature]),
+    logger:info("jwt_fields => ~p", [Fields]),
 
     case maps:find(<<"exp">>, Fields) of
         error ->
             %% No expiry in token => We consider token invalid:
             false;
         {ok, Exp} ->
+            logger:info("~p",
+                        [jiffy:encode(
+                            #{'mod' => ?MODULE,
+                              'fun' => ?FUNCTION_NAME,
+                              'now' => Now,
+                              'exp' => Exp,
+                              'type' => <<"claims_info">>
+                            })
+                        ]),
+
             if Exp > Now ->
                 ejabberd_hooks:run_fold(
                                 check_decoded_jwt,
