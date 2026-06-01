@@ -323,12 +323,14 @@ mod_opt_type(rabbitmq_host) -> fun iolist_to_binary/1;
 mod_opt_type(rabbitmq_username) -> fun iolist_to_binary/1;
 mod_opt_type(rabbitmq_exchange) -> fun iolist_to_binary/1;
 mod_opt_type(rabbitmq_password) -> fun iolist_to_binary/1;
+mod_opt_type(amqp_listener) -> fun is_boolean/1;
 
 mod_opt_type(_) ->
-  [rabbitmq_host, rabbitmq_username, rabbitmq_password, rabbitmq_exchange].
+  [rabbitmq_host, rabbitmq_username, rabbitmq_password, rabbitmq_exchange, amqp_listener].
 
 mod_options(_Host) ->
   [{rabbitmq_host, undefined},
     {rabbitmq_username, undefined},
     {rabbitmq_exchange, undefined},
-    {rabbitmq_password, undefined}].
+    {rabbitmq_password, undefined},
+    {amqp_listener, false}].
