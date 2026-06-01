@@ -416,6 +416,19 @@ set_vcard(LUser, LServer, VCARD,
     %% =========================
     %% WRITE TRANSACTION (ONLY UPSERTS)
     %% =========================
+    
+
+    %% Live columns msg_disappear (INT) and disp_updated_at (DATETIME NOT NULL)
+    %% reject '' under MySQL strict mode; fall back to their DB defaults.
+    MsgDisappear1Norm = case MsgDisappear1 of
+                            <<>> -> <<"0">>;
+                            _    -> MsgDisappear1
+                        end,
+    DispUpdatedAt1Norm = case DispUpdatedAt1 of
+                            <<>> -> <<"0000-00-00 00:00:00">>;
+                            _    -> DispUpdatedAt1
+                        end,
+
 
     %% Live columns msg_disappear (INT) and disp_updated_at (DATETIME NOT NULL)
     %% reject '' under MySQL strict mode; fall back to their DB defaults.
@@ -432,6 +445,13 @@ set_vcard(LUser, LServer, VCARD,
                       IT when is_integer(IT) -> true;
                       _ -> false
                   end,
+    
+    ?INFO_MSG("msg_disappear: ~p", [MsgDisappear1]),
+    ?INFO_MSG("msg_disappear norm: ~p", [MsgDisappear1Norm]),
+    ?INFO_MSG("disp_updated_at: ~p", [DispUpdatedAt1]),
+    ?INFO_MSG("disp_updated_at norm: ~p", [DispUpdatedAt1Norm]),
+    ?INFO_MSG("disp_updated_at raw: ~p", [DispUpdatedAt]),
+    ?INFO_MSG("is timestamp: ~p", [IsTimestamp]),
 
     ?INFO_MSG("msg_disappear: ~p", [MsgDisappear1]),
     ?INFO_MSG("msg_disappear norm: ~p", [MsgDisappear1Norm]),
