@@ -490,21 +490,43 @@ check_password_fun(<<"X-OAUTH2">>, #{lserver := LServer}) ->
 	    end
     end;
 check_password_fun(_Mech, #{lserver := LServer}) ->
-    StartTime = erlang:monotonic_time(millisecond),
+    
     fun(U, AuthzId, P) ->
-	    Auth = ejabberd_auth:check_password_with_authmodule(U, AuthzId, LServer, P),
-	    ElapsedMs = erlang:monotonic_time(millisecond) - StartTime,
-	    ?LOG_INFO("check_password_fun: auth result ~p, time taken (~p ms)", [Auth, ElapsedMs]),
-	    Auth
+
+	   StartTime = erlang:monotonic_time(millisecond),
+	   Auth = ejabberd_auth:check_password_with_authmodule(U, AuthzId, LServer, P),
+	   TimeTaken = erlang:monotonic_time(millisecond) - StartTime,
+
+	   ?INFO_MSG("~s", 
+	            [jiffy:encode(
+			#{'mod' => ?MODULE,
+			  'fun' => ?FUNCTION_NAME,
+			  'auth_result' => Auth,
+			  'time_taken_ms' => TimeTaken
+			})
+		    ]),
+	   Auth
+
     end.
 
 check_password_digest_fun(_Mech, #{lserver := LServer}) ->
-    StartTime = erlang:monotonic_time(millisecond),
+    
     fun(U, AuthzId, P, D, DG) ->
-	    Auth = ejabberd_auth:check_password_with_authmodule(U, AuthzId, LServer, P, D, DG),
-	    ElapsedMs = erlang:monotonic_time(millisecond) - StartTime,
-	    ?LOG_INFO("check_password_digest_fun: auth result ~p, time taken (~p ms)", [Auth, ElapsedMs]),
-	    Auth
+
+	StartTime = erlang:monotonic_time(millisecond),
+	Auth = ejabberd_auth:check_password_with_authmodule(U, AuthzId, LServer, P, D, DG),
+	TimeTaken = erlang:monotonic_time(millisecond) - StartTime,
+	
+	?INFO_MSG("~s", 
+		[jiffy:encode(
+		    #{'mod' => ?MODULE,
+		      'fun' => ?FUNCTION_NAME,
+		      'auth_result' => Auth,
+		      'time_taken_ms' => TimeTaken
+		     })
+		]),
+	Auth
+
     end.
 
 bind(<<"">>, State) ->

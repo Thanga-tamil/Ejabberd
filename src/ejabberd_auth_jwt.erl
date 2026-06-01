@@ -106,10 +106,6 @@ use_cache(_) ->
 %%%----------------------------------------------------------------------
 check_decoded_jwt(true, Fields, _Signature, Server, User) ->
     JidField = ejabberd_option:jwt_jid_field(Server),
-    io:format("check_decoded_jwt: checking decoded JWT fields ~p for user ~p@~p~n",
-              [Fields, User, Server]),
-    io:format("check_decoded_jwt: looking for JID field ~p in JWT fields~n", [JidField]),
-    
     case maps:find(JidField, Fields) of
         {ok, SJid} when is_binary(SJid) ->
             try
@@ -129,63 +125,85 @@ check_decoded_jwt(Acc, _, _, _, _) ->
 %%%----------------------------------------------------------------------
 check_jwt_token(User, Server, Token) ->
     % validate is client is app user 
-    ?LOG_INFO("jwt_auth: checking JWT token for user ~p~n with token: ~p",
-              [<<User/binary, $@, Server/binary>>, Token]),
+    logger:info("~s", 
+	            [jiffy:encode(
+                  #{'mod' => ?MODULE,
+                    'fun' => ?FUNCTION_NAME,
+                    'jid' => <<User/binary, $@, Server/binary>>,
+                    'jwt' => Token,
+                    'auth' => "info"
+                  })
+		    ]),
     case verify_jwt(Server, User, Token, redis) of
         true ->
             JWK = ejabberd_option:jwt_key(Server),
+            logger:debug("secret.jwt k ~p", [JWK]),
+
             try jose_jwt:verify(JWK, Token) of
                 {true, {jose_jwt, Fields}, Signature} ->
-                    Now = erlang:system_time(second),
-                    ?LOG_INFO("jwt verify at system timestamp ~p: ~p - ~p~n", 
-                           [Now, Fields, Signature]),
-                    case maps:find(<<"exp">>, Fields) of
-                        error ->
-                            %% No expiry in token => We consider token invalid:
-                            false;
-                        {ok, Exp} ->
-                            if Exp > Now ->
-                                ejabberd_hooks:run_fold(
-                                                check_decoded_jwt,
-                                                Server,
-                                                true,
-                                                [Fields, Signature, Server, User]);
-                            true ->
-                                %% return false, if token has expired
-                                false
-                            end
-                    end;
+                    check_claims(Fields, Signature, Server, User);
                 {false, _, _} ->
                     false
             catch
                 A:B ->
-                    ?LOG_INFO("jose_jwt:verify failed ~n for account ~p@~p~n "
-                           " JWK and token: ~p~n with error: ~p",
+                    logger:info("jwt verification failed for user ~p@~p~n 
+                           JWK and token: ~p~n with error: ~p",
                            [User, Server, {JWK, Token}, {A, B}]),
-                           false
+
+                    false
             end;
         false -> 
             false
     end.
 
-% Client should have jwt token in redis & db via gateway
-% if no jwt token in cache check sql as a fallback
-% if not found::consider the token is invalid::unauth
+check_claims(Fields, Signature, Server, User) ->
+    Now = erlang:system_time(second),
+
+    logger:info("jwt verify at system timestamp ~p: ~p - ~p~n", 
+            [Now]),
+    logger:info("jwt_fields => ~p sign => ~p", 
+            [Fields, Signature]),
+
+    case maps:find(<<"exp">>, Fields) of
+        error ->
+            %% No expiry in token => We consider token invalid:
+            false;
+        {ok, Exp} ->
+            if Exp > Now ->
+                ejabberd_hooks:run_fold(
+                                check_decoded_jwt,
+                                Server,
+                                true,
+                                [Fields, Signature, Server, User]);
+            true ->
+                %% return false, if token has expired
+                logger:warning("auth token has expired at ~p, 
+                                current time is ~p~n", [Exp, Now]),
+                false
+            end
+    end.
+
+% Client should have jwt token in redis & db via gateway if no jwt token 
+% in cache check sql as a fallback if not found consider the 
+% token is invalid::unauth
+
 verify_jwt(Server, User, Key, redis) ->
-    case ejabberd_redis:q([<<"GET">>, Key]) of
+    Res = ejabberd_redis:q([<<"GET">>, Key]),
+    logger:debug("redis:: GET ~p => ~p", [Key, Res]),
+    case Res of
         {ok, ErUser} when is_binary(ErUser) ->
             User =:= ErUser;
-        {_, Reason} -> 
-            ?LOG_INFO("redis:: key=> ~p 404:reason=> ~p",
-                      [Key, Reason]),
+        {_, _} -> 
             (fun verify_jwt/4)
             (Server, User, Key, db)
     end;
 verify_jwt(Server, User, Token, db) ->
-    ?LOG_INFO("verify token=> ~p in sql for user=> ~p",
-              [Token, User]),
+    logger:info(
+    "verify token=> ~p in sql for user=> ~p", [Token, User]),
+
     Q = ?SQL("SELECT @(username)s FROM chat_access_tokens
               WHERE token=%(Token)s"),
+
     case ejabberd_sql:sql_query(Server, Q) of
         {selected, []} -> false;
         {selected, [{SqlUser}]} ->
