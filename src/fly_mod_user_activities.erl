@@ -3337,94 +3337,6 @@ delete_story(From, RequestType, SubEl, IQ) ->
     story_id = StoryId
   }).
 
-% post_story(From, RequestType, SubEl, IQ) ->
-%   #jid{luser = FromUser, lserver = FromServer} = From,
-%   UsersTag = fxml:get_subtag(SubEl, <<"users">>),
-%   UsersFromTag = case UsersTag of
-%     false ->
-%       [];
-%     #xmlel{} = UTag ->
-%       [fxml:get_tag_cdata(UserEl) || UserEl <- UTag#xmlel.children, is_record(UserEl, xmlel), fxml:get_tag_cdata(UserEl) =/= <<>>]
-%   end,
-%   ToUserAttr = fxml:get_attr_s(<<"to_user">>, SubEl#xmlel.attrs),
-%   UsersFromAttr = case ToUserAttr of
-%     <<>> ->
-%       [];
-%     _ ->
-%       [list_to_binary(string:trim(binary_to_list(U))) || U <- binary:split(ToUserAttr, <<",">>, [global]), U =/= <<>>]
-%   end,
-%   UsersList = case UsersFromTag of
-%     [] -> UsersFromAttr;
-%     _ -> UsersFromTag
-%   end,
-  
-%   %% 1. Extract ALL attributes including timestamps
-%   StoryId      = fxml:get_attr_s(<<"story_id">>, SubEl#xmlel.attrs),
-%   Username     = fxml:get_attr_s(<<"username">>, SubEl#xmlel.attrs),
-%   StoryType    = fxml:get_attr_s(<<"story_type">>, SubEl#xmlel.attrs),
-%   Caption      = fxml:get_attr_s(<<"caption">>, SubEl#xmlel.attrs),
-%   BgColor      = fxml:get_attr_s(<<"background_color">>, SubEl#xmlel.attrs),
-%   FontStyle    = fxml:get_attr_s(<<"font_style">>, SubEl#xmlel.attrs),
-%   Duration     = fxml:get_attr_s(<<"duration">>, SubEl#xmlel.attrs),
-%   DurationSec  = fxml:get_attr_s(<<"duration_seconds">>, SubEl#xmlel.attrs),
-%   MediaUrl     = fxml:get_attr_s(<<"media_url">>, SubEl#xmlel.attrs),
-%   ThumbUrl     = fxml:get_attr_s(<<"thumbnail_url">>, SubEl#xmlel.attrs),
-%   Width        = fxml:get_attr_s(<<"width">>, SubEl#xmlel.attrs),
-%   Height       = fxml:get_attr_s(<<"height">>, SubEl#xmlel.attrs),
-%   BlurHash     = fxml:get_attr_s(<<"blur_hash">>, SubEl#xmlel.attrs),
-  
-%   %% NEW: Extract timestamps
-%   CreatedAt    = fxml:get_attr_s(<<"created_at">>, SubEl#xmlel.attrs),
-%   ExpiresAt    = fxml:get_attr_s(<<"expires_at">>, SubEl#xmlel.attrs),
-  
-%   MessageId = fly_mod_utils:get_iq_message_id(16),
-%   ?INFO_MSG("post_story request from=~ts@~ts story_id=~ts targets=~p created_at=~ts expires_at=~ts",
-%             [FromUser, FromServer, StoryId, UsersList, CreatedAt, ExpiresAt]),
-  
-%   lists:foreach(fun(TargetUser) ->
-%     ToUserJid = jid:make(TargetUser, FromServer, <<>>),
-%     ToUserStr = jid:to_string(ToUserJid),
-    
-%     XmlBody = #xmlel{name = <<"message">>,
-%       attrs = [
-%         {<<"from">>, jid:to_string(From)}, 
-%         {<<"to">>, ToUserStr}, 
-%         {<<"type">>, <<"chat">>}, 
-%         {<<"id">>, MessageId}
-%       ],
-%       children = [#xmlel{name = <<"story">>,
-%         attrs = [
-%             {<<"xmlns">>, ?NS_RECEIPTS}, 
-%             {<<"status">>, <<"posted">>}, 
-%             {<<"story_id">>, StoryId}, 
-%             {<<"username">>, Username}, 
-%             {<<"story_type">>, StoryType},
-%             {<<"caption">>, Caption},
-%             {<<"background_color">>, BgColor},
-%             {<<"font_style">>, FontStyle},
-%             {<<"duration">>, Duration},
-%             {<<"media_url">>, MediaUrl},
-%             {<<"thumbnail_url">>, ThumbUrl},
-%             {<<"created_at">>, CreatedAt},
-%             {<<"expires_at">>, ExpiresAt}
-%         ],
-%         children = []}]},
-        
-%     ?INFO_MSG("post_story routing story_id=~ts to=~ts msg_id=~ts", [StoryId, ToUserStr, MessageId]),
-%     try
-%       ejabberd_router:route(From, ToUserJid, XmlBody),
-%       ?INFO_MSG("post_story routed story_id=~ts to=~ts", [StoryId, ToUserStr])
-%     catch
-%       Class:Reason:Stacktrace ->
-%         ?INFO_MSG("post_story route failed story_id=~ts to=~ts class=~p reason=~p stack=~p",
-%                   [StoryId, ToUserStr, Class, Reason, Stacktrace])
-%     end
-%     %% ... (offline storage logic remains same) ...
-%   end, UsersList),
-  
-%   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"posted story routed">>}).
-
-
 story_seen(From, RequestType, SubEl, IQ) ->
     ?INFO_MSG("process_iq_set story_seen", []),
 
@@ -3655,16 +3567,6 @@ story_like(From, RequestType, SubEl, IQ) ->
         },
     %% Route to owner
     ejabberd_router:route(From, OwnerJid, XmlBody),
-    %% Store offline if owner offline
-    % TResources = ejabberd_sm:get_user_resources(OUser, OServer),
-
-    % if
-    %     length(TResources) =:= 0 ->
-    %         mod_offline:store_packet({From, xmpp:decode(XmlBody)});
-    %     true ->
-    %         ok
-    % end,
-
     fly_mod_utils:generate_subel(
         IQ,
         #user_activities{
@@ -3673,64 +3575,6 @@ story_like(From, RequestType, SubEl, IQ) ->
             story_id = StoryId
         }
     ).
-    
-% delete_story(From, RequestType, SubEl, IQ) ->
-%     #jid{lserver = FromServer} = From,
-
-%     %% 1. Extract Target Users (Same logic as post_story)
-%     UsersTag = fxml:get_subtag(SubEl, <<"users">>),
-%     UsersList = case UsersTag of
-%         false -> [];
-%         #xmlel{} = UTag ->
-%             [fxml:get_tag_cdata(UserEl) || UserEl <- UTag#xmlel.children, 
-%              is_record(UserEl, xmlel), fxml:get_tag_cdata(UserEl) =/= <<>>]
-%     end,
-
-%     %% 2. Extract Attributes
-%     StoryId  = fxml:get_attr_s(<<"story_id">>, SubEl#xmlel.attrs),
-%     Username = fxml:get_attr_s(<<"username">>, SubEl#xmlel.attrs),
-%     MessageId = fly_mod_utils:get_iq_message_id(16),
-
-%     ?INFO_MSG("delete_story request from=~ts story_id=~ts targets=~p", 
-%               [jid:to_string(From), StoryId, UsersList]),
-
-%     %% 3. Route Deletion to each target user
-%     lists:foreach(fun(TargetUser) ->
-%         ToUserJid = jid:make(TargetUser, FromServer, <<>>),
-%         ToUserStr = jid:to_string(ToUserJid),
-
-%         XmlBody = #xmlel{name = <<"message">>,
-%             attrs = [
-%                 {<<"from">>, jid:to_string(From)}, 
-%                 {<<"to">>, ToUserStr}, 
-%                 {<<"type">>, <<"chat">>}, 
-%                 {<<"id">>, MessageId}
-%             ],
-%             children = [#xmlel{name = <<"story">>,
-%                 attrs = [
-%                     {<<"xmlns">>, ?NS_RECEIPTS}, 
-%                     {<<"status">>, <<"deleted">>}, 
-%                     {<<"story_id">>, StoryId}, 
-%                     {<<"username">>, Username}
-%                 ],
-%                 children = []}]},
-
-%         try
-%             ejabberd_router:route(From, ToUserJid, XmlBody),
-%             ?INFO_MSG("delete_story routed story_id=~ts to=~ts", [StoryId, ToUserStr])
-%         catch
-%             Class:Reason ->
-%                 ?ERROR_MSG("delete_story failed story_id=~ts to=~ts: ~p:~p", 
-%                            [StoryId, ToUserStr, Class, Reason])
-%         end
-%     end, UsersList),
-
-%     %% 4. Return IQ Result back to the sender
-%     fly_mod_utils:generate_subel(IQ, #user_activities{
-%         type = RequestType,
-%         result_type = <<"success">>,
-%         story_id = StoryId
-%     }).
 
 meeting_reminder(From, RequestType, SubEl, IQ) ->
     #jid{lserver = FromServer} = From,
