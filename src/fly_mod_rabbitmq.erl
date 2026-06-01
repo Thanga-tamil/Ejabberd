@@ -93,7 +93,7 @@ init([Host | _]) ->
              ?LOG_INFO("rabbitMQ connection established: ~p", 
                        [Connection]),
             [Host] = ejabberd_option:hosts(),
-            init_state(Connection, RabbitMQE, Host, false);
+            init_state(Connection, RabbitMQE, Host, AmqpListner);
         Error ->
             ?LOG_ERROR("init rabbitMQ connection failure with 
                         error =>: ~p", [Error]),

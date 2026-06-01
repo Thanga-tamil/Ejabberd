@@ -6,7 +6,7 @@
 
 -define(PROCNAME, fly_mod_offline_push).
 -define(MOD_PURPOSE, publication).
--define(MOD_AMQP, ejabberd_rabbitmq).
+-define(MOD_AMQP, fly_mod_rabbitmq).
 -define(MOD_AMQP_FUN, publish).
 
 %% gen_mod callbacks
