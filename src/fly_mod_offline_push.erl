@@ -117,9 +117,10 @@ handle_cast({pushnotification, <<"chat">>,
         case catch send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) of
           {ok, _Result} -> ok;
           {error, Error} ->
-            ?INFO_MSG("push error ~p", [Error]), ok;
-          _Exception ->
-            ?INFO_MSG("push status ~p", [_Exception]), ok
+            ?WARNING_MSG("push error ~p", [Error]),
+            ok;
+          _ ->
+            ok
         end;
       true ->
         ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
