@@ -494,7 +494,7 @@ check_password_fun(_Mech, #{lserver := LServer}) ->
     fun(U, AuthzId, P) ->
 	    Auth = ejabberd_auth:check_password_with_authmodule(U, AuthzId, LServer, P),
 	    ElapsedMs = erlang:monotonic_time(millisecond) - StartTime,
-	    ?DEBUG("check_password_fun: auth result ~p, time taken (~p ms)", [Auth, ElapsedMs]),
+	    ?LOG_INFO("check_password_fun: auth result ~p, time taken (~p ms)", [Auth, ElapsedMs]),
 	    Auth
     end.
 
@@ -503,7 +503,7 @@ check_password_digest_fun(_Mech, #{lserver := LServer}) ->
     fun(U, AuthzId, P, D, DG) ->
 	    Auth = ejabberd_auth:check_password_with_authmodule(U, AuthzId, LServer, P, D, DG),
 	    ElapsedMs = erlang:monotonic_time(millisecond) - StartTime,
-	    ?DEBUG("check_password_digest_fun: auth result ~p, time taken (~p ms)", [Auth, ElapsedMs]),
+	    ?LOG_INFO("check_password_digest_fun: auth result ~p, time taken (~p ms)", [Auth, ElapsedMs]),
 	    Auth
     end.
 
