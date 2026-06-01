@@ -490,13 +490,21 @@ check_password_fun(<<"X-OAUTH2">>, #{lserver := LServer}) ->
 	    end
     end;
 check_password_fun(_Mech, #{lserver := LServer}) ->
+    StartTime = erlang:monotonic_time(millisecond),
     fun(U, AuthzId, P) ->
-	    ejabberd_auth:check_password_with_authmodule(U, AuthzId, LServer, P)
+	    Auth = ejabberd_auth:check_password_with_authmodule(U, AuthzId, LServer, P),
+	    ElapsedMs = erlang:monotonic_time(millisecond) - StartTime,
+	    ?DEBUG("check_password_fun: auth result ~p, time taken (~p ms)", [Auth, ElapsedMs]),
+	    Auth
     end.
 
 check_password_digest_fun(_Mech, #{lserver := LServer}) ->
+    StartTime = erlang:monotonic_time(millisecond),
     fun(U, AuthzId, P, D, DG) ->
-	    ejabberd_auth:check_password_with_authmodule(U, AuthzId, LServer, P, D, DG)
+	    Auth = ejabberd_auth:check_password_with_authmodule(U, AuthzId, LServer, P, D, DG),
+	    ElapsedMs = erlang:monotonic_time(millisecond) - StartTime,
+	    ?DEBUG("check_password_digest_fun: auth result ~p, time taken (~p ms)", [Auth, ElapsedMs]),
+	    Auth
     end.
 
 bind(<<"">>, State) ->
