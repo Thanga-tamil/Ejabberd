@@ -2213,7 +2213,7 @@ decrypt_license_data(FServer, LicenseData) ->
   ClientKey = gen_mod:get_module_opt(FServer, fly_mod_user_activities, client_key),
   ClientKeyValue = binary_to_list(ClientKey),
   DecryptedMessage = fly_mod_security:aes_decrpyt_license(list_to_binary(ClientKeyValue++ClientKeyValue++ClientKeyValue), <<"k%$/@B[jqAx}>8H@">>, binary_to_list(LicenseData)),
-  {ParsedMessageJson} = jiffy:decode(uri_string:unquote(binary_to_list(DecryptedMessage))),
+  {ParsedMessageJson} = jiffy:decode(list_to_binary(http_uri:decode(binary_to_list(DecryptedMessage)))),
   ParsedMessageJson.
 
 update_license_lookup(LServer) ->
@@ -2233,7 +2233,7 @@ update_license_lookup(LServer) ->
       ?INFO_MSG("Lkey: ~p ", [Lkey]),
       DecryptedMessage = fly_mod_security:aes_decrpyt_license(list_to_binary(ClientKeyValue++ClientKeyValue++ClientKeyValue), <<"k%$/@B[jqAx}>8H@">>, binary_to_list(Lkey)),
       ?LOG_INFO("DecryptedMessage: ~p ", [DecryptedMessage]),
-      {ParsedMessageJson} = jiffy:decode(uri_string:unquote(binary_to_list(DecryptedMessage))),
+      {ParsedMessageJson} = jiffy:decode(list_to_binary(http_uri:decode(binary_to_list(DecryptedMessage)))),
       AvailableModules = proplists:get_value(<<"modulesPurchased">>, ParsedMessageJson),
       Expiry = proplists:get_value(<<"expiresAt">>, ParsedMessageJson),
       Domains = proplists:get_value(<<"domains">>, ParsedMessageJson),
