@@ -3225,6 +3225,7 @@ post_story(From, RequestType, SubEl, IQ) ->
 
       XmlBody = #xmlel{name = <<"message">>,
         attrs = [
+          {<<"xmlns">>, <<"jabber:client">>},
           {<<"from">>, jid:to_string(From)},
           {<<"to">>, ToUserStr},
           {<<"type">>, <<"chat">>},
@@ -3251,9 +3252,13 @@ post_story(From, RequestType, SubEl, IQ) ->
       ?INFO_MSG("post_story routing story_id=~ts to=~ts msg_id=~ts", [StoryId, ToUserStr, MessageId]),
       try
         ejabberd_router:route(From, ToUserJid, XmlBody),
+        
+        Pkt = xmpp:decode(XmlBody),
+        mod_carboncopy:user_send_packet({Pkt, #{jid => From}}),
+        
         TResources = ejabberd_sm:get_user_resources(TargetUser, FromServer),
         if length(TResources) =:= 0 ->
-             mod_offline:store_packet({ToUserJid, xmpp:decode(XmlBody)});
+             mod_offline:store_packet({ToUserJid, Pkt});
            true -> ok
         end,
         ?INFO_MSG("post_story routed story_id=~ts to=~ts", [StoryId, ToUserStr])
