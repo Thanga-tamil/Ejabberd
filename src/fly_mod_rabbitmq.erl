@@ -49,7 +49,25 @@ mod_doc() ->
       author => "Thangatamil",
       version => "1.0.0"}.
 
+mod_opt_type(rabbitmq_host) -> fun iolist_to_binary/1;
+mod_opt_type(rabbitmq_username) -> fun iolist_to_binary/1;
+mod_opt_type(rabbitmq_exchange) -> fun iolist_to_binary/1;
+mod_opt_type(rabbitmq_password) -> fun iolist_to_binary/1;
+mod_opt_type(amqp_listener) -> fun is_boolean/1;
 
+mod_opt_type(_) ->
+  [rabbitmq_host, 
+   rabbitmq_username, 
+   rabbitmq_password, 
+   rabbitmq_exchange, 
+   amqp_listener].
+
+mod_options(_Host) ->
+  [{rabbitmq_host, undefined},
+    {rabbitmq_username, undefined},
+    {rabbitmq_exchange, undefined},
+    {rabbitmq_password, undefined},
+    {amqp_listener, false}].
 
 
 init([Host | _]) ->
@@ -59,6 +77,8 @@ init([Host | _]) ->
     RabbitMQP = maps:get(rabbitmq_password, ModOptions),
     RabbitMQE = maps:get(rabbitmq_exchange, ModOptions),
     AmqpListner = maps:get(amqp_listener, ModOptions),
+    ?LOG_INFO("Initializing RabbitMQ module with host: ~p, username: ~p, exchange: ~p, listener: ~p",
+              [RabbitMQH, RabbitMQU, RabbitMQE, AmqpListner]),
 
     case amqp_connection:start(
         #amqp_params_network{
@@ -313,23 +333,5 @@ logger(Pkt, Exchange, RoutingKey, Msg) ->
             exchange => Exchange,
             routing_key => RoutingKey
         },
-
     
     io:format("~p~n", [Map]).
-
-
-mod_opt_type(rabbitmq_host) -> fun iolist_to_binary/1;
-mod_opt_type(rabbitmq_username) -> fun iolist_to_binary/1;
-mod_opt_type(rabbitmq_exchange) -> fun iolist_to_binary/1;
-mod_opt_type(rabbitmq_password) -> fun iolist_to_binary/1;
-mod_opt_type(amqp_listener) -> fun is_boolean/1;
-
-mod_opt_type(_) ->
-  [rabbitmq_host, rabbitmq_username, rabbitmq_password, rabbitmq_exchange, amqp_listener].
-
-mod_options(_Host) ->
-  [{rabbitmq_host, undefined},
-    {rabbitmq_username, undefined},
-    {rabbitmq_exchange, undefined},
-    {rabbitmq_password, undefined},
-    {amqp_listener, false}].
