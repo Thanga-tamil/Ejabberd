@@ -318,22 +318,23 @@ subscription(Mod, Fun, Args) ->
     apply(Mod, Fun, Args).
 
 logger(Pkt, Exchange, RoutingKey, Msg) ->
-    MsgId = Pkt#message.id,
-    Type = Pkt#message.type,
-    {FUser, _, FRes} = jid:tolower(Pkt#message.from),
-    {TUser, _, TRes} = jid:tolower(Pkt#message.to),
-        
-    ?LOG_INFO(Msg ++ " rabbitmq payload from=~p to=~p ", [Msg]),
+    Packet = xmpp:decode(Pkt),
+    case Packet of
+        #message{id = MsgId, from = From, to = To, type = Type} ->
+            {FUser, _, FRes} = jid:tolower(From),
+            {TUser, _, TRes} = jid:tolower(To),
 
-    Map = #{
+        ?INFO_MSG(Msg ++ " rabbitmq payload from=~p to=~p~n ~s", 
+        [Msg, jiffy:encode(#{
             message_id => MsgId,
             type => Type,
-            from_user_id => FUser,
+            from_userid => FUser,
             from_resource => FRes,
-            to_user_id => TUser,
+            to_userid => TUser,
             to_resource => TRes,
             exchange => Exchange,
             routing_key => RoutingKey
-        },
-    
-    io:format("~p~n", [Map]).
+        })]);
+    _ ->
+        ok
+    end.

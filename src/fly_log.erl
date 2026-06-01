@@ -18,24 +18,23 @@
 log(Mod, Fun, Line, Pkt, Msg) ->
     case Pkt of
         #message{id = Id, from = From, to = To, type = Type} ->
-           {FUserId, _, FResource} = jid:tolower(From),
-           {TUserId, _, TResource} = jid:tolower(To),
+           {FUser, _, FRes} = jid:tolower(From),
+           {TUser, _, TRes} = jid:tolower(To),
 
            % use -E grep with 'from' and 'to' 
            % to trace the message flow 
 
-           ?LOG_INFO("[~p:~p:~p] from=~p to=~p ~s",
-                [Mod, Fun, Line, binary_to_list(FUserId), 
-                binary_to_list(TUserId), Msg]),
-
-            Map = #{message_id => Id,
-                    type => Type,
-                    from_user_id => FUserId,
-                    from_resource => FResource,
-                    to_user_id => TUserId,
-                    to_resource => TResource},
-
-            io:format("~p~n", [Map]);
+            ?INFO_MSG("[~p:~p:~p] from=~p to=~p ~s~n ~s", 
+                      [Mod, Fun, Line, binary_to_list(FUser), 
+                      binary_to_list(TUser), Msg, 
+                      jiffy:encode(
+                            #{message_id => Id,
+                              type => Type,
+                              from_userid => FUser,
+                              from_resource => FRes,
+                              to_userid => TUser,
+                              to_resource => TRes})
+                      ]);
         _ ->
            ok
     end.
