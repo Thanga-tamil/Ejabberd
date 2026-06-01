@@ -327,10 +327,8 @@ mod_opt_type(rabbitmq_password) -> fun iolist_to_binary/1;
 mod_opt_type(_) ->
   [rabbitmq_host, rabbitmq_username, rabbitmq_password, rabbitmq_exchange].
 
-mod_options(Host) ->
-    [{rabbitmq_host, Host, [{type, erlang:binary()}]},
-     {rabbitmq_username, <<"guest">>, [{type, erlang:binary()}]},
-     {rabbitmq_password, <<"guest">>, [{type, erlang:binary()}]},
-     {rabbitmq_exchange, <<"ejabberd_exchange">>, 
-                                [{type, erlang:binary()}]},
-     {amqp_listener, false, [{type, erlang:boolean()}]}].
+mod_options(_Host) ->
+  [{rabbitmq_host, undefined},
+    {rabbitmq_username, undefined},
+    {rabbitmq_exchange, undefined},
+    {rabbitmq_password, undefined}].
