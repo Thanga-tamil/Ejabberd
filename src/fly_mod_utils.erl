@@ -107,7 +107,7 @@
   get_message_status/2,
   get_groupmessage_status/2,
   get_msg_disappear_single_chat/3,
-  single_notify_message/6,
+  single_notify_message/7,
   group_notify_message/9,
   get_blockedlist/2,
   check_group_exists/2,
@@ -2518,7 +2518,7 @@ get_msg_disappear_single_chat(LServer, LUser, ToUser) ->
     _ -> <<"0">>
   end.
 
-single_notify_message(#jid{luser = AUser, lserver = AServer}, #jid{luser = TUser, lserver = TServer}, NotifyId, Msgid, TimeStamp, Txt) ->
+single_notify_message(#jid{luser = AUser, lserver = AServer}, #jid{luser = TUser, lserver = TServer}, NotifyId, Msgid, TimeStamp, Txt, MsgDisappear) ->
   Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
   FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
 
@@ -2558,7 +2558,7 @@ single_notify_message(#jid{luser = AUser, lserver = AServer}, #jid{luser = TUser
                             {<<"id">>, Msgid}],
                    children = [#xmlel{name = <<"msg_disappear">>,
                                       attrs = [{<<"xmlns">>, <<"urn:xmpp:receipts">>},
-                                               {<<"msg_disappear">>, <<"1">>},
+                                               {<<"msg_disappear">>, MsgDisappear},
                                                {<<"id">>, Msgid}],
                                       children = []},
                                #xmlel{name = <<"timestamp">>,
