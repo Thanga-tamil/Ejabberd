@@ -131,7 +131,7 @@ check_jwt_token(User, Server, Token) ->
                     'fun' => ?FUNCTION_NAME,
                     'jid' => <<User/binary, $@, Server/binary>>,
                     'jwt' => Token,
-                    'auth' => "info"
+                    'type' => <<"auth_info">>
                   })
 		    ]),
     case verify_jwt(Server, User, Token, redis) of
@@ -159,9 +159,9 @@ check_jwt_token(User, Server, Token) ->
 check_claims(Fields, Signature, Server, User) ->
     Now = erlang:system_time(second),
 
-    logger:info("jwt verify at system timestamp ~p: ~p - ~p~n", 
+    logger:info("jwt verify at system timestamp ~p", 
             [Now]),
-    logger:info("jwt_fields => ~p sign => ~p", 
+    logger:info("jwt_fields => ~p & sign => ~p", 
             [Fields, Signature]),
 
     case maps:find(<<"exp">>, Fields) of
