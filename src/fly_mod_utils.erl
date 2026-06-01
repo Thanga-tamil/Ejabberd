@@ -1782,19 +1782,31 @@ get_message_status(#jid{lserver = FServer}, Msgid) ->
   ejabberd_sql:sql_query(FServer,
     [<<"SELECT message_id, status, to_user,updated_at, recall_status FROM message_status WHERE message_id ='">>,Msgid,<<"';">>]).
 
-get_groupmessage_status(#jid{luser = FUser, lserver = FServer}, Msgid) ->
-  ejabberd_sql:sql_query(FServer,
-    iolist_to_binary([<<"SELECT status FROM message_status WHERE to_user != '">>,FUser,<<"' and message_id = '">>,Msgid,<<"' order by status asc limit 1;">>])).
-
-
 get_message_time(FServer , Msgid) ->
   ejabberd_sql:sql_query(FServer,
     [<<"SELECT message_time FROM message_status WHERE  message_id = '">>,Msgid,<<"'  order by id asc limit 1;">>]).
 
-message_status(FServer, Msgid, Fuser) ->
-  ejabberd_sql:sql_query(FServer,
-    iolist_to_binary([<<"SELECT status FROM message_status WHERE to_user != '">>,Fuser,<<"' and message_id = '">>,Msgid,<<"' order by status asc limit 1;">>])).
+get_groupmessage_status(#jid{luser = FUser, lserver = FServer}, Msgid) ->
+  message_status(FServer, Msgid, FUser).
 
+message_status(FServer, Msgid, Fuser) ->
+  CheckMixHost = string:str(binary_to_list(FServer), binary_to_list(<<"mix.">>)),
+
+  ?LOG_INFO("[message_status] FServer: ~p, CheckMixHost: ~p", [FServer, CheckMixHost]),
+
+  Server = 
+  if CheckMixHost =:= 1 ->
+       ejabberd_router:host_of_route(FServer);
+     true ->
+       FServer
+  end,
+
+  ?LOG_INFO("Server used for query: ~p", [Server]),
+
+  ejabberd_sql:sql_query(Server,
+             [<<"SELECT status FROM message_status WHERE 
+                 to_user != '">>,Fuser,<<"' and message_id = '">>,Msgid,<<"' 
+                 order by status asc limit 1;">>]).
 
 message_status_new(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
@@ -2263,23 +2275,41 @@ remove_poll_offline(FServer, FResource, PollMsgId)->
       0
   end.
 
-get_spool_seq(Server, User, MessageId, DeviceId) -> 
+
+seq_to_bin(S) when is_integer(S) -> integer_to_binary(S);
+seq_to_bin(S) -> S.
+
+get_spool_seq(Server, User, MessageId, DeviceId) ->
   Result = ejabberd_sql:sql_query(Server, [<<"select seq from spool where username ='">>,User,<<"' and message_id = '">>,MessageId,<<"' and device_id='">>,DeviceId,<<"' limit 1;">>]),
   case Result of
-    {selected, _, [[Seq]]} -> 
+    {selected, _, [[Seq]]} ->
       Seq;
-    _ -> 
+    _ ->
       0
   end.
 
-batch_remove_spool(Server, User, Seq, DeviceId) -> 
-    DeleteQ = ejabberd_sql:sql_query(Server, [<<"DELETE FROM spool WHERE username ='">>,User,<<"' and device_id='">>,DeviceId,<<"' and seq <= '">>,Seq,<<"' ;">>]),
-    case DeleteQ of
-      {updated, D} -> 
-        D;
-      _ -> 
+batch_remove_spool(Host, User, Seq, DeviceId) ->
+
+  F = fun() ->
+    case ejabberd_sql:sql_query_t(
+      [<<"SELECT seq FROM spool FORCE INDEX (idx_username_device_id_seq) WHERE username='">>,User,
+      <<"' AND device_id='">>,DeviceId,
+      <<"' AND seq <= '">>,Seq,<<"';">>]) of
+      {selected, _, []} ->
+        0;
+      {selected, _, Rows} ->
+        SeqList = lists:join(<<",">>, [seq_to_bin(S) || [S] <- Rows]),
+        case ejabberd_sql:sql_query_t([<<"DELETE FROM spool WHERE seq IN (">>, SeqList, <<");">>]) of
+          {updated, D} ->
+            D;
+          _ ->
+            0
+        end;
+      _ ->
         0
-    end.
+    end
+  end,
+  ejabberd_sql:sql_transaction(Host, F).
 
 get_mobile_user_message(TUser, TServer) ->
   Resources = ejabberd_sm:get_user_resources(TUser,
