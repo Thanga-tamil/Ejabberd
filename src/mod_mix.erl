@@ -740,19 +740,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
                                                             ejabberd_sql:sql_query(LServer, [RecentQ])
                                                     end),
 
-						DisappearAtValue =
-									case DisappearAt of
-										<<>> ->
-										<<"NULL">>;
-										"" ->
-										<<"NULL">>;
-										undefined ->
-										<<"NULL">>;
-										null ->
-										<<"NULL">>;
-										_ ->
-										[<<"'">>, DisappearAt, <<"'">>]
-									end,
+				    DisappearAtValue = fly_mod_utils:validate_datetime(DisappearAt),
 
                                     ejabberd_sql:sql_query(LServer,
                                                            [<<"INSERT INTO chat_message_edit_history ",

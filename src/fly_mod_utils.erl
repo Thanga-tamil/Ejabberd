@@ -219,7 +219,7 @@
   get_hide_profile_privacy/2, update_mix_participant/3, batch_remove_spool/4, is_session_exists/2,is_group_admin/3, get_spool_seq/4,
   update_story_view/3, update_story_like/3,
   get_message_chat_info/2, get_all_group_participants/2, update_call_session_reminder_status/2, update_call_session_schedule/9,
-  delete_story_like/3]).
+  delete_story_like/3, validate_datetime/1]).
 
 -include("logger.hrl").
 
@@ -1529,13 +1529,7 @@ insert_status(#jid{luser = User}, #jid{luser = ToUser,lserver = ToServer}, Messa
     EditMsgId = EditmsgId
 end,
 
-DisappearAtValue =
-    case DisappearAt of
-        <<"">> ->
-            <<"NULL">>;
-        _ ->
-            [<<"'">>, DisappearAt, <<"'">>]
-    end,
+DisappearAtValue = fly_mod_utils:validate_datetime(DisappearAt),
 
   ?INFO_MSG("Insert message is DisappearAt ~p", [DisappearAtValue]), 
   if EditMsgId =:= MessageId ->
@@ -2996,6 +2990,19 @@ get_mix_channel_service(Server, Channel) ->
     _ ->
       <<"">>
   end.
+
+validate_datetime(DateBin) ->
+    case is_binary(DateBin) of
+        true ->
+            case re:run(DateBin, <<"^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}:\\d{2}">>) of
+                {match, _} ->
+                    [<<"'">>, DateBin, <<"'">>];
+                nomatch ->
+                    <<"NULL">>
+            end;
+        false ->
+            <<"NULL">>
+    end.
 
 %   -- Disable foreign key checks to ensure smooth conversion
 % SET FOREIGN_KEY_CHECKS = 0;
