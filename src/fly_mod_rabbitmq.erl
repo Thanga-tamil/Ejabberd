@@ -77,7 +77,9 @@ init([Host | _]) ->
     RabbitMQP = maps:get(rabbitmq_password, ModOptions),
     RabbitMQE = maps:get(rabbitmq_exchange, ModOptions),
     AmqpListner = maps:get(amqp_listener, ModOptions),
-    ?LOG_INFO("Initializing RabbitMQ module with host: ~p, username: ~p, exchange: ~p, listener: ~p",
+
+    ?LOG_INFO("Initializing RabbitMQ module with host: ~p, 
+               username: ~p, exchange: ~p, listener: ~p",
               [RabbitMQH, RabbitMQU, RabbitMQE, AmqpListner]),
 
     case amqp_connection:start(
@@ -91,7 +93,7 @@ init([Host | _]) ->
              ?LOG_INFO("rabbitMQ connection established: ~p", 
                        [Connection]),
             [Host] = ejabberd_option:hosts(),
-            init_state(Connection, RabbitMQE, Host, AmqpListner);
+            init_state(Connection, RabbitMQE, Host, false);
         Error ->
             ?LOG_ERROR("init rabbitMQ connection failure with 
                         error =>: ~p", [Error]),
