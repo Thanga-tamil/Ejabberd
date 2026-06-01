@@ -106,6 +106,10 @@ use_cache(_) ->
 %%%----------------------------------------------------------------------
 check_decoded_jwt(true, Fields, _Signature, Server, User) ->
     JidField = ejabberd_option:jwt_jid_field(Server),
+    io:format("check_decoded_jwt: checking decoded JWT fields ~p for user ~p@~p~n",
+              [Fields, User, Server]),
+    io:format("check_decoded_jwt: looking for JID field ~p in JWT fields~n", [JidField]),
+    
     case maps:find(JidField, Fields) of
         {ok, SJid} when is_binary(SJid) ->
             try
@@ -125,15 +129,15 @@ check_decoded_jwt(Acc, _, _, _, _) ->
 %%%----------------------------------------------------------------------
 check_jwt_token(User, Server, Token) ->
     % validate is client is app user 
-    ?LOG_INFO("jwt_auth: checking JWT token for account ~p@~p~n with token: ~p",
-              [User, Server, Token]),
+    ?LOG_INFO("jwt_auth: checking JWT token for user ~p~n with token: ~p",
+              [<<User/binary, $@, Server/binary>>, Token]),
     case verify_jwt(Server, User, Token, redis) of
         true ->
             JWK = ejabberd_option:jwt_key(Server),
             try jose_jwt:verify(JWK, Token) of
                 {true, {jose_jwt, Fields}, Signature} ->
                     Now = erlang:system_time(second),
-                    ?DEBUG("jwt verify at system timestamp ~p: ~p - ~p~n", 
+                    ?LOG_INFO("jwt verify at system timestamp ~p: ~p - ~p~n", 
                            [Now, Fields, Signature]),
                     case maps:find(<<"exp">>, Fields) of
                         error ->
@@ -155,7 +159,7 @@ check_jwt_token(User, Server, Token) ->
                     false
             catch
                 A:B ->
-                    ?DEBUG("jose_jwt:verify failed ~n for account ~p@~p~n "
+                    ?LOG_INFO("jose_jwt:verify failed ~n for account ~p@~p~n "
                            " JWK and token: ~p~n with error: ~p",
                            [User, Server, {JWK, Token}, {A, B}]),
                            false
