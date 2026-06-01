@@ -2542,27 +2542,18 @@ publish(RoutingKey, PayPac) ->
   Args = [?MOD_PURPOSE, RoutingKey, PayPac],
   apply(?MOD_AMQP, ?MOD_AMQP_FUN, Args).
   
-mod_opt_type(rabbitmq_host) -> fun iolist_to_binary/1;
-mod_opt_type(rabbitmq_username) -> fun iolist_to_binary/1;
-mod_opt_type(rabbitmq_exchange) -> fun iolist_to_binary/1;
-mod_opt_type(rabbitmq_password) -> fun iolist_to_binary/1;
-mod_opt_type(iqdisc) -> fun gen_iq_handler:check_type/1;
 mod_opt_type(db_type) ->
   fun(T) -> ejabberd_config:v_db(?MODULE, T) end;
 mod_opt_type(restricted_country_code) ->
     econf:list(econf:binary());
 mod_opt_type(_) ->
-  [db_type, iqdisc, rabbitmq_host, rabbitmq_username, rabbitmq_password, rabbitmq_exchange, restricted_country_code].
+  [db_type, iqdisc, restricted_country_code].
 
 depends(_, _) ->
   [].
 
 mod_options(_Host) ->
-  [{rabbitmq_host, undefined},
-    {rabbitmq_username, undefined},
-    {rabbitmq_exchange, undefined},
-    {rabbitmq_password, undefined},
-    {restricted_country_code, []}].
+  [{restricted_country_code, []}].
 
 mod_doc() -> 
   #{}.

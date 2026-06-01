@@ -6,7 +6,7 @@
 -behaviour(gen_server).
 
 %% gen_mod callbacks %%
--export([start/2, stop/1, reload/3,
+-export([start/2, stop/1, reload/3, mod_opt_type/1,
          depends/2, mod_doc/0, mod_options/1]).
 
 %% gen_server callbacks %%
@@ -49,13 +49,7 @@ mod_doc() ->
       author => "Thangatamil",
       version => "1.0.0"}.
 
-mod_options(Host) ->
-    [{rabbitmq_host, Host, [{type, erlang:binary()}]},
-     {rabbitmq_username, <<"guest">>, [{type, erlang:binary()}]},
-     {rabbitmq_password, <<"guest">>, [{type, erlang:binary()}]},
-     {rabbitmq_exchange, <<"ejabberd_exchange">>, 
-                                [{type, erlang:binary()}]},
-     {amqp_listener, false, [{type, erlang:boolean()}]}].
+
 
 
 init([Host | _]) ->
@@ -323,3 +317,20 @@ logger(Pkt, Exchange, RoutingKey, Msg) ->
 
     
     io:format("~p~n", [Map]).
+
+
+mod_opt_type(rabbitmq_host) -> fun iolist_to_binary/1;
+mod_opt_type(rabbitmq_username) -> fun iolist_to_binary/1;
+mod_opt_type(rabbitmq_exchange) -> fun iolist_to_binary/1;
+mod_opt_type(rabbitmq_password) -> fun iolist_to_binary/1;
+
+mod_opt_type(_) ->
+  [rabbitmq_host, rabbitmq_username, rabbitmq_password, rabbitmq_exchange].
+
+mod_options(Host) ->
+    [{rabbitmq_host, Host, [{type, erlang:binary()}]},
+     {rabbitmq_username, <<"guest">>, [{type, erlang:binary()}]},
+     {rabbitmq_password, <<"guest">>, [{type, erlang:binary()}]},
+     {rabbitmq_exchange, <<"ejabberd_exchange">>, 
+                                [{type, erlang:binary()}]},
+     {amqp_listener, false, [{type, erlang:boolean()}]}].
