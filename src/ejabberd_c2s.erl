@@ -497,11 +497,11 @@ check_password_fun(_Mech, #{lserver := LServer}) ->
 	   Auth = ejabberd_auth:check_password_with_authmodule(U, AuthzId, LServer, P),
 	   TimeTaken = erlang:monotonic_time(millisecond) - StartTime,
 
-	   ?INFO_MSG("~s", 
+	   logger:info("~s", 
 	            [jiffy:encode(
 			#{'mod' => ?MODULE,
 			  'fun' => ?FUNCTION_NAME,
-			  'auth_result' => Auth,
+			  'auth_result' => io_lib:format("~p", [Auth]),
 			  'time_taken_ms' => TimeTaken
 			})
 		    ]),
@@ -517,11 +517,11 @@ check_password_digest_fun(_Mech, #{lserver := LServer}) ->
 	Auth = ejabberd_auth:check_password_with_authmodule(U, AuthzId, LServer, P, D, DG),
 	TimeTaken = erlang:monotonic_time(millisecond) - StartTime,
 	
-	?INFO_MSG("~s", 
+	logger:info("~s", 
 		[jiffy:encode(
 		    #{'mod' => ?MODULE,
 		      'fun' => ?FUNCTION_NAME,
-		      'auth_result' => Auth,
+		      'auth_result' => io_lib:format("~p", [Auth]),
 		      'time_taken_ms' => TimeTaken
 		     })
 		]),
