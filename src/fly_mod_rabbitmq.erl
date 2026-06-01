@@ -86,7 +86,7 @@ init_state(Connection, RabbitMQE, Host, true) ->
                        ex = RabbitMQE, 
                        channels = Channels, 
                        monitor = #{Channel => MonitorRef}}};
-init_state(Connection, RabbitMQE, Host, _) ->
+init_state(Connection, RabbitMQE, Host, false) ->
     Channels = create_channel(Connection, publication),
     {ok, #state{host = Host, 
                 connection = Connection, 
