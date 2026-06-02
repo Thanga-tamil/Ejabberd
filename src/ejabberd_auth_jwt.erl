@@ -216,11 +216,11 @@ verify_jwt(Server, User, Token, db) ->
         {selected, [{SqlUser}]} ->
             User =:= SqlUser 
             andalso 
-            insert_token_in_redis(Token, jid:make(User, Server))
+            insert_token_in_redis(Token, User)
     end.
 
-insert_token_in_redis(Token, Jid) ->
-    Res = ejabberd_redis:q([<<"SET">>, Token, jid:to_string(Jid)]),
+insert_token_in_redis(Token, User) ->
+    Res = ejabberd_redis:q([<<"SET">>, Token, User]),
     logger:debug("redis:: SET ~p => ~p", [Token, Res]),
     case Res of
         {ok, <<"OK">>} -> true;
