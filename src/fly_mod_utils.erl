@@ -107,7 +107,7 @@
   get_message_status/2,
   get_groupmessage_status/2,
   get_msg_disappear_single_chat/3,
-  single_notify_message/6,
+  single_notify_message/7,
   group_notify_message/9,
   get_blockedlist/2,
   check_group_exists/2,
@@ -219,7 +219,7 @@
   get_hide_profile_privacy/2, update_mix_participant/3, batch_remove_spool/4, is_session_exists/2,is_group_admin/3, get_spool_seq/4,
   update_story_view/3, update_story_like/3,
   get_message_chat_info/2, get_all_group_participants/2, update_call_session_reminder_status/2, update_call_session_schedule/9,
-  delete_story_like/3]).
+  delete_story_like/3, validate_datetime/1]).
 
 -include("logger.hrl").
 
@@ -1529,13 +1529,7 @@ insert_status(#jid{luser = User}, #jid{luser = ToUser,lserver = ToServer}, Messa
     EditMsgId = EditmsgId
 end,
 
-DisappearAtValue =
-    case DisappearAt of
-        <<"">> ->
-            <<"NULL">>;
-        _ ->
-            [<<"'">>, DisappearAt, <<"'">>]
-    end,
+DisappearAtValue = fly_mod_utils:validate_datetime(DisappearAt),
 
   ?INFO_MSG("Insert message is DisappearAt ~p", [DisappearAtValue]), 
   if EditMsgId =:= MessageId ->
@@ -2518,7 +2512,7 @@ get_msg_disappear_single_chat(LServer, LUser, ToUser) ->
     _ -> <<"0">>
   end.
 
-single_notify_message(#jid{luser = AUser, lserver = AServer}, #jid{luser = TUser, lserver = TServer}, NotifyId, Msgid, TimeStamp, Txt) ->
+single_notify_message(#jid{luser = AUser, lserver = AServer}, #jid{luser = TUser, lserver = TServer}, NotifyId, Msgid, TimeStamp, Txt, MsgDisappear) ->
   Timestamp = fly_add_timestamp:now_to_microseconds(erlang:now()),
   FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
 
@@ -2551,23 +2545,24 @@ single_notify_message(#jid{luser = AUser, lserver = AServer}, #jid{luser = TUser
 
   % Send real-time message to recipient
   XmlBody = #xmlel{name = <<"message">>,
-                   attrs = [{<<"from">>, FromNotification},
+                   attrs = [{<<"xmlns">>, <<"jabber:client">>},
+                            {<<"from">>, FromNotification},
                             {<<"to">>, ToNotification},
                             {<<"type">>, <<"chat">>},
                             {<<"id">>, Msgid}],
-                   children = [#xmlel{name = <<"notification">>,
+                   children = [#xmlel{name = <<"msg_disappear">>,
                                       attrs = [{<<"xmlns">>, <<"urn:xmpp:receipts">>},
-                                               {<<"type">>, <<"message_disappear">>},
-                                               {<<"notification_id">>, NotifyId}],
+                                               {<<"msg_disappear">>, MsgDisappear},
+                                               {<<"id">>, Msgid}],
                                       children = []},
                                #xmlel{name = <<"timestamp">>,
                                       attrs = [{<<"xmlns">>, <<"urn:xmpp:messagetime">>},
                                                {<<"time">>, Currenttime}],
                                       children = []}]},
   ejabberd_router:route(jid:make(AUser, AServer, <<>>), jid:make(TUser, TServer, <<>>), XmlBody),
-
-  % Handle carbons for sender (local resources)
-  fly_mix_group_chat:carboncall_message(AUser, AServer, XmlBody, jid:make(AUser, AServer, <<>>)).
+  Pkt = xmpp:decode(XmlBody),
+  FromJid = jid:from_string(FromNotification),
+  mod_carboncopy:user_send_packet({Pkt, #{jid => FromJid}}).
 
 days_from_value(<<"0">>) -> 0;
 days_from_value(Val) when is_binary(Val) ->
@@ -2995,6 +2990,19 @@ get_mix_channel_service(Server, Channel) ->
     _ ->
       <<"">>
   end.
+
+validate_datetime(DateBin) ->
+    case is_binary(DateBin) of
+        true ->
+            case re:run(DateBin, <<"^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}:\\d{2}">>) of
+                {match, _} ->
+                    [<<"'">>, DateBin, <<"'">>];
+                nomatch ->
+                    <<"NULL">>
+            end;
+        false ->
+            <<"NULL">>
+    end.
 
 %   -- Disable foreign key checks to ensure smooth conversion
 % SET FOREIGN_KEY_CHECKS = 0;
