@@ -320,21 +320,21 @@ subscription(Mod, Fun, Args) ->
 logger(Pkt, Exchange, RoutingKey, Msg) ->
     Packet = xmpp:decode(Pkt),
     case Packet of
-        #message{id = MsgId, from = From, to = To, type = Type} ->
+        #message{id = Id, from = From, to = To, type = Type} ->
             {FUser, _, FRes} = jid:tolower(From),
             {TUser, _, TRes} = jid:tolower(To),
 
-        ?INFO_MSG(Msg ++ " rabbitmq payload from=~p to=~p~n ~s", 
-        [Msg, jiffy:encode(#{
-            message_id => MsgId,
-            type => Type,
-            from_userid => FUser,
-            from_resource => FRes,
-            to_userid => TUser,
-            to_resource => TRes,
-            exchange => Exchange,
-            routing_key => RoutingKey
-        })]);
+        logger:info(Msg ++ " rabbitmq payload from=~p to=~p~n ~s", 
+                [Msg, jiffy:encode(#{
+                        message_id => Id,
+                        type => Type,
+                        from_userid => FUser,
+                        from_resource => FRes,
+                        to_userid => TUser,
+                        to_resource => TRes,
+                        exchange => Exchange,
+                        routing_key => RoutingKey
+                    })]);
     _ ->
         ok
     end.

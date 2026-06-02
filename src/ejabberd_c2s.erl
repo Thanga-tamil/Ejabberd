@@ -131,10 +131,10 @@ send(#{lserver := LServer} = State, Pkt) ->
 
     case ejabberd_hooks:run_fold(c2s_filter_send, LServer, {Pkt1, State}, []) of
 	{drop, State1} -> 
-		?MSG_LOGX(Pkt1, "::drop pkt@c2s_filter_send::"),
+		?LOGX(Pkt1, "::drop pkt@c2s_filter_send::"),
 		State1;
 	{Pkt2, State1} ->
-		?MSG_LOGX(Pkt1, "sent to recipient"),
+		?LOGX(Pkt1, "packet sent to 'To'"),
 		xmpp_stream_in:send(State1, Pkt2)
     end.
 
@@ -243,12 +243,13 @@ process_info(#{lserver := LServer} = State, {route, Packet}) ->
 		     end,
 
     if Pass ->
+	?LOGX(Packet, "start user_receive_packet hook for message packet"),
 	{Packet1, State2} = ejabberd_hooks:run_fold(
 			user_receive_packet, LServer,
 			{Packet, State1}, []),
 	case Packet1 of
 		drop -> 
-			?MSG_LOGX(Packet, 
+			?LOGX(Packet, 
 			"::drop pkt@user_receive_packet::"),
 			State2;
 		_ -> send(State2, Packet1)
@@ -547,6 +548,7 @@ handle_authenticated_packet(Pkt, #{lserver := LServer, jid := JID,
 
     State1 = ejabberd_hooks:run_fold(c2s_authenticated_packet,
 				     LServer, State, [Pkt1]),
+    ?LOGX(Pkt1, "start user_send_packet hook for message packet"),
     #jid{luser = LUser} = JID,
     {Pkt2, State2} = ejabberd_hooks:run_fold(
 		       user_send_packet, LServer, {Pkt1, State1}, []),
@@ -965,7 +967,7 @@ check_privacy_then_route(#{lang := Lang} = State, Pkt) ->
 	    send_error(State, Pkt, Err);
         allow ->
 	    % trace message packet
-    	    ?MSG_LOGX(Pkt, "::dispatching packet to router::"),
+    	    ?LOGX(Pkt, "::dispatching packet to router::"),
 	    ejabberd_router:route(Pkt),
 	    State
     end.

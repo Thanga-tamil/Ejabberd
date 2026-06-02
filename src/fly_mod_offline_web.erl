@@ -131,7 +131,7 @@ store_offline_user_send(Packet, _C2SState, #jid{luser = FUser, lserver = FServer
             end
 
           end,
-          ?MSG_LOGX(Packet, "::store 'sent' carbon copy in offline::"),
+          ?LOGX(Packet, "::store 'sent' carbon copy in offline::"),
           mod_offline:store_packet({_C2SState, NewPacket});
         true ->
           ok

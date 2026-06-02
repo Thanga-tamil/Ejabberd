@@ -33,7 +33,6 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
   #jid{user = TUser, lserver = LServer} = To,
   #jid{user = FUser, lserver = _FServer} = From,
     Type = XML#message.type,
-    ?MSG_LOGX(XML),
     %% Add timestamp to chat message and where no DataTag exist
     case Type of
       chat ->
@@ -88,6 +87,7 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
                           NewDeliveyXMl = fxml:replace_subtag( xmpp:encode(XMLNewTag),xmpp:encode(XML)),
                           NewXMl = xmpp:decode(NewDeliveyXMl)
                         end,
+                        ?LOGX(XML),
                         Return = add_timestamp(NewXMl);
                       _ ->
                         Return = XML
@@ -99,6 +99,7 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
             Return = XML
         end;
       receipts->
+        ?LOGX(XML),
         Return = add_timestamp(XML);
       normal ->
         Return = add_timestamp(XML);

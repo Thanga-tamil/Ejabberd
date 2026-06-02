@@ -246,7 +246,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
             end,
           store_in_table(FServer,BarePeer,SUser,MessageId,MsgContent,SType,MessageType,Topicid, Metadata,BlockUser, EditMsgid, FlatTimeStamp),
           fly_mod_utils:insert_status(From, To, IdValue,MessageType, Topicid,  Metadata, erlang:atom_to_binary(ChatType, utf8),<<"">>,BlockUser,xmpp:get_text(Packet#message.body),FlatTimeStamp, EditMsgid,DisappearAt),
-          ?MSG_LOGX(Packet, "store singlechat message in db")
+          ?LOGX(Packet, "store singlechat message in db")
        end;
       
         S when (S == false) ->
@@ -508,7 +508,7 @@ send_ack_response(From, To, ReceiptId, Type, DisappearAt) ->
   Proc = gen_mod:get_module_proc(ServerHost, ?MODULE),
   Msg = #message{from = To, to = From, type = chat, sub_els = [XmlBody]},
   
-  ?MSG_LOGX(Msg, "::send singlechat acknowledge receipt::"),
+  ?LOGX(Msg, "::send singlechat acknowledge receipt::"),
 
   gen_server:cast(Proc, {send_ack,Msg}).
 

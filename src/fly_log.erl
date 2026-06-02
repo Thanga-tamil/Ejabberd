@@ -24,7 +24,7 @@ log(Mod, Fun, Line, Pkt, Msg) ->
            % use -E grep with 'from' and 'to' 
            % to trace the message flow 
 
-            ?INFO_MSG("[~p:~p:~p] from=~p to=~p ~s~n ~s", 
+            logger:info("[~p:~p:~p] from=~p to=~p ~s~n ~s", 
                       [Mod, Fun, Line, binary_to_list(FUser), 
                       binary_to_list(TUser), Msg, 
                       jiffy:encode(
