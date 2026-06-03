@@ -24,7 +24,7 @@ def read():
     cmd = pkt.split(':')[0]
     if cmd == 'auth':
         log('requested input' + pkt)
-        u, s, p, l = pkt.split(':', 5)[1:]
+        u, s, p, l, e = pkt.split(':', 6)[1:]
         if u == "wrong":
             write(False)
         elif p == 'allow':
@@ -33,7 +33,7 @@ def read():
             rurl = str("https://"+l)
             #dt = datetime.now()
             currentTimestamp = int(time.time())
-            obj = {'password': p, 'username': u,'currentTimestamp':currentTimestamp}
+            obj = {'password': p, 'username': u, 'extAuth': e, 'currentTimestamp':currentTimestamp}
             headers = {'Content-Type': 'application/json'}
             log('reuted url' + rurl)
             try:

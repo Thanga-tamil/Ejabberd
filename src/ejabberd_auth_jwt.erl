@@ -185,8 +185,9 @@ verify_jwt(Server, User, Key, redis) ->
     case Res of
         {ok, ErUserJid} when is_binary(ErUserJid) ->
             ErJid = jid:from_string(ErUserJid),
-            {ErUser, _, _} = jid:tolower(ErJid),
-            User =:= ErUser;
+            {ErUser, ErServer, _} = jid:tolower(ErJid),
+
+            (User =:= ErUser) =:= (Server =:= ErServer);
         {_, _} -> 
             (fun verify_jwt/4)
             (Server, User, Key, db)
@@ -195,19 +196,22 @@ verify_jwt(Server, User, Token, db) ->
     logger:info(
     "verify token=> ~p in sql for user=> ~p", [Token, User]),
 
-    Q = ?SQL("SELECT @(username)s FROM chat_access_tokens
+    Q = ?SQL("SELECT @(jid)s FROM chat_access_tokens
               WHERE token=%(Token)s"),
 
     case ejabberd_sql:sql_query(Server, Q) of
         {selected, []} -> false;
-        {selected, [{SqlUser}]} ->
-            User =:= SqlUser 
+        {selected, [{SqlUserJid}]} when is_binary(SqlUserJid) ->
+            UserJid = jid:from_string(SqlUserJid),
+            {SqlUser, SqlServer, _} = jid:tolower(UserJid),
+
+            (User =:= SqlUser) =:= (Server =:= SqlServer)
             andalso 
-            insert_token_in_redis(Token, jid:make(User, Server))
+            insert_token_in_redis(Token, jid:to_string(UserJid))
     end.
 
 insert_token_in_redis(Token, Jid) ->
-    Res = ejabberd_redis:q([<<"SET">>, Token, jid:to_string(Jid)]),
+    Res = ejabberd_redis:q([<<"SET">>, Token, Jid]),
     logger:debug("redis:: SET ~p => ~p", [Token, Res]),
     case Res of
         {ok, <<"OK">>} -> true;
