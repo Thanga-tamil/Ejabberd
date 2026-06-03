@@ -125,15 +125,9 @@ check_decoded_jwt(Acc, _, _, _, _) ->
 %%%----------------------------------------------------------------------
 check_jwt_token(User, Server, Token) ->
     % validate is client is app user 
-    logger:info("~s", 
-	            [jiffy:encode(
-                  #{'mod' => ?MODULE,
-                    'fun' => ?FUNCTION_NAME,
-                    'jid' => <<User/binary, $@, Server/binary>>,
-                    'jwt' => Token,
-                    'type' => <<"auth_info">>
-                  })
-		    ]),
+    jinfo(<<"auth_info">>, 
+          {'jid', <<User/binary, $@, Server/binary>>},
+          {'jwt', Token}),
     case verify_jwt(Server, User, Token, redis) of
         true ->
             JWK = ejabberd_option:jwt_key(Server),
@@ -166,16 +160,7 @@ check_claims(Fields, Signature, Server, User) ->
             %% No expiry in token => We consider token invalid:
             false;
         {ok, Exp} ->
-            logger:info("~p",
-                        [jiffy:encode(
-                            #{'mod' => ?MODULE,
-                              'fun' => ?FUNCTION_NAME,
-                              'now' => Now,
-                              'exp' => Exp,
-                              'type' => <<"claims_info">>
-                            })
-                        ]),
-
+            jinfo(<<"claims_info">>, {'now', Now}, {'exp', Exp}),
             if Exp > Now ->
                 ejabberd_hooks:run_fold(
                                 check_decoded_jwt,
@@ -198,7 +183,9 @@ verify_jwt(Server, User, Key, redis) ->
     Res = ejabberd_redis:q([<<"GET">>, Key]),
     logger:debug("redis:: GET ~p => ~p", [Key, Res]),
     case Res of
-        {ok, ErUser} when is_binary(ErUser) ->
+        {ok, ErUserJid} when is_binary(ErUserJid) ->
+            ErJid = jid:from_string(ErUserJid),
+            {ErUser, _, _} = jid:tolower(ErJid),
             User =:= ErUser;
         {_, _} -> 
             (fun verify_jwt/4)
@@ -216,13 +203,25 @@ verify_jwt(Server, User, Token, db) ->
         {selected, [{SqlUser}]} ->
             User =:= SqlUser 
             andalso 
-            insert_token_in_redis(Token, User)
+            insert_token_in_redis(Token, jid:make(User, Server))
     end.
 
-insert_token_in_redis(Token, User) ->
-    Res = ejabberd_redis:q([<<"SET">>, Token, User]),
+insert_token_in_redis(Token, Jid) ->
+    Res = ejabberd_redis:q([<<"SET">>, Token, jid:to_string(Jid)]),
     logger:debug("redis:: SET ~p => ~p", [Token, Res]),
     case Res of
         {ok, <<"OK">>} -> true;
         {_, _} -> false
     end.
+
+
+jinfo(Type, {Key1, Val1}, {Key2, Val2}) ->
+    logger:info("~s",
+                [jiffy:encode(
+                    #{'mod' => ?MODULE,
+                      'fun' => ?FUNCTION_NAME,
+                       Key1 => Val1,
+                       Key2 => Val2,
+                      'type' => Type
+                    })
+                ]).
