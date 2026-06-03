@@ -290,6 +290,7 @@ send_offline_message(({Action, #message{from = Sender, to = Recipient, type = Ch
   Server = gen_mod:get_module_proc(Recipient#jid.lserver,?PROCNAME),
   PushSource = case Action of
     #jid{} -> <<"offline_message_hook">>;
+    bounce -> <<"offline_message_hook">>;
     _ when is_binary(Action) -> <<"direct_call">>;
     _ -> <<"unknown">>
   end,

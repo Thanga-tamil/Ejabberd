@@ -3670,12 +3670,15 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
             ?INFO_MSG("meeting_reminder dispatch to=~ts online=~p resources=~p notify_msg_id=~ts meeting_msg_id=~ts",
                       [ToUserStr, IsOnline, TResources, NotifyMessageId, MessageIdAttr]),
             ejabberd_router:route(From, ToUserJid, XmlBody),
-            ?INFO_MSG("meeting_reminder routed via ejabberd_router to=~ts (offline_hook may also trigger send_offline_message)",
-                      [ToUserStr]),
-            fly_mod_offline_push:send_offline_message({FromServer, xmpp:decode(XmlBody)}),
-            ?INFO_MSG("meeting_reminder direct send_offline_message called to=~ts source=direct_call",
-                      [ToUserStr]),
-            ?INFO_MSG("meeting_reminder routed message_id=~ts to=~ts", [MessageIdAttr, ToUserStr])
+            if IsOnline ->
+                %% Online: route delivers stanza; push separately (offline hook does not run).
+                fly_mod_offline_push:send_offline_message({From, xmpp:decode(XmlBody)}),
+                ?INFO_MSG("meeting_reminder push via direct_call (online) to=~ts", [ToUserStr]);
+               true ->
+                %% Offline: route bounce triggers offline_message_hook push once; skip direct call.
+                ?INFO_MSG("meeting_reminder push via offline_hook only (offline) to=~ts", [ToUserStr])
+            end,
+            ?INFO_MSG("meeting_reminder done message_id=~ts to=~ts", [MessageIdAttr, ToUserStr])
         catch
             Class:Reason ->
                 ?ERROR_MSG("meeting_reminder failed message_id=~ts to=~ts: ~p:~p",
