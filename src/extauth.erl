@@ -66,7 +66,7 @@ check_password(User, Server, Password) ->
     {selected, _, _Result} ->
       Secure = <<"allow">>
   end,
-call_port(Server, [<<"auth">>, User, Server, Secure, LoginUrl, true]).
+call_port(Server, [<<"auth">>, User, Server, Secure, LoginUrl]).
 
 check_certificate(User, Server, Certificate) ->
     call_port(Server, [<<"certauth">>, User, Server, Certificate]).
