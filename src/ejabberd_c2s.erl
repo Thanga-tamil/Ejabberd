@@ -497,25 +497,21 @@ check_password_fun(_Mech, #{lserver := LServer}) ->
 	   Auth = ejabberd_auth:check_password_with_authmodule(U, AuthzId, LServer, P),
 	   TimeTaken = erlang:monotonic_time(millisecond) - StartTime,
 
-    	   {AuthResult, AuthMod} =
+    	   AuthResult =
     	   case Auth of
-		{true, Mod} -> {true, Mod};
-		{false, Mod} -> {false, Mod};
+		{true, _} -> true;
+		{false, _} -> false;
 		_ -> Auth
 	   end,
 	   logger:info("~s", 
 	            [jiffy:encode(
 			#{'mod' => ?MODULE,
 			  'fun' => ?FUNCTION_NAME,
-			  'auth' => AuthMod,
 			  'auth_result' => AuthResult,
 			  'time_taken_ms' => TimeTaken
 			})
 		    ]),
-	   case Auth of 
-		{false, _} -> false;
-		_ -> Auth
-	   end
+	   Auth
 
     end.
 
