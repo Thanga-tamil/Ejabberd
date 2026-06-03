@@ -251,7 +251,7 @@ check_password_with_authmodule(User, AuthzId, Server, Password, Digest, DigestGe
                                        LUser, LAuthzId, LServer, Password,
                                        Digest, DigestGen, Mod) of
                                     true -> {true, Mod};
-                                    false -> false;
+                                    false -> {false, Mod};
                                     {stop, true} -> {stop, {true, Mod}};
                                     {stop, false} -> {stop, false}
                                 end;
