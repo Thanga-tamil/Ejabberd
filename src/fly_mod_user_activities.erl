@@ -3666,19 +3666,13 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
 
         try
             TResources = ejabberd_sm:get_user_resources(TargetUser, FromServer),
-            IsOnline = length(TResources) =/= 0,
-            ?INFO_MSG("meeting_reminder dispatch to=~ts online=~p resources=~p notify_msg_id=~ts meeting_msg_id=~ts",
-                      [ToUserStr, IsOnline, TResources, NotifyMessageId, MessageIdAttr]),
             ejabberd_router:route(From, ToUserJid, XmlBody),
-            if IsOnline ->
-                %% Online: route delivers stanza; push separately (offline hook does not run).
-                fly_mod_offline_push:send_offline_message({From, xmpp:decode(XmlBody)}),
-                ?INFO_MSG("meeting_reminder push via direct_call (online) to=~ts", [ToUserStr]);
+            if length(TResources) =/= 0 ->
+                fly_mod_offline_push:send_offline_message({From, xmpp:decode(XmlBody)});
                true ->
-                %% Offline: route bounce triggers offline_message_hook push once; skip direct call.
-                ?INFO_MSG("meeting_reminder push via offline_hook only (offline) to=~ts", [ToUserStr])
+                ok
             end,
-            ?INFO_MSG("meeting_reminder done message_id=~ts to=~ts", [MessageIdAttr, ToUserStr])
+            ?INFO_MSG("meeting_reminder routed message_id=~ts to=~ts", [MessageIdAttr, ToUserStr])
         catch
             Class:Reason ->
                 ?ERROR_MSG("meeting_reminder failed message_id=~ts to=~ts: ~p:~p",

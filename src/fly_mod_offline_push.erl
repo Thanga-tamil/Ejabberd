@@ -133,13 +133,6 @@ handle_cast({pushnotification, <<"chat">>,
       end
       end,
       if Call =:= true ->
-        case ChatType of
-          <<"meeting_reminder">> ->
-            ?INFO_MSG("handle_cast meeting_reminder push to=~ts stanza_id=~ts",
-                      [jid:to_string(Recipient), fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs)]);
-          _ ->
-            ok
-        end,
         case catch send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) of
           {ok, _Result} -> ok;
           {error, Error} ->
@@ -284,25 +277,10 @@ groupcreationfunction(Proc, Type, From, Participants, Channel, GroupJID, SubEl, 
 %% @param record Packet
 %% @return atom
 %%send_offline_message(#message{from = Sender,to = Recipient,type = ChatType} = Pac) ->
-send_offline_message(({Action, #message{from = Sender, to = Recipient, type = ChatType, id = MsgId} = Pkt} = Acc)) ->
+send_offline_message(({_Action, #message{from = Sender, to = Recipient, type = ChatType} = Pkt} = Acc)) ->
   Packet = xmpp:encode(Pkt),
   SubEl = fxml:get_subtag_cdata(Packet, <<"body">>),
   Server = gen_mod:get_module_proc(Recipient#jid.lserver,?PROCNAME),
-  PushSource = case Action of
-    #jid{} -> <<"offline_message_hook">>;
-    bounce -> <<"offline_message_hook">>;
-    _ when is_binary(Action) -> <<"direct_call">>;
-    _ -> <<"unknown">>
-  end,
-  MeetingInfo =
-    case fxml:get_subtag_with_xmlns(Packet, <<"meeting">>, <<"urn:xmpp:receipts">>) of
-      false ->
-        <<"none">>;
-      #xmlel{attrs = MAttrs} ->
-        fxml:get_attr_s(<<"status">>, MAttrs)
-    end,
-  ?INFO_MSG("send_offline_message source=~ts from=~ts to=~ts msg_id=~ts chat_type=~p meeting_status=~ts action=~p",
-            [PushSource, jid:to_string(Sender), jid:to_string(Recipient), MsgId, ChatType, MeetingInfo, Action]),
   if ChatType == chat ->
     case SubEl of
       <<"">> ->
@@ -378,10 +356,6 @@ send_offline_message(({Action, #message{from = Sender, to = Recipient, type = Ch
       if Meeting =:= false ->
         ok;
         true ->
-          MeetingMsgId = fxml:get_attr_s(<<"message_id">>, Meeting#xmlel.attrs),
-          MeetingStatus = fxml:get_attr_s(<<"status">>, Meeting#xmlel.attrs),
-          ?INFO_MSG("send_offline_message meeting push source=~ts to=~ts stanza_id=~ts meeting_msg_id=~ts status=~ts",
-                    [PushSource, jid:to_string(Recipient), MsgId, MeetingMsgId, MeetingStatus]),
           push(Server, <<"chat">>, Sender, Recipient,
             <<"meeting_reminder">>, SubEl, Packet)
       end;
@@ -494,11 +468,6 @@ get_string() ->
 %% @return atom
 send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet, State) ->
   MsgId = fxml:get_attr_s(<<"id">>,Packet#xmlel.attrs),
-  if ChatType =:= <<"meeting_reminder">> ->
-    ?INFO_MSG("send_push_notifications entry meeting_reminder to=~ts from=~ts stanza_id=~ts",
-              [jid:to_string(Recipient), jid:to_string(Sender), MsgId]);
-    true -> ok
-  end,
   Rs = if ChatType == <<"meeting_reminder">> -> "";
     true -> has_more_resources(Recipient#jid.luser,Recipient#jid.server)
   end,
@@ -1034,8 +1003,6 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
       Meeting = fxml:get_subtag_with_xmlns(Packet, <<"meeting">>,
         <<"urn:xmpp:receipts">>),
       MessageId = fxml:get_attr_s(<<"message_id">>, Meeting#xmlel.attrs),
-      ?INFO_MSG("send_push_notifications meeting_reminder to=~ts device=~ts meeting_msg_id=~ts stanza_id=~ts",
-                [jid:to_string(To), DeviceType, MessageId, fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs)]),
       SessionId = fxml:get_attr_s(<<"session_id">>, Meeting#xmlel.attrs),
       RoomId = fxml:get_attr_s(<<"room_id">>, Meeting#xmlel.attrs),
       ChatId = fxml:get_attr_s(<<"chat_id">>, Meeting#xmlel.attrs),
