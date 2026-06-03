@@ -186,6 +186,9 @@ verify_jwt(Server, User, Key, redis) ->
         {ok, ErUserJid} when is_binary(ErUserJid) ->
             ErJid = jid:from_string(ErUserJid),
             {ErUser, _, _} = jid:tolower(ErJid),
+            logger:debug(
+            "redis userId validation => ~p == ~p", 
+            [User, ErUser]),
             User =:= ErUser;
         {_, _} -> 
             (fun verify_jwt/4)
