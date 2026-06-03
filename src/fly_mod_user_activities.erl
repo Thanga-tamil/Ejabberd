@@ -3665,9 +3665,16 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
                 children = []}]},
 
         try
-            ejabberd_router:route(From, ToUserJid, XmlBody),             
-            fly_mod_offline_push:send_offline_message({FromServer,xmpp:decode(XmlBody)}),
-            
+            TResources = ejabberd_sm:get_user_resources(TargetUser, FromServer),
+            IsOnline = length(TResources) =/= 0,
+            ?INFO_MSG("meeting_reminder dispatch to=~ts online=~p resources=~p notify_msg_id=~ts meeting_msg_id=~ts",
+                      [ToUserStr, IsOnline, TResources, NotifyMessageId, MessageIdAttr]),
+            ejabberd_router:route(From, ToUserJid, XmlBody),
+            ?INFO_MSG("meeting_reminder routed via ejabberd_router to=~ts (offline_hook may also trigger send_offline_message)",
+                      [ToUserStr]),
+            fly_mod_offline_push:send_offline_message({FromServer, xmpp:decode(XmlBody)}),
+            ?INFO_MSG("meeting_reminder direct send_offline_message called to=~ts source=direct_call",
+                      [ToUserStr]),
             ?INFO_MSG("meeting_reminder routed message_id=~ts to=~ts", [MessageIdAttr, ToUserStr])
         catch
             Class:Reason ->

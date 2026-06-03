@@ -601,30 +601,30 @@ handle_authenticated_packet(Pkt, #{lserver := LServer, jid := JID,
 	{FUserId, _, FResource} = jid:tolower(From),
 	{TUserId, _, TResource} = jid:tolower(To),
 
-	?LOG_INFO(
-	"run c2s_authenticated_packet hook: ~p",
-	[#{
-		stanza_id => StanzaId,
-		type => Type,
-		from_user_id => FUserId,
-		from_resource => FResource,
-		to_user_id => TUserId,
-		to_resource => TResource
-	}]),
+	% ?LOG_INFO(
+	% "run c2s_authenticated_packet hook: ~p",
+	% [#{
+	% 	stanza_id => StanzaId,
+	% 	type => Type,
+	% 	from_user_id => FUserId,
+	% 	from_resource => FResource,
+	% 	to_user_id => TUserId,
+	% 	to_resource => TResource
+	% }]),
 
     State1 = ejabberd_hooks:run_fold(c2s_authenticated_packet,
 				     LServer, State, [Pkt1]),
     #jid{luser = LUser} = JID,
-	?LOG_INFO(
-	"run user_send_packet hook: ~p",
-	[#{
-		stanza_id => StanzaId,
-		type => Type,
-		from_user_id => FUserId,
-		from_resource => FResource,
-		to_user_id => TUserId,
-		to_resource => TResource
-	}]),
+	% ?LOG_INFO(
+	% "run user_send_packet hook: ~p",
+	% [#{
+	% 	stanza_id => StanzaId,
+	% 	type => Type,
+	% 	from_user_id => FUserId,
+	% 	from_resource => FResource,
+	% 	to_user_id => TUserId,
+	% 	to_resource => TResource
+	% }]),
     {Pkt2, State2} = ejabberd_hooks:run_fold(
 		       user_send_packet, LServer, {Pkt1, State1}, []),
     case Pkt2 of
