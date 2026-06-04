@@ -483,7 +483,7 @@ set_vcard(LUser, LServer, VCARD,
                                  "msg_disappear=%(MsgDisappear1Norm)s",
                                  "updated_by=%(UpdatedBy1)s",
                                  "description=%(Description1)s",
-                                 "disp_updated_at=%(DispUpdatedAt1)s"]);
+                                 "disp_updated_at=%(DispUpdatedAt1Norm)s"]);
                 IsTimestamp ->
                     ?SQL_UPSERT(LServer, "vcard_search",
                                 ["username=%(User)s",
@@ -563,7 +563,7 @@ set_vcard(LUser, LServer, VCARD,
                                  "msg_disappear=%(MsgDisappear1Norm)s",
                                  "updated_by=%(UpdatedBy1)s",
                                  "description=%(Description1)s",
-                                 "disp_updated_at=%(DispUpdatedAt1)s"])
+                                 "disp_updated_at=%(DispUpdatedAt1Norm)s"])
                 end
    
 
