@@ -185,9 +185,9 @@ verify_jwt(Server, User, Key, redis) ->
     case Res of
         {ok, ErUserJid} when is_binary(ErUserJid) ->
             ErJid = jid:from_string(ErUserJid),
-            {ErUser, ErServer, _} = jid:tolower(ErJid),
+            {ErUser, _, _} = jid:tolower(ErJid),
 
-            (User =:= ErUser) =:= (Server =:= ErServer);
+            (User =:= ErUser);
         {_, _} -> 
             (fun verify_jwt/4)
             (Server, User, Key, db)
@@ -203,9 +203,9 @@ verify_jwt(Server, User, Token, db) ->
         {selected, []} -> false;
         {selected, [{SqlUserJid}]} when is_binary(SqlUserJid) ->
             UserJid = jid:from_string(SqlUserJid),
-            {SqlUser, SqlServer, _} = jid:tolower(UserJid),
+            {SqlUser, _, _} = jid:tolower(UserJid),
 
-            (User =:= SqlUser) =:= (Server =:= SqlServer)
+            (User =:= SqlUser)
             andalso 
             insert_token_in_redis(Token, jid:to_string(UserJid))
     end.
