@@ -3653,12 +3653,15 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
             if TargetUser == MsgFromUser -> MsgToUser;
                true -> MsgFromUser
             end,
-        if (ChatType == <<"chat">>) andalso (PeerUser =/= <<>>)
-           andalso meeting_reminder_users_blocked(FromServer, TargetUser, PeerUser) ->
-            ?INFO_MSG(
-                "meeting_reminder skipped blocked target=~ts peer=~ts from_user=~ts to_user=~ts",
-                [TargetUser, PeerUser, MsgFromUser, MsgToUser]);
-           true ->
+        SkipBlocked =
+            (ChatType == <<"chat">>) andalso (PeerUser =/= <<>>)
+                andalso meeting_reminder_users_blocked(FromServer, TargetUser, PeerUser),
+        case SkipBlocked of
+            true ->
+                ?INFO_MSG(
+                    "meeting_reminder skipped blocked target=~ts peer=~ts from_user=~ts to_user=~ts",
+                    [TargetUser, PeerUser, MsgFromUser, MsgToUser]);
+            false ->
         XmlBody = #xmlel{name = <<"message">>,
             attrs = [
                 {<<"from">>, jid:to_string(From)},
