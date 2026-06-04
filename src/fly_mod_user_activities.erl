@@ -3576,6 +3576,17 @@ story_like(From, RequestType, SubEl, IQ) ->
         }
     ).
 
+%% True if either user has the other on their privacy block list.
+meeting_reminder_users_blocked(LServer, UserA, UserB) ->
+    meeting_reminder_user_blocked(LServer, UserA, UserB)
+        orelse meeting_reminder_user_blocked(LServer, UserB, UserA).
+
+meeting_reminder_user_blocked(LServer, Blocker, Blocked) ->
+    case catch fly_mod_utils:check_blockedlist(LServer, Blocker, Blocked) of
+        {selected, _, [[_]]} -> true;
+        _ -> false
+    end.
+
 meeting_reminder(From, RequestType, SubEl, IQ) ->
     #jid{lserver = FromServer} = From,
 
@@ -3638,6 +3649,19 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
         ToUserJid = jid:make(TargetUser, FromServer, <<>>),
         ToUserStr = jid:to_string(ToUserJid),
 
+        PeerUser =
+            if TargetUser == MsgFromUser -> MsgToUser;
+               true -> MsgFromUser
+            end,
+        SkipBlocked =
+            (ChatType == <<"chat">>) andalso (PeerUser =/= <<>>)
+                andalso meeting_reminder_users_blocked(FromServer, TargetUser, PeerUser),
+        case SkipBlocked of
+            true ->
+                ?INFO_MSG(
+                    "meeting_reminder skipped blocked target=~ts peer=~ts from_user=~ts to_user=~ts",
+                    [TargetUser, PeerUser, MsgFromUser, MsgToUser]);
+            false ->
         XmlBody = #xmlel{name = <<"message">>,
             attrs = [
                 {<<"from">>, jid:to_string(From)},
@@ -3665,14 +3689,19 @@ meeting_reminder(From, RequestType, SubEl, IQ) ->
                 children = []}]},
 
         try
-            ejabberd_router:route(From, ToUserJid, XmlBody),             
-            fly_mod_offline_push:send_offline_message({FromServer,xmpp:decode(XmlBody)}),
-            
+            TResources = ejabberd_sm:get_user_resources(TargetUser, FromServer),
+            ejabberd_router:route(From, ToUserJid, XmlBody),
+            if length(TResources) =/= 0 ->
+                fly_mod_offline_push:send_offline_message({From, xmpp:decode(XmlBody)});
+               true ->
+                ok
+            end,
             ?INFO_MSG("meeting_reminder routed message_id=~ts to=~ts", [MessageIdAttr, ToUserStr])
         catch
             Class:Reason ->
                 ?ERROR_MSG("meeting_reminder failed message_id=~ts to=~ts: ~p:~p",
                            [MessageIdAttr, ToUserStr, Class, Reason])
+        end
         end
     end, TargetUsers),
 

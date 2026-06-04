@@ -49,14 +49,14 @@ on_user_send_packet({#message{from = From,to = To,type = Type, id = MessageId } 
     StanzaId = MessageId,
     {FUserId, _, FResource2} = jid:tolower(From),
     {TUserId, _, TResource} = jid:tolower(To),
-    ?LOG_INFO(
-      "user_send_packet:fly_mod_offline_web for to_user=~p with message details: ~p",
-      [TUserId, #{stanza_id => StanzaId,
-         type => Type,
-         from_user_id => FUserId,
-         from_resource => FResource2,
-         to_user_id => TUserId,
-         to_resource => TResource}]),
+    % ?LOG_INFO(
+    %   "user_send_packet:fly_mod_offline_web for to_user=~p with message details: ~p",
+    %   [TUserId, #{stanza_id => StanzaId,
+    %      type => Type,
+    %      from_user_id => FUserId,
+    %      from_resource => FResource2,
+    %      to_user_id => TUserId,
+    %      to_resource => TResource}]),
     Packet = xmpp:encode(Pkt),
   IsValid = fly_mod_utils:validate_license(FServer, true, <<"chat">>),
   if IsValid =:= true ->
