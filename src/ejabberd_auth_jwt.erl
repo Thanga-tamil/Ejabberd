@@ -34,7 +34,7 @@
          user_exists/2, use_cache/1]).
 
 %% 'ejabberd_hooks' callback:
--export([check_decoded_jwt/5]).
+-export([check_decoded_jwt/6]).
 
 -include("logger.hrl").
 -include("ejabberd_sql_pt.hrl").
@@ -104,20 +104,22 @@ use_cache(_) ->
 %%%----------------------------------------------------------------------
 %%% 'ejabberd_hooks' callback
 %%%----------------------------------------------------------------------
-check_decoded_jwt(true, Fields, _Signature, Server, User) ->
+check_decoded_jwt(true, Fields, _Signature, Server, User, Token) ->
     JidField = ejabberd_option:jwt_jid_field(Server),
     case maps:find(JidField, Fields) of
         {ok, SJid} when is_binary(SJid) ->
             try
                 JID = jid:decode(SJid),
-                JID#jid.luser == User andalso JID#jid.lserver == Server
+                (JID#jid.luser == User andalso
+                 JID#jid.lserver == Server) andalso
+                 verify_jwt(Server, User, Token, redis)
             catch error:{bad_jid, _} ->
                 false
             end;
         _ -> % error | {ok, _UnknownType}
             false
     end;
-check_decoded_jwt(Acc, _, _, _, _) ->
+check_decoded_jwt(Acc, _, _, _, _, _) ->
     Acc.
 
 %%%----------------------------------------------------------------------
@@ -128,29 +130,24 @@ check_jwt_token(User, Server, Token) ->
     jinfo(<<"auth_info">>, 
           {'jid', <<User/binary, $@, Server/binary>>},
           {'jwt', Token}),
-    case verify_jwt(Server, User, Token, redis) of
-        true ->
-            JWK = ejabberd_option:jwt_key(Server),
-            logger:debug("secret.jwt k ~p", [JWK]),
+    JWK = ejabberd_option:jwt_key(Server),
+    logger:debug("secret.jwt k ~p", [JWK]),
 
-            try jose_jwt:verify(JWK, Token) of
-                {true, {jose_jwt, Fields}, Signature} ->
-                    check_claims(Fields, Signature, Server, User);
-                {false, _, _} ->
-                    false
-            catch
-                A:B ->
-                    logger:info("jwt verification failed for user ~p@~p~n 
-                           JWK and token: ~p~n with error: ~p",
-                           [User, Server, {JWK, Token}, {A, B}]),
+    try jose_jwt:verify(JWK, Token) of
+        {true, {jose_jwt, Fields}, Signature} ->
+            check_claims(Fields, Signature, Server, User, Token);
+        {false, _, _} ->
+            false
+    catch
+        A:B ->
+            logger:info("jwt verification failed for user ~p@~p~n 
+                    JWK and token: ~p~n with error: ~p",
+                    [User, Server, {JWK, Token}, {A, B}]),
 
-                    false
-            end;
-        false -> 
             false
     end.
 
-check_claims(Fields, Signature, Server, User) ->
+check_claims(Fields, Signature, Server, User, Token) ->
     Now = erlang:system_time(second),
 
     logger:info("jwt_fields => ~p", [Fields]),
@@ -166,7 +163,7 @@ check_claims(Fields, Signature, Server, User) ->
                                 check_decoded_jwt,
                                 Server,
                                 true,
-                                [Fields, Signature, Server, User]);
+                                [Fields, Signature, Server, User, Token]);
             true ->
                 %% return false, if token has expired
                 logger:warning("auth token has expired at ~p, 
@@ -185,9 +182,9 @@ verify_jwt(Server, User, Key, redis) ->
     case Res of
         {ok, ErUserJid} when is_binary(ErUserJid) ->
             ErJid = jid:from_string(ErUserJid),
-            {ErUser, _, _} = jid:tolower(ErJid),
+            {ErUser, ErServer, _} = jid:tolower(ErJid),
 
-            (User =:= ErUser);
+            User =:= ErUser andalso Server =:= ErServer;
         {_, _} -> 
             (fun verify_jwt/4)
             (Server, User, Key, db)
@@ -203,9 +200,9 @@ verify_jwt(Server, User, Token, db) ->
         {selected, []} -> false;
         {selected, [{SqlUserJid}]} when is_binary(SqlUserJid) ->
             UserJid = jid:from_string(SqlUserJid),
-            {SqlUser, _, _} = jid:tolower(UserJid),
+            {SqlUser, SqlServer, _} = jid:tolower(UserJid),
 
-            (User =:= SqlUser)
+            User =:= SqlUser andalso Server =:= SqlServer
             andalso 
             insert_token_in_redis(Token, jid:to_string(UserJid))
     end.
