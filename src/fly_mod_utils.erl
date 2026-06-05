@@ -20,6 +20,7 @@
   update_sync_roster/4,
   del_sync_roster/3,
   update_delete_roster/2,
+  get_hide_online_privac/2,
   get_roster_delete/2,
   update_roster_avail/3,
   remove_bulk_notification/2,
