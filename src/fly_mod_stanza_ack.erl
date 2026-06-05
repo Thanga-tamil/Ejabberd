@@ -227,7 +227,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
       ElementAcknowledge = xmpp:get_subtag(Packet, #delivered{}),
       {delivered,Id,_,_,_Time} = ElementAcknowledge,
       send_ack_response(From, To, Id, <<"delivered">>),
-      fly_mod_utils:remove_offline(FServer, Id, MResource),
+      fly_mod_utils:remove_offline(FServer, FUser, Id, MResource),
       NewReceivePacket = xmpp:set_from_to(Packet,From, To),
       GetReceiveTimestamp = xmpp:get_subtag(Packet, #timestampmsg{}),
       if GetReceiveTimestamp =:= false ->
@@ -264,7 +264,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
         end,
         fly_mod_utils:update_recent_group_unread_chat(Id,FUser,FServer),
         fly_mod_utils:update_msg_seen_receipt(FServer, Id, integer_to_binary(ReadReceipt)),
-        case fly_mod_utils:get_mobile_user_message(TUser, TServer) of
+        case ReceiptStatus =/= <<"0">> andalso fly_mod_utils:get_mobile_user_message(TUser, TServer) of
           true ->
             mod_offline:store_packet({SeenTimeStampedPacket,xmpp:decode(SeenTimeStampedPacket)});
           false ->
@@ -314,7 +314,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
         true ->
           #acknowledge{id = ReceiptId} = ReceiptsElementAcknowledge,
 
-          fly_mod_utils:remove_offline(FServer, ReceiptId, MResource)
+          fly_mod_utils:remove_offline(FServer, FUser, ReceiptId, MResource)
       end;
     U when (U == seen_receipt) ->
       ReceiptsElementAcknowledge = xmpp:get_subtag(Packet, #acknowledge{}),
@@ -323,7 +323,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
         true ->
           #acknowledge{id = ReceiptId} = ReceiptsElementAcknowledge,
 
-          fly_mod_utils:remove_offline(FServer, ReceiptId, MResource)
+          fly_mod_utils:remove_offline(FServer, FUser, ReceiptId, MResource)
       end;
     U when (U == recall_receipt) ->
       ReceiptsElementAcknowledge = xmpp:get_subtag(Packet, #acknowledge{}),
@@ -332,7 +332,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
         true ->
           #acknowledge{id = ReceiptId} = ReceiptsElementAcknowledge,
 
-          fly_mod_utils:remove_offline(FServer, ReceiptId, MResource)
+          fly_mod_utils:remove_offline(FServer, FUser, ReceiptId, MResource)
 
       end;
     U when (U == ok) ->

@@ -420,7 +420,6 @@ process_mix_join(#iq{to = To, from = From,
     Mod = gen_mod:db_mod(ServerHost, ?MODULE),
     case Mod:get_channel(ServerHost, Chan, Host) of
 	{ok, {_, _, Key}} ->
-	    ID = make_id(From, Key),
 	    InputNick = JoinReq#mix_join.nick,
 	    BFrom = jid:remove_resource(From),
 	    Nodes = filter_nodes(JoinReq#mix_join.subscribe),

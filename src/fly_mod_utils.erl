@@ -27,7 +27,6 @@
   delete_bulk_message_row/3,
   delete_bulk_messages/3,
   get_bulk_message_details/4, 
-  remove_bulk_notification/2,
   get_vcard/2,
   get_vcard_from_search/2,
   get_user_device/2,
@@ -78,9 +77,9 @@
   clear_all/2,
   delete_message/2,
   remove_offline/2,
-  remove_offline/3,
+  remove_offline/4,
   remove_offline_by_user/2,
-  update_offline/3,
+  update_offline/4,
   update_seen/4,
   update_delivery/4,
   update_delivery_offline/2,
@@ -148,7 +147,7 @@
   get_reply_message/2,
 
   update_push_sent/4,
-  set_msg_reaction/8,
+  set_msg_reaction/9,
   generate_uuid_v4/0,
   update_reaction_status_chat/6,
   chat_history_query/2,
@@ -849,8 +848,11 @@ check_chatmuted(LServer,FUser, TUser) ->
 %% &param  userid
 %% @return list
 delete_spool(LServer,User) ->
-  ejabberd_sql:sql_query(LServer,
-    [<<"delete from spool where username ='">>,User, <<"';">>]).
+  case ejabberd_sql:sql_query(LServer,
+    [<<"delete from spool where username ='">>,User, <<"';">>]) of
+    {updated, N} -> ?INFO_MSG("[delete_spool] ~p row(s) deleted from spool for user ~ts", [N, User]);
+    _ -> ok
+  end.
 
 %% update broadcast name when admin updates
 %%
@@ -940,16 +942,32 @@ get_last_message_id(#jid{luser = FUser,lserver = FServer},#jid{luser = ToUser,ls
 %% @return Update
 
 create_user_ifuserexit(LServer, From, Nickname, Image, MobileNumber, Status, Email) ->
+  UserIdResult = get_user_id(LServer, From),
   case user_exit(LServer, From) of
     {selected,[<<"username">>],[]} ->
-      ejabberd_sql:sql_query(
-        LServer,
-        [<<"insert into chat_users (username,name,image,mobile_number,status_msg,email) values ('">>,From, <<"','">>,ejabberd_sql:escape(Nickname), <<"','">>,Image, <<"','">>,MobileNumber, <<"','">>,ejabberd_sql:escape(Status), <<"','">>,Email, <<"') ;">>]);
+      case UserIdResult of
+        {ok, UserId} ->
+          ejabberd_sql:sql_query(
+            LServer,
+            [<<"insert into chat_users (username,user_id,name,image,mobile_number,status_msg,email) values ('">>,From, <<"','">>,UserId, <<"','">>,ejabberd_sql:escape(Nickname), <<"','">>,Image, <<"','">>,MobileNumber, <<"','">>,ejabberd_sql:escape(Status), <<"','">>,Email, <<"') ;">>]);
+        not_found ->
+          ejabberd_sql:sql_query(
+            LServer,
+            [<<"insert into chat_users (username,name,image,mobile_number,status_msg,email) values ('">>,From, <<"','">>,ejabberd_sql:escape(Nickname), <<"','">>,Image, <<"','">>,MobileNumber, <<"','">>,ejabberd_sql:escape(Status), <<"','">>,Email, <<"') ;">>])
+      end;
     {selected,[<<"username">>],[_]} ->
-      ejabberd_sql:sql_query(
-        LServer,
-        [<<"update chat_users set name = '">>,ejabberd_sql:escape(Nickname), <<"', image = '">>,Image, <<"', mobile_number = '">>,MobileNumber, <<"', status_msg = '">>,ejabberd_sql:escape(Status), <<"', email = '">>,Email, <<"' where username='">>,From,<<"';">>])
+      case UserIdResult of
+        {ok, UserId} ->
+          ejabberd_sql:sql_query(
+            LServer,
+            [<<"update chat_users set user_id = '">>,UserId, <<"', name = '">>,ejabberd_sql:escape(Nickname), <<"', image = '">>,Image, <<"', mobile_number = '">>,MobileNumber, <<"', status_msg = '">>,ejabberd_sql:escape(Status), <<"', email = '">>,Email, <<"' where username='">>,From,<<"';">>]);
+        not_found ->
+          ejabberd_sql:sql_query(
+            LServer,
+            [<<"update chat_users set name = '">>,ejabberd_sql:escape(Nickname), <<"', image = '">>,Image, <<"', mobile_number = '">>,MobileNumber, <<"', status_msg = '">>,ejabberd_sql:escape(Status), <<"', email = '">>,Email, <<"' where username='">>,From,<<"';">>])
+      end
     end.
+
 
 %% Check user is exist or not
 %%
@@ -981,8 +999,11 @@ delete_group_user(LServer,GroupId,User) ->
               LServer,
               [<<"delete  from mix_pam  where  channel ='">>,GroupId,<<"' and username='">>,User,<<"';">>]),
 
-ejabberd_sql:sql_query(LServer,
-    [<<"Delete from spool WHERE  to_user = '">>,GroupId, <<"' and username = '">>,User, <<"' ;">>]),
+case ejabberd_sql:sql_query(LServer,
+    [<<"Delete from spool WHERE  to_user = '">>,GroupId, <<"' and username = '">>,User, <<"' ;">>]) of
+  {updated, N} -> ?INFO_MSG("[delete_group_user] ~p row(s) deleted from spool for user ~ts group ~ts", [N, User, GroupId]);
+  _ -> ok
+end,
 
 ejabberd_sql:sql_query(LServer,
     [<<"Delete from chat_recent WHERE  from_user = '">>,GroupId, <<"' and to_user = '">>,User, <<"' ;">>]).
@@ -1285,24 +1306,45 @@ get_group_message_status(#jid{luser = FUser,lserver = Server, lresource = _Resou
 %% &param MessageId
 %% @return List
 
-remove_offline(Server,  MessageId) -> 
- ejabberd_sql:sql_query(Server,[<<"DELETE from spool where message_id='">>,MessageId,<<"';">>]).
+remove_offline(Server,  MessageId) ->
 
-remove_offline(Server, MessageId, LResource) -> 
- ejabberd_sql:sql_query(Server,[<<"DELETE from spool where message_id='">>,MessageId,<<"' and (device_id = '">>,LResource,<<"' or device_id = '') ;">>]).
+  ejabberd_sql:sql_query(
+    Server,
+    [<<"DELETE from spool where message_id='">>,MessageId,<<"';">>]).
 
+remove_offline(Server, Username, MessageId, LResource) ->
+  case ejabberd_sql:sql_query(Server,
+    [<<"SELECT seq FROM spool FORCE INDEX (idx_user_msg_id) WHERE username='">>,Username,
+     <<"' AND message_id='">>,MessageId,
+     <<"' AND device_id IN ('">>,LResource,<<"', '');">>]) of
+    {selected, _, []} ->
+      ok;
+    {selected, _, Rows} ->
+      SeqList = lists:join(<<",">>, [seq_to_bin(S) || [S] <- Rows]),
+      ejabberd_sql:sql_query(Server, [<<"DELETE FROM spool WHERE seq IN (">>, SeqList, <<");">>]);
+    _ ->
+      ok
+  end.
  
 remove_offline_by_user(Server, FUser) ->
   ejabberd_sql:sql_query(
     Server,
     [<<"delete from spool where username= '">>,FUser,<<"' and device_id not in (select device_id from chat_users_details where username='">>,FUser,<<"');">>]).
 
-update_offline(Server, MessageId, LResource) ->
-
-  ejabberd_sql:sql_query(
-  Server,
-  [<<"update spool set admin_delivered = 1 where message_id='">>,MessageId,<<"' and (device_id = '">>,LResource,<<"' or device_id = '') ;">>]).
-
+update_offline(Server, Username, MessageId, LResource) ->
+  case ejabberd_sql:sql_query(Server,
+    [<<"SELECT seq FROM spool FORCE INDEX (idx_user_msg_id) WHERE username='">>,Username,
+     <<"' AND message_id='">>,MessageId,
+     <<"' AND device_id IN ('">>,LResource,<<"', '');">>]) of
+    {selected, _, []} ->
+      ok;
+    {selected, _, Rows} ->
+      SeqList = lists:join(<<",">>, [seq_to_bin(S) || [S] <- Rows]),
+      ejabberd_sql:sql_query(Server, [<<"UPDATE spool SET admin_delivered=1 WHERE seq IN (">>, SeqList, <<");">>]);
+    _ ->
+      ok
+  end.
+  
 read_all(Server, Fuser, Tuser)->
   ejabberd_sql:sql_query(
     Server,
@@ -1412,17 +1454,29 @@ clear_particular_call_log(#jid{luser = User,lserver = Server},RoomId) ->
 %% &param RecallStatus
 %% @return List
 
-update_recall(#jid{luser = _User,lserver = Server}, MessageId) ->
+update_recall(#jid{luser = User,lserver = Server}, MessageId) ->
   Range = binary:split(MessageId, <<",">>, [global]),
-  lists:foreach(fun(N) ->
-  %ejabberd_sql:sql_query(Server, [<<"delete FROM spool  where message_id='">>,N,<<"';">>]), % commented to retain recalled message in offline storage
-    
-  ejabberd_sql:sql_query(Server, [<<"update message_status set recall_status =  1 where message_id='">>,N,<<"';">>]),
+  F = fun() ->
+    lists:foreach(fun(N) ->
+      %ejabberd_sql:sql_query(Server, [<<"delete FROM spool  where message_id='">>,N,<<"';">>]), % commented to retain recalled message in offline storage
 
-  ejabberd_sql:sql_query(Server, [<<"DELETE FROM message_favourite WHERE message_id = '">>,N,<<"';">>]),
+      if User /= <<"123456789">> ->
+        ejabberd_sql:sql_query_t([<<"update message_status set recall_status =  1 where message_id='">>,N,<<"';">>]),
+        ejabberd_sql:sql_query_t([<<"update chat_recent set recall_status  =  1 where message_id='">>,N,<<"';">>]);
+      true ->
+          ok
+      end,
 
-  ejabberd_sql:sql_query(Server, [<<"update chat_recent set recall_status  =  1 where message_id='">>,N,<<"';">>])
-  end, Range).
+      ejabberd_sql:sql_query_t([<<"DELETE FROM message_favourite WHERE message_id = '">>,N,<<"';">>])
+    end, Range)
+  end,
+
+  case ejabberd_sql:sql_transaction(Server, F) of
+      {atomic, _} ->
+          ok;
+      {aborted, Reason} ->
+          ?ERROR_MSG("update_recall failed message_id=~p reason=~p", [MessageId, Reason])
+  end.
 
 %% insert message status
 %%
@@ -2345,12 +2399,50 @@ get_users_devices_detail(FServer, TUserIds, Codes) ->
       []
   end.
 
-set_seen_receipt(FServer, FUser, Action) -> 
-  ejabberd_sql:sql_query(FServer,[<<"insert into privacy_settings (username, seen_receipt, created_at) value ('">>,FUser,<<"', '">>,Action,<<"', now()) on duplicate key update seen_receipt='">>,Action,<<"', updated_at = now();">>]).
-  
-set_hide_profile(FServer, FUser, Action) -> 
-  ejabberd_sql:sql_query(FServer,[<<"insert into privacy_settings (username, hide_profile, created_at) value ('">>,FUser,<<"', '">>,Action,<<"', now()) on duplicate key update hide_profile='">>,Action,<<"', updated_at = now();">>]),
-  ejabberd_sql:sql_query(FServer,[<<"update vcard set updated_at = now() where username = '">>,FUser,<<"';">>]).
+set_seen_receipt(FServer, FUser, Action) ->
+    case get_user_id(FServer, FUser) of
+        {ok, UserId} ->
+            ejabberd_sql:sql_query(FServer, [
+                <<"INSERT INTO privacy_settings (username, user_id, seen_receipt, created_at) 
+                   VALUES ('">>, FUser, <<"','">>, UserId, <<"','">>, Action, <<"', NOW())
+                   ON DUPLICATE KEY UPDATE 
+                   seen_receipt='">>, Action, <<"', 
+                   user_id='">>, UserId, <<"',
+                   updated_at=NOW();">>
+            ]);
+        not_found ->
+            ejabberd_sql:sql_query(FServer, [
+                <<"INSERT INTO privacy_settings (username, seen_receipt, created_at) 
+                   VALUES ('">>, FUser, <<"','">>, Action, <<"', NOW())
+                   ON DUPLICATE KEY UPDATE 
+                   seen_receipt='">>, Action, <<"',
+                   updated_at=NOW();">>
+            ])
+    end.
+set_hide_profile(FServer, FUser, Action) ->
+  case get_user_id(FServer, FUser) of
+    {ok, UserId} ->
+      ejabberd_sql:sql_query(FServer, [
+        <<"insert into privacy_settings (username, user_id, hide_profile, created_at) 
+           values ('">>, FUser, <<"','">>, UserId, <<"','">>, Action, <<"', now()) 
+           on duplicate key update 
+           hide_profile='">>, Action, <<"', 
+           user_id='">>, UserId, <<"', 
+           updated_at = now();">>
+      ]);
+    not_found ->
+      ejabberd_sql:sql_query(FServer, [
+        <<"insert into privacy_settings (username, hide_profile, created_at) 
+           values ('">>, FUser, <<"','">>, Action, <<"', now()) 
+           on duplicate key update 
+           hide_profile='">>, Action, <<"', 
+           updated_at = now();">>
+      ])
+  end,
+  %% runs always
+  ejabberd_sql:sql_query(FServer, [
+    <<"update vcard set updated_at = now() where username = '">>, FUser, <<"';">>
+  ]).
 
 get_hide_profile_privacy(Server, User) ->
   ejabberd_sql:sql_query(Server,[<<"select hide_profile from privacy_settings where username='">>,User,<<"';">>]).
@@ -2368,6 +2460,49 @@ get_rosters_to_update_privacy(User, Server) ->
 update_mix_participant(FServer, LUser, NickName) -> 
   ejabberd_sql:sql_query(FServer, [<<"update mix_participant set nick = '">>,NickName,<<"' where channel = '">>,LUser,<<"';">>]).
 
+get_user_id(FServer, FUser) ->
+    case ejabberd_sql:sql_query(FServer,
+        [<<"SELECT user_id FROM users WHERE username='">>, FUser, <<"' LIMIT 1;">>]) of
+        {selected, _, [[UserId]]} when is_binary(UserId), UserId =/= <<>> -> {ok, UserId};
+        _ -> not_found
+    end.
+
+set_hide_online(FServer, FUser, Action) ->
+    U = ejabberd_sql:escape(FUser),
+    A = case Action of
+            <<"1">> -> <<"1">>;
+            <<"true">> -> <<"1">>;
+            _ -> <<"0">>
+        end,
+
+    case get_user_id(FServer, FUser) of
+        {ok, UserId} ->
+            UID = ejabberd_sql:escape(UserId),
+            ejabberd_sql:sql_query(FServer, [
+                <<"insert into privacy_settings (username, user_id, online_status, created_at) 
+                   values ('">>, U, <<"','">>, UID, <<"','">>, A, <<"',now()) 
+                   on duplicate key update 
+                   online_status='">>, A, <<"', 
+                   user_id='">>, UID, <<"', 
+                   updated_at=now()">>
+            ]);
+
+        not_found ->
+            ejabberd_sql:sql_query(FServer, [
+                <<"insert into privacy_settings (username, online_status, created_at) 
+                   values ('">>, U, <<"','">>, A, <<"',now()) 
+                   on duplicate key update 
+                   online_status='">>, A, <<"', 
+                   updated_at=now()">>
+            ])
+    end.
+
+get_hide_online_privacy(Server, User) ->
+    U = ejabberd_sql:escape(User),
+    ejabberd_sql:sql_query(Server,
+      [<<"select online_status from privacy_settings where username='">>,
+       U, <<"';">>]).
+       
 is_session_exists(FServer, User) ->
   ?LOG_INFO("Checking session exists for user: ~p", [User]),
   case ejabberd_sql:sql_query(FServer,
@@ -2582,12 +2717,12 @@ get_now_timestamp() ->
     {{Y, M, D}, {H, Min, S}} = calendar:universal_time(),
     iolist_to_binary(io_lib:format("~4..0B-~2..0B-~2..0B ~2..0B:~2..0B:~2..0B", [Y, M, D, H, Min, S])).
 
-set_msg_reaction(Lserver, Luser, Recipient, MessageId, Action, EmojiId, ChatType, StanzaId) ->
+set_msg_reaction(Lserver, Luser, Recipient, MessageId, Action, EmojiId, ChatType, StanzaId, MsgSender) ->
   Now = get_now_timestamp(),
 
   MsgReactionQ = 
       [<<"insert into message_reactions (username, message_id, chat_id, created_at, is_deleted, emoji_id, chat_type) values 
-      ('">>,Luser,<<"','">>,MessageId,<<"','">>,Recipient,<<"','">>,Now,<<"','0','">>,EmojiId,<<"','">>,ChatType,<<"')
+      ('">>,Luser,<<"','">>,MessageId,<<"','">>,MsgSender,<<"','">>,Now,<<"','0','">>,EmojiId,<<"','">>,ChatType,<<"')
       on duplicate key update updated_at = '">>,Now,<<"', is_deleted = '">>,if Action == <<"remove">> -> <<"1">>; true -> <<"0">> end,
       <<"', emoji_id='">>,EmojiId,<<"';">>],
 
@@ -2601,38 +2736,27 @@ set_msg_reaction(Lserver, Luser, Recipient, MessageId, Action, EmojiId, ChatType
           values 
           (
           '">>,Luser,<<"', '">>,Recipient,<<"', '">>,StanzaId,<<"', 'emoji', 'reaction', '0', '0', '0', '0', '0', NULL, '0', '0', '0', '', '', '0', '', NULL, now(), 
-          '0000-00-00 00:00:00', '0000-00-00 00:00:00', now(), '0', '{}', '">>,MessageId,<<"', '', '0', NULL
+          '0000-00-00 00:00:00', '0000-00-00 00:00:00', now(), unix_timestamp(), '{}', '">>,MessageId,<<"', '', '0', NULL
       );">>],
 
     DeleteMsgQ = [<<"DELETE FROM message_status WHERE edit_message_id = '">>,MessageId,<<"' AND from_user = '">>,Luser,<<"' AND to_user = '">>,Recipient,<<"' and chat_type = 'reaction';">>],
 
   ejabberd_sql:sql_query(Lserver, MsgReactionQ),
-  case Action of 
-      <<"add">> -> 
-        ?LOG_INFO("[add reaction: insert message_status] StanzaId as reaction_id: ~p", [StanzaId]),
-        ejabberd_sql:sql_query(Lserver, MsgStatusQ);
-      <<"update">> -> 
-        ?LOG_INFO("[update reaction: delete and insert message_status] msg_id ~p", [MessageId]),
-        ejabberd_sql:sql_query(Lserver, DeleteMsgQ),
-        ejabberd_sql:sql_query(Lserver, MsgStatusQ);
-      <<"remove">> -> 
-        ?LOG_INFO("[remove reaction: delete message_status] msg_id ~p", [MessageId]),
-        ejabberd_sql:sql_query(Lserver, DeleteMsgQ);
-      _ ->
-        ?LOG_INFO("invalid action for msg reaction"),
-        ok
-  end,
 
-  Id = 
-  case ejabberd_sql:sql_query(Lserver, [<<"select id from message_reactions where username = '">>,Luser,<<"' and message_id = '">>,MessageId,<<"' and chat_id = '">>,Recipient,<<"';">>]) of
-    {selected, _, [[ReactionId]]} -> 
-      ReactionId;
-    _ -> 
-      ?LOG_INFO("message reaction Id not found"),
-      <<"">>
-    end,
+  spawn(fun() ->
+      case Action of
+          <<"add">> ->
+              ejabberd_sql:sql_query(Lserver, MsgStatusQ);
+          <<"update">> ->
+              ejabberd_sql:sql_query(Lserver, DeleteMsgQ),
+              ejabberd_sql:sql_query(Lserver, MsgStatusQ);
+          <<"remove">> ->
+              ejabberd_sql:sql_query(Lserver, DeleteMsgQ)
+      end
+  end),
 
-  {Now, Id}.
+Now.
+
 
 generate_uuid_v4() ->
     <<A:32, B:16, C:16, D:16, E:48>> = crypto:strong_rand_bytes(16),
@@ -2915,7 +3039,7 @@ update_msg_reaction_sent(Server, ReactionIds, C2sUser) ->
     Error ->
         ?LOG_ERROR("SQL error: ~p", [Error]),
         ok
-  end.    
+  end.
 
 get_mix_channel_service(Server, Channel) ->
   case ejabberd_sql:sql_query(Server, [<<"select service from mix_channel where channel='">>,Channel,<<"';">>]) of
