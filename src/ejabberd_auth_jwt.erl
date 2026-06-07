@@ -184,7 +184,9 @@ verify_jwt(Server, User, Key, redis) ->
             ErJid = jid:from_string(ErUserJid),
             {ErUser, ErServer, _} = jid:tolower(ErJid),
 
-            User =:= ErUser andalso Server =:= ErServer;
+            User =:= ErUser 
+            andalso 
+            Server =:= ErServer;
         {_, _} -> 
             (fun verify_jwt/4)
             (Server, User, Key, db)
@@ -193,28 +195,52 @@ verify_jwt(Server, User, Token, db) ->
     logger:info(
     "verify token=> ~p in sql for user=> ~p", [Token, User]),
 
-    Q = ?SQL("SELECT @(jid)s FROM chat_access_tokens
-              WHERE token=%(Token)s"),
+    Q = ?SQL("SELECT @(jid)s, @(token_expiry_time)s 
+              FROM chat_access_tokens WHERE token=%(Token)s"),
 
     case ejabberd_sql:sql_query(Server, Q) of
         {selected, []} -> false;
-        {selected, [{SqlUserJid}]} when is_binary(SqlUserJid) ->
+        {selected, [{SqlUserJid, SqlTokenExp}]} when is_binary(SqlUserJid) ->
             UserJid = jid:from_string(SqlUserJid),
             {SqlUser, SqlServer, _} = jid:tolower(UserJid),
 
-            User =:= SqlUser andalso Server =:= SqlServer
+            User =:= SqlUser 
             andalso 
-            insert_token_in_redis(Token, jid:to_string(UserJid))
+            Server =:= SqlServer
+            andalso 
+            insert_token_in_redis(Token, jid:to_string(UserJid), SqlTokenExp)
     end.
 
-insert_token_in_redis(Token, Jid) ->
-    Res = ejabberd_redis:q([<<"SET">>, Token, Jid]),
-    logger:debug("redis:: SET ~p => ~p", [Token, Res]),
+insert_token_in_redis(Token, Jid, ExpiryTime) ->
+    Expiry = finalize_expiry(ExpiryTime),
+
+    Res = ejabberd_redis:q([<<"SET">>, Token, 
+            Jid, <<"EX">>, integer_to_binary(Expiry)]),
+
+    logger:debug("redis:: SET ~p => ~p with TTL ~p seconds", 
+                 [Token, Res, Expiry]),
+
     case Res of
         {ok, <<"OK">>} -> true;
         {_, _} -> false
     end.
 
+finalize_expiry(ExpiryTime) ->
+    Now = erlang:system_time(second),
+
+    case ExpiryTime of
+        ExpBin when is_binary(ExpBin) ->
+            case binary_to_integer(ExpBin) of
+                Exp when is_integer(Exp) ->
+                    max(0, Exp - Now);
+                _ ->
+                    3600  % fallback: 1 hour
+            end;
+        Exp when is_integer(Exp) ->
+            max(0, Exp - Now);
+        _ ->
+            3600  % fallback: 1 hour
+    end.
 
 jinfo(Type, {Key1, Val1}, {Key2, Val2}) ->
     logger:info("~s",
