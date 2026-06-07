@@ -34,7 +34,7 @@
          user_exists/2, use_cache/1]).
 
 %% 'ejabberd_hooks' callback:
--export([check_decoded_jwt/6]).
+-export([check_decoded_jwt/7]).
 
 -include("logger.hrl").
 -include("ejabberd_sql_pt.hrl").
@@ -104,7 +104,7 @@ use_cache(_) ->
 %%%----------------------------------------------------------------------
 %%% 'ejabberd_hooks' callback
 %%%----------------------------------------------------------------------
-check_decoded_jwt(true, Fields, _Signature, Server, User, Token) ->
+check_decoded_jwt(true, Fields, _Signature, Server, User, Token, Exp) ->
     JidField = ejabberd_option:jwt_jid_field(Server),
     case maps:find(JidField, Fields) of
         {ok, SJid} when is_binary(SJid) ->
@@ -112,14 +112,14 @@ check_decoded_jwt(true, Fields, _Signature, Server, User, Token) ->
                 JID = jid:decode(SJid),
                 (JID#jid.luser == User andalso
                  JID#jid.lserver == Server) andalso
-                 verify_jwt(Server, User, Token, redis)
+                 verify_jwt(Server, User, Token, Exp, redis)
             catch error:{bad_jid, _} ->
                 false
             end;
         _ -> % error | {ok, _UnknownType}
             false
     end;
-check_decoded_jwt(Acc, _, _, _, _, _) ->
+check_decoded_jwt(Acc, _, _, _, _, _, _) ->
     Acc.
 
 %%%----------------------------------------------------------------------
@@ -163,7 +163,8 @@ check_claims(Fields, Signature, Server, User, Token) ->
                                 check_decoded_jwt,
                                 Server,
                                 true,
-                                [Fields, Signature, Server, User, Token]);
+                                [Fields, Signature, Server, 
+                                 User, Token, Exp]);
             true ->
                 %% return false, if token has expired
                 logger:warning("auth token has expired at ~p, 
@@ -176,7 +177,7 @@ check_claims(Fields, Signature, Server, User, Token) ->
 % in cache check sql as a fallback if not found consider the 
 % token is invalid::unauth
 
-verify_jwt(Server, User, Key, redis) ->
+verify_jwt(Server, User, Key, Exp, redis) ->
     Res = ejabberd_redis:q([<<"GET">>, Key]),
     logger:debug("redis:: GET ~p => ~p", [Key, Res]),
     case Res of
@@ -188,31 +189,31 @@ verify_jwt(Server, User, Key, redis) ->
             andalso 
             Server =:= ErServer;
         {_, _} -> 
-            (fun verify_jwt/4)
-            (Server, User, Key, db)
+            (fun verify_jwt/5)
+            (Server, User, Key, Exp, db)
     end;
-verify_jwt(Server, User, Token, db) ->
+verify_jwt(Server, User, Token, Exp, db) ->
     logger:info(
     "verify token=> ~p in sql for user=> ~p", [Token, User]),
 
-    Q = ?SQL("SELECT @(jid)s, @(token_expiry_time)s 
-              FROM chat_access_tokens WHERE token=%(Token)s"),
+    Q = ?SQL("SELECT @(jid)s FROM chat_access_tokens WHERE token=%(Token)s"),
 
     case ejabberd_sql:sql_query(Server, Q) of
         {selected, []} -> false;
-        {selected, [{SqlUserJid, SqlTokenExp}]} when is_binary(SqlUserJid) ->
+        {selected, [{SqlUserJid}]} when is_binary(SqlUserJid) ->
             UserJid = jid:from_string(SqlUserJid),
             {SqlUser, SqlServer, _} = jid:tolower(UserJid),
+            Jid = jid:to_string(UserJid),
 
             User =:= SqlUser 
             andalso 
             Server =:= SqlServer
             andalso 
-            insert_token_in_redis(Token, jid:to_string(UserJid), SqlTokenExp)
+            insert_token_in_redis(Token, Jid, Exp)
     end.
 
-insert_token_in_redis(Token, Jid, ExpiryTime) ->
-    Expiry = finalize_expiry(ExpiryTime),
+insert_token_in_redis(Token, Jid, Exp) ->
+    Expiry = finalize_expiry(Exp),
 
     Res = ejabberd_redis:q([<<"SET">>, Token, 
             Jid, <<"EX">>, integer_to_binary(Expiry)]),
@@ -225,22 +226,8 @@ insert_token_in_redis(Token, Jid, ExpiryTime) ->
         {_, _} -> false
     end.
 
-finalize_expiry(ExpiryTime) ->
-    Now = erlang:system_time(second),
-
-    case ExpiryTime of
-        ExpBin when is_binary(ExpBin) ->
-            case binary_to_integer(ExpBin) of
-                Exp when is_integer(Exp) ->
-                    max(0, Exp - Now);
-                _ ->
-                    3600  % fallback: 1 hour
-            end;
-        Exp when is_integer(Exp) ->
-            max(0, Exp - Now);
-        _ ->
-            3600  % fallback: 1 hour
-    end.
+finalize_expiry(Exp) when is_integer(Exp) ->
+    max(1, Exp - erlang:system_time(second)).
 
 jinfo(Type, {Key1, Val1}, {Key2, Val2}) ->
     logger:info("~s",
