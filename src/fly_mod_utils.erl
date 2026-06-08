@@ -1552,7 +1552,7 @@ DisappearAtValue =
   %ejabberd_sql:sql_query(ToServer, [<<"delete from spool where username = '">>,ToUser, <<"' and message_id ='">>,MessageId, <<"';">>]), % commented to retain recalled message on edit in offline storage 
   ejabberd_sql:sql_query( ToServer, [<<"update  message_status set edit_status = 1, status = 0,  edit_message_id = '">>, EditMsgId , <<"' where message_id = '">>, MessageId, <<"' ;">>])
   end,
-  ejabberd_sql:sql_query(ToServer, [<<"insert into chat_message_edit_history (from_user,to_user,message_id,edit_message_id,chat_type,msg,meta_data,disappear_at) values ('">>, User, <<"','">>, ToUser, <<"','">>, MessageId, <<"','">>, EditMsgId, <<"','chat','">>, Msg, <<"','">>, MetaData, <<"', ">>, DisappearAtValue, <<" );">>]).
+  ejabberd_sql:sql_query( ToServer, [<<"insert into chat_message_edit_history (from_user,to_user, message_id, edit_message_id, chat_type, msg, meta_data, disappear_at) values ('">>, User, <<"', '">>, ToUser,  <<"', '">>, MessageId, <<"', '">>, EditMsgId, <<"', 'chat', '">>, Msg, <<"', '">>, MetaData, <<"', ">>,DisappearAtValue,<<" );">>]).
 
 mute_status(Lserver, Luser, Tuser)->
   ejabberd_sql:sql_query(Lserver,
@@ -1872,19 +1872,31 @@ get_message_status(#jid{lserver = FServer}, Msgid) ->
   ejabberd_sql:sql_query(FServer,
     [<<"SELECT message_id, status, to_user,updated_at, recall_status FROM message_status WHERE message_id ='">>,Msgid,<<"';">>]).
 
-get_groupmessage_status(#jid{luser = FUser, lserver = FServer}, Msgid) ->
-  ejabberd_sql:sql_query(FServer,
-    iolist_to_binary([<<"SELECT status FROM message_status WHERE to_user != '">>,FUser,<<"' and message_id = '">>,Msgid,<<"' order by status asc limit 1;">>])).
-
-
 get_message_time(FServer , Msgid) ->
   ejabberd_sql:sql_query(FServer,
     [<<"SELECT message_time FROM message_status WHERE  message_id = '">>,Msgid,<<"'  order by id asc limit 1;">>]).
 
-message_status(FServer, Msgid, Fuser) ->
-  ejabberd_sql:sql_query(FServer,
-    iolist_to_binary([<<"SELECT status FROM message_status WHERE to_user != '">>,Fuser,<<"' and message_id = '">>,Msgid,<<"' order by status asc limit 1;">>])).
+get_groupmessage_status(#jid{luser = FUser, lserver = FServer}, Msgid) ->
+  message_status(FServer, Msgid, FUser).
 
+message_status(FServer, Msgid, Fuser) ->
+  CheckMixHost = string:str(binary_to_list(FServer), binary_to_list(<<"mix.">>)),
+
+  ?LOG_INFO("[message_status] FServer: ~p, CheckMixHost: ~p", [FServer, CheckMixHost]),
+
+  Server = 
+  if CheckMixHost =:= 1 ->
+       ejabberd_router:host_of_route(FServer);
+     true ->
+       FServer
+  end,
+
+  ?LOG_INFO("Server used for query: ~p", [Server]),
+
+  ejabberd_sql:sql_query(Server,
+             [<<"SELECT status FROM message_status WHERE 
+                 to_user != '">>,Fuser,<<"' and message_id = '">>,Msgid,<<"' 
+                 order by status asc limit 1;">>]).
 
 message_status_new(FServer, Msgid, Fuser) ->
   ejabberd_sql:sql_query(FServer,
@@ -1896,7 +1908,7 @@ check_group_exists(FServer, GroupId) ->
     [<<"SELECT from_user FROM message_status WHERE from_user  = '">>,GroupId,<<"';">>]).
 
 get_existing_group_info(FServer, GroupId) ->
-  ejabberd_sql:sql_query(FServer, [<<"SELECT nickname, description, image, msg_disappear, on_ongoing_call, ongoing_call_link FROM vcard_search WHERE username = '">>,GroupId,<<"' ;">>]).
+  ejabberd_sql:sql_query(FServer, [<<"SELECT nickname, description, image, msg_disappear FROM vcard_search WHERE username = '">>,GroupId,<<"' ;">>]).
 
 group_notify_message(#jid{luser = AUser, lserver = AServer},#jid{luser = FUser}, TUser, Groupid,NotifyId, RequestType, Msgid, TimeStamp, Txt)->
   % MsgId = get_iq_message_id(8),
@@ -2364,23 +2376,41 @@ remove_poll_offline(FServer, FResource, PollMsgId)->
       0
   end.
 
-get_spool_seq(Server, User, MessageId, DeviceId) -> 
+
+seq_to_bin(S) when is_integer(S) -> integer_to_binary(S);
+seq_to_bin(S) -> S.
+
+get_spool_seq(Server, User, MessageId, DeviceId) ->
   Result = ejabberd_sql:sql_query(Server, [<<"select seq from spool where username ='">>,User,<<"' and message_id = '">>,MessageId,<<"' and device_id='">>,DeviceId,<<"' limit 1;">>]),
   case Result of
-    {selected, _, [[Seq]]} -> 
+    {selected, _, [[Seq]]} ->
       Seq;
-    _ -> 
+    _ ->
       0
   end.
 
-batch_remove_spool(Server, User, Seq, DeviceId) -> 
-    DeleteQ = ejabberd_sql:sql_query(Server, [<<"DELETE FROM spool WHERE username ='">>,User,<<"' and device_id='">>,DeviceId,<<"' and seq <= '">>,Seq,<<"' ;">>]),
-    case DeleteQ of
-      {updated, D} -> 
-        D;
-      _ -> 
+batch_remove_spool(Host, User, Seq, DeviceId) ->
+
+  F = fun() ->
+    case ejabberd_sql:sql_query_t(
+      [<<"SELECT seq FROM spool FORCE INDEX (idx_username_device_id_seq) WHERE username='">>,User,
+      <<"' AND device_id='">>,DeviceId,
+      <<"' AND seq <= '">>,Seq,<<"';">>]) of
+      {selected, _, []} ->
+        0;
+      {selected, _, Rows} ->
+        SeqList = lists:join(<<",">>, [seq_to_bin(S) || [S] <- Rows]),
+        case ejabberd_sql:sql_query_t([<<"DELETE FROM spool WHERE seq IN (">>, SeqList, <<");">>]) of
+          {updated, D} ->
+            D;
+          _ ->
+            0
+        end;
+      _ ->
         0
-    end.
+    end
+  end,
+  ejabberd_sql:sql_transaction(Host, F).
 
 get_mobile_user_message(TUser, TServer) ->
   Resources = ejabberd_sm:get_user_resources(TUser,
@@ -2503,7 +2533,7 @@ add_userin_roster_asunknown(LServer, ToUser, FUser,Subscription) ->
     [<<"SELECT username FROM rosterusers WHERE username = '">>, FUser ,<<"' and jid_username = '">>, ToUser ,<<"' ;">>]) of
     {selected, _, []} ->
       Jid1 = make_jid_s(ToUser, LServer),
-      ejabberd_sql:sql_query(LServer,[<<"INSERT INTO rosterusers(username, nickname, jid, jid_username, subscription, ask, server, type, relation) values ('">>,FUser, <<"','">>,FUser, <<"','">>, Jid1,<<"','">>,ToUser,<<"','">>,Subscription,<<"','N','N','item', 'U');">>]);
+      ejabberd_sql:sql_query(LServer,[<<"INSERT INTO rosterusers(username, nick, jid, jid_username, subscription, ask, server, type, relation) values ('">>,FUser, <<"','">>,FUser, <<"','">>, Jid1,<<"','">>,ToUser,<<"','">>,Subscription,<<"','N','N','item', 'U');">>]);
     _ ->
       ok
   end.
