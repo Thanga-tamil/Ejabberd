@@ -740,7 +740,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
   Profile = fxml:get_subtag(SubEl, <<"profile">>),
   VCard = fxml:get_subtag(Profile, <<"vCard">>),
   #jid{user = LUser} = To,
-  #jid{lserver = FServer} = From,
+  {_, FServer, Lresource} = jid:tolower(From),
   Status = <<"group_profile_updated">>,
   ?INFO_MSG("process_set_group_info -> NewStatus: ~p, From: ~p, To: ~p", [NewStatus, From, To]),
   ?INFO_MSG("VCard : ~p", [VCard]), 
@@ -911,7 +911,7 @@ process_set_group_info_web(From, To, SubEl, IQ) ->
   Profile = fxml:get_subtag(SubEl, <<"profile">>),
   VCard = fxml:get_subtag(Profile, <<"vCard">>),
   #jid{user = LUser} = To,
-  {_, FServer, Lresource} = jid:tolower(From),
+  #jid{lserver = FServer} = From,
   Status = <<"group_profile_updated">>,
   case catch fly_mod_utils:get_group_users(FServer, LUser) of
     {selected, _, []} ->
