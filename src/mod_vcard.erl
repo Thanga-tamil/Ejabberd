@@ -402,10 +402,6 @@ make_vcard_search(User, LUser, LServer, VCARD) ->
 	        	[{elem, <<"updatedBy">>}, cdata]),
     DispUpdatedAt = fxml:get_path_s(VCARD,
 	        	[{elem, <<"dispUpdatedAt">>}, cdata]),
-    OnOngoingCall = fxml:get_path_s(VCARD,
-	        	[{elem, <<"onOngoingCall">>}, cdata]),
-    OngoingCallLink = fxml:get_path_s(VCARD,
-	        	[{elem, <<"ongoingCallLink">>}, cdata]),
     EMail = case EMail1 of
 	      <<"">> -> EMail2;
 	      _ -> EMail1
@@ -470,9 +466,7 @@ make_vcard_search(User, LUser, LServer, VCARD) ->
           msg_disappear = MsgDisappear,
           updated_by = UpdatedBy,
           disp_updated_at = DispUpdatedAt,
-          description = Description,
-          on_ongoing_call = OnOngoingCall,
-          ongoing_call_link = OngoingCallLink}.
+          description = Description}.
 
 -spec vcard_iq_set(iq()) -> iq() | {stop, stanza_error()}.
 vcard_iq_set(#iq{from = From, lang = Lang, sub_els = [VCard]} = IQ) ->
