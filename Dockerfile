@@ -38,7 +38,6 @@ RUN chmod +x /opt/ejabberd/sso-auth
 
 RUN mkdir -p /opt/ejabberd/certs
 COPY limits.conf /etc/security/limits.conf
-### Move Source code files  and Install ###
 
 # ejabberd build (unchanged)
 COPY . /tmp/ejabberd/
