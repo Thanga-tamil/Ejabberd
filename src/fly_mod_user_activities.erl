@@ -1001,19 +1001,28 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
   
   fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Privacy settings updated successfully">>}).
   
-  acknowledge(From,RequestType,SubEl,IQ) ->
-    
+acknowledge(From,RequestType,SubEl,IQ) ->
+
   #jid{user = FUser, lserver = FServer,lresource = LResource} = From,
   MsgId = fxml:get_path_s(SubEl, [{attr, <<"id">>}]),
+
+  ?INFO_MSG("acknowledge called by user=~s server=~s resource=~s msgId=~s", [FUser, FServer, LResource, MsgId]),
+  
   Substring = string:str(binary_to_list(LResource),binary_to_list(<<"Mobile-">>)),
   if Substring =:= 1 ->
     MResource = fly_mod_utils:get_device_from_resource(LResource);
   true ->
     MResource = <<"">>
   end,
+
   Seq = fly_mod_utils:get_spool_seq(FServer, FUser, MsgId, MResource),
   Result = fly_mod_utils:batch_remove_spool(FServer, FUser, Seq, MResource),
-  fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Ack successfully">>}).
+
+  ?LOG_INFO("clear spool on acknowledge: 
+             user=~s server=~s resource=~s msgId=~s seq=~p result=~p",
+             [FUser, FServer, LResource, MsgId, Seq, Result]),
+
+fly_mod_utils:generate_subel(IQ, #user_activities{type = RequestType, result_type = <<"Ack successfully">>}).
 
 read_all(From,RequestType,SubEl,IQ) ->
   #jid{user = FUser, lserver = FServer,lresource = LResource} = From,

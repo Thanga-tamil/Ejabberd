@@ -740,7 +740,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
                                                             ejabberd_sql:sql_query(LServer, [RecentQ])
                                                     end),
 
-						DisappearAtValue =
+						     DisappearAtValue =
 									case DisappearAt of
 										<<>> ->
 										<<"NULL">>;
