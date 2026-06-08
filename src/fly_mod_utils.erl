@@ -1560,7 +1560,7 @@ update_recall(#jid{luser = User,lserver = Server}, MessageId) ->
       end,
 
       ejabberd_sql:sql_query_t([<<"UPDATE call_sessions SET reminder_before_minutes= ' ',  scheduled_at = '', 
-                                   message_id = '' WHERE message_id = '">>, N, <<"';">>])
+                                   message_id = '' WHERE message_id = '">>, N, <<"';">>]),
       ejabberd_sql:sql_query_t([<<"DELETE FROM message_favourite WHERE message_id = '">>,N,<<"';">>])
     end, Range)
   end,
