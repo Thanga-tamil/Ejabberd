@@ -129,7 +129,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
           MsgContent = xmpp:get_text(Packet#message.body),
 
       DecryptedMessage = fly_mod_security:aes_decrpyt(binary_to_list(IdValue), MsgContent),
-      Message1 = uri_string:unquote(binary_to_list(DecryptedMessage)),
+      Message1 = uri_string:percent_decode(binary_to_list(DecryptedMessage)),
       ParsedMessageJson = jiffy:decode(response_to_binary(Message1)),
       MessageJson = proplists:get_value(<<"message">>, element(1, ParsedMessageJson)),
 
@@ -137,7 +137,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
               JSON = "{\"model\": \"gpt-4\",\"messages\": [ {\"role\": \"system\",\"content\": \"you are a content moderation engine in bank for arabic and english language. Identify all sensitive information like password & creditcards and offensive languages.Provide response in Json format only wihtout newline character  . always provide keyword senseitive True or false offensive true or false message reason\" }, {\"role\": \"user\",\"content\": \"" ++ binary_to_list(MessageJson)++ "\"}]}",
               Text = jiffy:decode(JSON),
 
-    Base64Crypt = binary_to_list(uri_string:unquote(jiffy:encode(Text))),
+    Base64Crypt = binary_to_list(uri_string:percent_decode(jiffy:encode(Text))),
 
               Request = {"https://api.openai.com/v1/chat/completions", [{"Authorization", "Bearer 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"}], "application/json", Base64Crypt},
                 try httpc:request(post, Request, [], []) of
