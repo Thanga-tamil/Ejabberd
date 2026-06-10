@@ -1036,6 +1036,12 @@ process_admin_remove_participant(From, To, SubEl, IQ) ->
   case catch fly_mod_utils:get_participants(FServer, TUser, fly_mod_utils:get_user_from_string_jid(ParticipantData)) of
       {selected, _, []} ->
       ?INFO_MSG("process_admin_remove_participant participant not found ~p",[TUser]),
+      case catch fly_mod_utils:get_group_users(FServer, TUser) of                                                                                 
+        {selected, _, GroupMembers} ->                                                                                                            
+          JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),                                                                            
+          mod_mix:notify_participant_left_api(FServer, To, From, FromJID, FromJID, JIDs);                                                         
+        _ -> ok
+      end,
       fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Participant not removed in group">>});
     {selected, _, _GroupMembers} ->
       ?INFO_MSG("process_admin_remove_participant FromJID ~p",[FromJID]),
