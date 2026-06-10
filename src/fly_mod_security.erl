@@ -90,13 +90,13 @@ aes_decrpyt(Key, Base64Crypt) ->
 
     JSON = "{\"message_type\":\"auto_text\",\"message\":\"" ++ binary_to_list(Base64Crypts)++ "\"}",
     Text = jiffy:decode(JSON),
-    Base64Crypt = binary_to_list(uri_string:unquote(jiffy:encode(Text))),
+    Base64Crypt = binary_to_list(uri_string:percent_decode(jiffy:encode(Text))),
     % ?INFO_MSG("Base64Crypt ~p", [Base64Crypt]),
     Decrypt = crypto:crypto_one_time(aes_256_cbc, get_hash_key(binary_to_list(Key)), Iv, Base64Crypt, [{encrypt,true},{padding,pkcs_padding}]),
     EncryptedText = base64:encode(Decrypt).
     % ?INFO_MSG("EncryptedTexts ~p", [EncryptedText]),
     % DecryptedMessage = fly_mod_security:aes_decrpyt(binary_to_list(Key), EncryptedText),
-    % ParsedMessageJson = jiffy:decode(uri_string:unquote(binary_to_list(DecryptedMessage))),
+    % ParsedMessageJson = jiffy:decode(uri_string:percent_decode(binary_to_list(DecryptedMessage))),
     % ?INFO_MSG("ParsedMessageJson  ~p", [ParsedMessageJson]),
     % EncryptedText.
 
@@ -104,7 +104,7 @@ aes_decrpyt(Key, Base64Crypt) ->
 
     JSON = "{\"replyTo\":\"" ++ binary_to_list(ReplyId)++ "\",\"message_type\":\"" ++ binary_to_list(MessageType)++ "\",\"message\":\"" ++ binary_to_list(Base64Crypts)++ "\"}",
     Text = jiffy:decode(JSON),
-    Base64Crypt = binary_to_list(uri_string:unquote(jiffy:encode(Text))),
+    Base64Crypt = binary_to_list(uri_string:percent_decode(jiffy:encode(Text))),
     ?INFO_MSG("Base64Crypt ~p", [Base64Crypt]),
     Decrypt = crypto:crypto_one_time(aes_256_cbc, get_hash_key(binary_to_list(Key)), Iv, Base64Crypt, [{encrypt,true},{padding,pkcs_padding}]),
     EncryptedText = base64:encode(Decrypt).
