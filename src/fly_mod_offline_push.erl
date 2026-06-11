@@ -2098,7 +2098,15 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
       {selected, _, ITokens} ->
         lists:map(fun(G) ->
           [Touser, IOSDevice, IOSDeviceUserType, IOSDevicePushType] = G,
-        ios_send_bulk_push(Server, Stanza, Touser, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"0">>, IOSDevice, Expiry, State,<<"13above">>,IOSDeviceUserType, IOSDevicePushType)
+          FUser = fly_mod_utils:get_user_from_string_jid(MesssageSend),
+          if FUser =:= Touser ->
+                ?LOG_INFO("restrict own push for ios, mode = 0, userId: [~p]", [Touser]),
+                ok;
+              true ->
+                ios_send_bulk_push(Server, Stanza, Touser, MessageContent, FromUser, 
+                FlatTimeStamp, ChatType, GroupID, <<"0">>, IOSDevice, Expiry, 
+                State, <<"13above">>,IOSDeviceUserType, IOSDevicePushType)
+          end
         end,ITokens)
     end,
     case catch fly_mod_utils:get_bulk_voip_user_device(Server,
@@ -2116,7 +2124,15 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
     {selected, _, IOTokens} ->
       lists:map(fun(G) ->
       [Touser, IOSDevices, IOSDevicesUserType, IOSDevicesPushType] = G,
-        ios_send_bulk_push(Server, Stanza, Touser, MessageContent, FromUser, FlatTimeStamp, ChatType, GroupID, <<"1">>, IOSDevices, Expiry, State,<<"13above">>,IOSDevicesUserType, IOSDevicesPushType)
+          FUser = fly_mod_utils:get_user_from_string_jid(MesssageSend),
+          if FUser =:= Touser ->
+                ?LOG_INFO("restrict own push for ios, mode = 1, userId: [~p]", [Touser]),
+                ok;
+              true ->
+                ios_send_bulk_push(Server, Stanza, Touser, MessageContent, FromUser, 
+                FlatTimeStamp, ChatType, GroupID, <<"1">>, IOSDevices, Expiry, 
+                State, <<"13above">>,IOSDevicesUserType, IOSDevicesPushType)
+          end
         end,IOTokens)
     end,
     case catch fly_mod_utils:get_bulk_voip_user_device(Server,

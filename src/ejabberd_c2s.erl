@@ -131,25 +131,8 @@ send(#{lserver := LServer} = State, Pkt) ->
 
     case ejabberd_hooks:run_fold(c2s_filter_send, LServer, {Pkt1, State}, []) of
 	{drop, State1} -> 
-		?LOG_INFO("after running c2s_filter_send drop at user_receive_packet xmpp_stream_in: ~p",
-			[#{stanza_id => StanzaId,
-			   type => Type,
-			   from_user_id => FUserId,
-			   from_resource => FResource,
-			   to_user_id => TUserId,
-			   to_resource => TResource
-			}]), 
 			State1;
 	{Pkt2, State1} -> 
-		% ?LOG_INFO("xmpp_stream_in send to reciever success: ~p",
-		% 	[#{
-		% 	   stanza_id => StanzaId,
-		% 	   type => Type,
-		% 	   from_user_id => FUserId,
-		% 	   from_resource => FResource,
-		% 	   to_user_id => TUserId,
-		% 	   to_resource => TResource
-		% 	}]),
 	xmpp_stream_in:send(State1, Pkt2)
     end.
 
@@ -258,20 +241,6 @@ process_info(#{lserver := LServer} = State, {route, Packet}) ->
 		     end,
 
     if Pass ->
-	StanzaId = xmpp:get_id(Packet),
-	From = xmpp:get_from(Packet),
-	To = xmpp:get_to(Packet),
-	Type = xmpp:get_type(Packet),
-	{FUserId, _, FResource} = jid:tolower(From),
-	{TUserId, _, TResource} = jid:tolower(To),
-	% ?LOG_INFO(
-	%   "run user_receive_packet hook: ~p",
-	%   [#{stanza_id => StanzaId,
-	%      type => Type,
-	%      from_user_id => FUserId,
-	%      from_resource => FResource,
-	%      to_user_id => TUserId,
-	%      to_resource => TResource}]),
 	{Packet1, State2} = ejabberd_hooks:run_fold(
 			user_receive_packet, LServer,
 			{Packet, State1}, []),
@@ -616,39 +585,10 @@ handle_authenticated_packet(Pkt, #{lserver := LServer, jid := JID,
 %% Contus code ended %%
     Pkt1 = xmpp:put_meta(Pkt, ip, IP),
 
-	StanzaId = xmpp:get_id(Pkt),
-	From = xmpp:get_from(Pkt),
-	To = xmpp:get_to(Pkt),
-	Type = xmpp:get_type(Pkt),
-
-	{FUserId, _, FResource} = jid:tolower(From),
-	{TUserId, _, TResource} = jid:tolower(To),
-
-	% ?LOG_INFO(
-	% "run c2s_authenticated_packet hook: ~p",
-	% [#{
-	% 	stanza_id => StanzaId,
-	% 	type => Type,
-	% 	from_user_id => FUserId,
-	% 	from_resource => FResource,
-	% 	to_user_id => TUserId,
-	% 	to_resource => TResource
-	% }]),
-
     State1 = ejabberd_hooks:run_fold(c2s_authenticated_packet,
 				     LServer, State, [Pkt1]),
     ?LOGX(Pkt1, "start user_send_packet hook for message packet"),
     #jid{luser = LUser} = JID,
-	% ?LOG_INFO(
-	% "run user_send_packet hook: ~p",
-	% [#{
-	% 	stanza_id => StanzaId,
-	% 	type => Type,
-	% 	from_user_id => FUserId,
-	% 	from_resource => FResource,
-	% 	to_user_id => TUserId,
-	% 	to_resource => TResource
-	% }]),
     {Pkt2, State2} = ejabberd_hooks:run_fold(
 		       user_send_packet, LServer, {Pkt1, State1}, []),
     case Pkt2 of
