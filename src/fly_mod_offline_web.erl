@@ -47,6 +47,17 @@ stop(Host) ->
 %% Function triggers when receive message packets from sender
 on_user_send_packet({#message{from = From,to = To,type = Type, id = MessageId } = Pkt, _C2SState}) ->
     #jid{luser = FUser, lserver = FServer,lresource = FResource} = From,
+    StanzaId = MessageId,
+    {FUserId, _, FResource2} = jid:tolower(From),
+    {TUserId, _, TResource} = jid:tolower(To),
+    % ?LOG_INFO(
+    %   "user_send_packet:fly_mod_offline_web for to_user=~p with message details: ~p",
+    %   [TUserId, #{stanza_id => StanzaId,
+    %      type => Type,
+    %      from_user_id => FUserId,
+    %      from_resource => FResource2,
+    %      to_user_id => TUserId,
+    %      to_resource => TResource}]),
     Packet = xmpp:encode(Pkt),
   IsValid = fly_mod_utils:validate_license(FServer, true, <<"chat">>),
   if IsValid =:= true ->
@@ -99,55 +110,53 @@ store_offline_user_send(Packet, _C2SState, #jid{luser = FUser, lserver = FServer
 
   fly_mod_offline_push:send_own_offline_message(From, To, xmpp:encode(Packet)),
   
-  case fly_mod_utils:get_mobile_user_message(FUser, FServer) of
-    true ->
-      {U, S, R} = jid:tolower(From),
-      Sender = jid:make({U, S, R}),
-      Dest = jid:make({U, S, <<>>}),
-      
-      case fly_mod_utils:is_carbon_copy(Packet) of 
-        false ->
-          NewPacket = build_forward_packet(From, Packet, Sender, Dest, sent),
-          ContentAcknowledge = xmpp:get_subtag(Packet, #chatcontent{}),
-          
-          if (ContentAcknowledge =:= false)  -> 
-            ok;
-          true ->
-            
-            if ContentAcknowledge == false ->
-              MessageType = <<"">>,
-              Topicid = <<"">>,
-              MetaData = <<"">>,
-              MentionList = <<"">>,
-              EditMsgid = MessageId;
-            true ->
-              {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,MentionList, DisappearAt ,_} = ContentAcknowledge
-            end,
+  {U, S, R} = jid:tolower(From),
+  Sender = jid:make({U, S, R}),
+  Dest = jid:make({U, S, <<>>}),
 
-            if EditMsgid =/= MessageId ->
-              ejabberd_sql:sql_query(FServer, [<<"delete from spool where username = '">>,FUser, <<"' and message_id ='">>,MessageId, <<"';">>]);
-              true ->
-                ok
-            end
-
-          end,
-          ?LOGX(Packet, "::store 'sent' carbon copy in offline::"),
-          mod_offline:store_packet({_C2SState, NewPacket});
-        true ->
-          ok
-      end;
+  case fly_mod_utils:is_carbon_copy(Packet) of
     false ->
+      NewPacket = build_forward_packet(From, Packet, Sender, Dest, sent),
+      ContentAcknowledge = xmpp:get_subtag(Packet, #chatcontent{}),
+
+      if (ContentAcknowledge =:= false) ->
+        ok;
+      true ->
+
+        if ContentAcknowledge == false ->
+          MessageType = <<"">>,
+          Topicid = <<"">>,
+          _MetaData = <<"">>,
+          _MentionList = <<"">>,
+          EditMsgid = MessageId;
+        true ->
+          {_,_,_,_, _MessageType, _Topicid, _MetaData, EditMsgid,_MentionList, _DisappearAt, _} = ContentAcknowledge
+        end,
+
+        if EditMsgid =/= MessageId ->
+          case ejabberd_sql:sql_query(FServer, [<<"delete from spool where username = '">>,FUser, <<"' and message_id ='">>,MessageId, <<"';">>]) of
+            {updated, N} -> ?INFO_MSG("[on_user_send_packet] ~p row(s) deleted from spool for user ~ts message_id ~ts edit_msg_id ~ts", [N, FUser, MessageId, EditMsgid]);
+            _ -> ok
+          end;
+          true ->
+            ok
+        end
+
+      end,
+      ?INFO_MSG("[spool] Storing packet to spool user=~p message_id=~p", [FUser, MessageId]),
+      mod_offline:store_packet({_C2SState,NewPacket});
+    true ->
       ok
   end.
 
 % -spec build_forward_packet(jid(), message(), jid(), jid(), direction()) -> message().
-build_forward_packet(JID, #message{type = T} = Msg, Sender, Dest, Direction) ->
+build_forward_packet(JID, #message{type = T, id = MsgId} = Msg, Sender, Dest, Direction) ->
   Forwarded = #forwarded{sub_els = [complete_packet(JID, Msg, Direction)]},
   Carbon = case Direction of
     sent -> #carbons_sent{forwarded = Forwarded};
     received -> #carbons_received{forwarded = Forwarded}
   end,
-  #message{from = Sender, to = Dest, type = T, sub_els = [Carbon],
+  #message{id = MsgId, from = Sender, to = Dest, type = T, sub_els = [Carbon],
       meta = #{carbon_copy => true}}.
 
 % -spec complete_packet(jid(), message(), direction()) -> message().

@@ -420,7 +420,6 @@ process_mix_join(#iq{to = To, from = From,
     Mod = gen_mod:db_mod(ServerHost, ?MODULE),
     case Mod:get_channel(ServerHost, Chan, Host) of
 	{ok, {_, _, Key}} ->
-	    ID = make_id(From, Key),
 	    InputNick = JoinReq#mix_join.nick,
 	    BFrom = jid:remove_resource(From),
 	    Nodes = filter_nodes(JoinReq#mix_join.subscribe),
@@ -740,19 +739,7 @@ multicast(Mod, LServer, Chan, Service, Node, F) ->
                                                             ejabberd_sql:sql_query(LServer, [RecentQ])
                                                     end),
 
-						DisappearAtValue =
-									case DisappearAt of
-										<<>> ->
-										<<"NULL">>;
-										"" ->
-										<<"NULL">>;
-										undefined ->
-										<<"NULL">>;
-										null ->
-										<<"NULL">>;
-										_ ->
-										[<<"'">>, DisappearAt, <<"'">>]
-									end,
+				    DisappearAtValue = fly_mod_utils:validate_datetime(DisappearAt),
 
                                     ejabberd_sql:sql_query(LServer,
                                                            [<<"INSERT INTO chat_message_edit_history ",
