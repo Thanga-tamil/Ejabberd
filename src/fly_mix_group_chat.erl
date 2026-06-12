@@ -735,6 +735,36 @@ process_remove_participant(From, To, SubEl, IQ) ->
 %%
 %%%============================================================================================
 
+-define(ONGOING_CALL_VCARD_TAGS, [<<"onOngoingCall">>, <<"ongoingCallLink">>]).
+
+preserve_ongoing_call_vcard_fields(IncomingVCard, LUser, FServer) ->
+    case mod_vcard:get_vcard(LUser, FServer) of
+        [ExistingVCard | _] ->
+            merge_ongoing_call_vcard_fields(IncomingVCard, ExistingVCard);
+        _ ->
+            IncomingVCard
+    end.
+
+merge_ongoing_call_vcard_fields(IncomingVCard, ExistingVCard) ->
+    PreservedTags = lists:foldl(fun(TagName, Acc) ->
+        case fxml:get_subtag(ExistingVCard, TagName) of
+            false -> Acc;
+            Tag -> [Tag | Acc]
+        end
+    end, [], ?ONGOING_CALL_VCARD_TAGS),
+    StrippedVCard = strip_ongoing_call_vcard_fields(IncomingVCard),
+    fxml:append_subtags(StrippedVCard, lists:reverse(PreservedTags)).
+
+strip_ongoing_call_vcard_fields(#xmlel{children = Children} = VCard) ->
+    VCard#xmlel{children = [El || El <- Children, not is_ongoing_call_vcard_tag(El)]};
+strip_ongoing_call_vcard_fields(VCard) ->
+    VCard.
+
+is_ongoing_call_vcard_tag(#xmlel{name = TagName}) ->
+    lists:member(TagName, ?ONGOING_CALL_VCARD_TAGS);
+is_ongoing_call_vcard_tag(_) ->
+    false.
+
 process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
   _RequestType = <<"set_group_info">>,
   Profile = fxml:get_subtag(SubEl, <<"profile">>),
@@ -780,7 +810,8 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
         end,
         
         JIDs = lists:flatmap(fun([Jid]) -> [Jid] end, GroupMembers),
-        SetVcard = mod_vcard:set_vcard(LUser, FServer, VCard),
+        VCardToSet = preserve_ongoing_call_vcard_fields(VCard, LUser, FServer),
+        SetVcard = mod_vcard:set_vcard(LUser, FServer, VCardToSet),
         ?INFO_MSG("SetVcard result for ~p: ~p", [LUser, SetVcard]),
         MixParticipant = fly_mod_utils:update_mix_participant(FServer, LUser, IncomingNickName),
         ?LOG_INFO("MixParticipant update result: ~p", [MixParticipant]),
@@ -790,7 +821,7 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
             case catch fly_mod_utils:check_group_exists(FServer, LUser) of
               {selected, _, []} ->
                 ?INFO_MSG("Group existence check failed during update for ~p", [LUser]),
-                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"1">>, SubEl, <<"">>);
+                update_group_info_to_members(From, To, Status, VCardToSet, JIDs, <<"1">>, SubEl, <<"">>);
 
               _ ->
                 ?INFO_MSG("devinprogress -> FServer : ~p LUser : ~p", [FServer, LUser]),
@@ -854,29 +885,29 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                         % Then handle the notifications based on what changed
                         case length(FinalChanges) of
                             0 -> 
-                                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"4">>, SubEl, <<"">>);
+                                update_group_info_to_members(From, To, Status, VCardToSet, JIDs, <<"4">>, SubEl, <<"">>);
                             1 -> % Single field changed - use specific notification codes
                                 [Change] = FinalChanges,
                                 case Change of
                                     nickname -> 
-                                        update_group_info_to_members(From, To, Status, VCard, JIDs, <<"9">>, SubEl, <<"">>);
+                                        update_group_info_to_members(From, To, Status, VCardToSet, JIDs, <<"9">>, SubEl, <<"">>);
                                     description -> % notify id 10
                                         case OldDesc of
                                             <<>> ->
                                                 NewNotifyStr = <<"added the group description \"", IncomingDescription/binary, "\"." >>,
-                                                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"10">>, SubEl, NewNotifyStr);
+                                                update_group_info_to_members(From, To, Status, VCardToSet, JIDs, <<"10">>, SubEl, NewNotifyStr);
                                             _ ->
                                                 UpdateNotifyStr = <<"updated the group description from \"", OldDesc/binary,"\" to \"", IncomingDescription/binary, "\"." >>,
-                                                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"10">>, SubEl, UpdateNotifyStr)
+                                                update_group_info_to_members(From, To, Status, VCardToSet, JIDs, <<"10">>, SubEl, UpdateNotifyStr)
                                         end;
                                     image ->
                                         case OldImage of
                                             <<>> -> % First time adding image
                                                 ?INFO_MSG("Image updated update_group_info_to_members 12 ~p", [OldImage]),
-                                                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"12">>, SubEl, <<"">>);
+                                                update_group_info_to_members(From, To, Status, VCardToSet, JIDs, <<"12">>, SubEl, <<"">>);
                                             _ -> % Updating existing image
                                                 ?INFO_MSG("Image updated update_group_info_to_members 13 ~p", [OldImage]),
-                                                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"13">>, SubEl, <<"">>)
+                                                update_group_info_to_members(From, To, Status, VCardToSet, JIDs, <<"13">>, SubEl, <<"">>)
                                         end;
                                     msg_disappear ->
                                         NotifyId = if
@@ -884,18 +915,18 @@ process_set_group_info(From, To, SubEl, IQ, NewStatus) ->
                                             OldMsgDisp =:= <<"0">> orelse OldMsgDisp =:= <<>> -> <<"21">>; % SET
                                             true -> <<"22">> % UPDATED
                                         end,
-                                        update_group_info_to_members(From, To, Status, VCard, JIDs, NotifyId, SubEl, <<"">>);
+                                        update_group_info_to_members(From, To, Status, VCardToSet, JIDs, NotifyId, SubEl, <<"">>);
                                      _  ->
-                                      update_group_info_to_members(From, To, Status, VCard, JIDs, <<"4">>, SubEl, <<"">>)
+                                      update_group_info_to_members(From, To, Status, VCardToSet, JIDs, <<"4">>, SubEl, <<"">>)
 
                                 end;
                             _ -> % Multiple fields changed - use generic update code
-                                update_group_info_to_members(From, To, Status, VCard, JIDs, <<"4">>, SubEl, <<"">>)
+                                update_group_info_to_members(From, To, Status, VCardToSet, JIDs, <<"4">>, SubEl, <<"">>)
                         end;
 
                     Error ->
                         ?ERROR_MSG("Error fetching group info for group ~p: ~p", [LUser, Error]),
-                        update_group_info_to_members(From, To, Status, VCard, JIDs, <<"4">>, SubEl, <<"">>)
+                        update_group_info_to_members(From, To, Status, VCardToSet, JIDs, <<"4">>, SubEl, <<"">>)
                 end
             end,
             fly_mod_utils:generate_subel(IQ, #group_query{type = _RequestType, result_type = <<"Group info updated successfully">>});
