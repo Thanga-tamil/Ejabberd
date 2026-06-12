@@ -629,14 +629,10 @@ gcm_single_push(DeviceType,DeviceToken, PushType, ChatType, From, To, Message,
       {<<"title">>, binary_to_list(ChangedMessage)},
       {<<"type">>, binary_to_list(MessageType)}],
     Payload = create_android_json(DeviceToken, BF),
-    if (EditMsgId =:= MessageId) or (EditMsgId =:= <<"">>) ->
-      if DeviceType ==  <<"android">> ->
-        send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet);
-      true ->
-        send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet)
-      end;
+    if DeviceType ==  <<"android">> ->
+      send_android_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet);
     true ->
-      ok
+      send_web_payload_to_rabbitmq(Channel, ChatType, Payload, RMExchange, Server, Packet)
     end;
     ChatType == <<"reaction">>; ChatType == <<"group_reaction">> ->
     Server = To#jid.server,
@@ -1668,11 +1664,7 @@ end,
         {mode, binary_to_list(Mode)},
         {sound, binary_to_list(<<"default">>)}],
       JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
-      if (EditMsgId =:= MessageId) or (EditMsgId =:= <<"">>) ->
       send_payload(JSON, ChatType, Channel, RMExchange,Server, PushType, Packet);
-      true ->
-        ok
-      end;
     ChatType == <<"adminblock">> ->
 
       Server = Recipient#jid.server,
