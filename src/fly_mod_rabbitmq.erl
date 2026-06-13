@@ -127,7 +127,7 @@ listen(Q) ->
 listen(down, Host, OldChannel, Q) -> 
 
     Proc = gen_mod:get_module_proc(Host, ?MODULE),
-    NewChannel = gen_server:call(?MODULE, 
+    NewChannel = gen_server:call(Proc, 
                     {channel, subscription, OldChannel}),
     MonitorRef = erlang:monitor(process, NewChannel),
 

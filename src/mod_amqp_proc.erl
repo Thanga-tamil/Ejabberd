@@ -393,18 +393,14 @@ send_user_left_iq(User, Chan, Host) ->
 
     ejabberd_router:route(IQ), true.
 
-delete_in_tables(Server, User, DeletedChannels) ->
+delete_in_tables(Host, User, DeletedChannels) ->
 
     InClause = lists:join(<<",">>, [[<<"'">>, Channel, <<"'">>] || Channel <- DeletedChannels]),
-    Q1 = [<<"DELETE FROM mix_map mp WHERE mp.username = '">>,User,<<"' AND mp.channel IN (">>,InClause,<<")">>],
-    Q2 = [<<"DELETE FROM mix_subscription ms WHERE ms.username = '">>,User,<<"' AND ms.channel IN (">>,InClause,<<")">>],
-    Q3 = [<<"DELETE FROM mix_participant mp WHERE mp.username = '">>,User,<<"' AND mp.channel IN (">>,InClause,<<")">>],
 
-    ejabberd_sql:sql_transaction(
-        Server,
-        fun() ->
-            ejabberd_sql:sql_query(Server, Q1),
-            ejabberd_sql:sql_query(Server, Q2),
-            ejabberd_sql:sql_query(Server, Q3)
-        end
-    ).
+    Tables = [<<"mix_pam">>, <<"mix_subscription">>, <<"mix_participant">>],
+    
+    WhereClause = [[<<"mp.username = '">>,User,<<"' AND mp.channel IN (">>,InClause,<<")">>],
+                   [<<"ms.username = '">>,User,<<"' AND ms.channel IN (">>,InClause,<<")">>],
+                   [<<"mp.username = '">>,User,<<"' AND mp.channel IN (">>,InClause,<<")">>]],
+
+    fly_sql:delete(Host, Tables, WhereClause).

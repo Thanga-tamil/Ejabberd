@@ -209,7 +209,7 @@ user_send({Packet, #{jid := JID} = C2SState}) ->
     {Packet, C2SState};
 user_send({Packet, C2SState}) ->
     logger:info("user_send:mod_ping for to_user=~p "
-        "with state: ~p", [Packet#message.to, C2SState]),
+     "with state: ~p", [Packet#message.to#jid.luser, C2SState]),
     {Packet, C2SState}.
 
 -spec c2s_handle_cast(ejabberd_c2s:state(), send_ping | term())
