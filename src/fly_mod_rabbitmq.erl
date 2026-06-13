@@ -324,8 +324,12 @@ logger(Pkt, Exchange, RoutingKey, Msg) ->
             {FUser, _, FRes} = jid:tolower(From),
             {TUser, _, TRes} = jid:tolower(To),
 
-        logger:info(Msg ++ " rabbitmq payload from=~p to=~p~n ~s", 
-                [Msg, jiffy:encode(#{
+        logger:info(Msg ++ 
+                    " rabbitmq payload"
+                    " from=~p"
+                    " to=~p~n ~s",
+                [FUser, TUser, 
+                    jiffy:encode(#{
                         message_id => Id,
                         type => Type,
                         from_userid => FUser,
