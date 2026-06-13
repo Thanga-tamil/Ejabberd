@@ -373,11 +373,13 @@ send_receipt(_, AdminJid, _, ToJid, MessageId, Id, ChatType) ->
 send_user_left_iq(User, Chan, Host) ->
     Id = fly_mod_utils:get_iq_message_id(20),
     UserJid = <<User/binary, "@mix.", Host/binary>>,
+    GroupJid = jid:make(Chan, Host),
 
     IQ = #iq{
         type = set,
         id = Id,
-        to = jid:make(Chan, Host),
+        from = jid:from_string(UserJid),
+        to = GroupJid,
         sub_els = [
             #xmlel{
                 name = <<"query">>,
@@ -393,14 +395,19 @@ send_user_left_iq(User, Chan, Host) ->
 
     ejabberd_router:route(IQ), true.
 
-delete_in_tables(Host, User, DeletedChannels) ->
+delete_in_tables(_Host, _User, []) ->
+    ok;
 
-    InClause = lists:join(<<",">>, [[<<"'">>, Channel, <<"'">>] || Channel <- DeletedChannels]),
+delete_in_tables(Host, User, DeletedChannels) ->
+    InClause =
+        iolist_to_binary(
+            lists:join(<<",">>, [[<<"'">>, C, <<"'">>] || C <- DeletedChannels])
+        ),
 
     Tables = [<<"mix_pam">>, <<"mix_subscription">>, <<"mix_participant">>],
-    
-    WhereClause = [[<<"mp.username = '">>,User,<<"' AND mp.channel IN (">>,InClause,<<")">>],
-                   [<<"ms.username = '">>,User,<<"' AND ms.channel IN (">>,InClause,<<")">>],
-                   [<<"mp.username = '">>,User,<<"' AND mp.channel IN (">>,InClause,<<")">>]],
 
-    fly_sql:delete(Host, Tables, WhereClause).
+    Clause = [<<"username = '">>, User, <<"' AND channel IN (">>, InClause, <<")">>],
+
+    WhereClauses = [Clause, Clause, Clause],
+
+    fly_sql:delete(Host, Tables, WhereClauses).
