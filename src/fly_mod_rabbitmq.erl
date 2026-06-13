@@ -15,6 +15,9 @@
 
 -export([publish/3, is_channel_alive/3, create_channel/2]).
 
+-define(Q_DATA, <<"data">>).
+-define(Q_API_DATA, <<"api_data">>).
+
 -define(LISTENER_MOD, mod_amqp_proc).
 -define(LISTENER_PROC_FUN, process_listener_payload).
 -define(LISTENER_LICENSE_DATA_FUN, update_license).
@@ -22,9 +25,6 @@
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
-
--define(Q_DATA, <<"data">>).
--define(Q_API_DATA, <<"api_data">>).
 
 -record(state, {host :: binary(),
                 connection :: pid(),
@@ -60,14 +60,17 @@ mod_opt_type(rabbitmq_exchange) ->
 mod_opt_type(rabbitmq_password) ->
     fun iolist_to_binary/1;
 mod_opt_type(amqp_listener) ->
-    fun(B) when is_boolean(B) -> B end.
+    fun(B) when is_boolean(B) -> B end;
+mod_opt_type(queues) ->
+    econf:list(econf:binary()).
 
 mod_options(_Host) ->
     [{rabbitmq_host, undefined},
      {rabbitmq_username, undefined},
      {rabbitmq_exchange, undefined},
      {rabbitmq_password, undefined},
-     {amqp_listener, false}].
+     {amqp_listener, false},
+     {queues, undefined}].
 
 init([Host | _]) ->
     ModOptions = gen_mod:get_module_opts(Host, ?MODULE),
@@ -76,6 +79,7 @@ init([Host | _]) ->
     RabbitMQP = maps:get(rabbitmq_password, ModOptions),
     RabbitMQE = maps:get(rabbitmq_exchange, ModOptions),
     AmqpListner = maps:get(amqp_listener, ModOptions),
+    Queues = maps:get(queues, ModOptions),
 
     logger:info("Initializing RabbitMQ module with host: ~p, 
                username: ~p, exchange: ~p, listener: ~p",
@@ -91,16 +95,16 @@ init([Host | _]) ->
         {ok, Connection} ->
              logger:info("rabbitMQ connection established: ~p", 
                        [Connection]),
-            init_state(Connection, RabbitMQE, Host, AmqpListner);
+            init_state(Connection, RabbitMQE, 
+                    Host, AmqpListner, Queues);
         Error ->
-            logger:error("init rabbitMQ connection failure with 
-                        error =>: ~p", [Error]),
+            logger:error("init rabbitMQ connection failure " 
+                         "with error =>: ~p", [Error]),
             {stop, ignore}
     end.
 
-init_state(Connection, RabbitMQE, Host, true) ->
+init_state(Connection, RabbitMQE, Host, true, Qs) ->
     Channels = create_channel(Connection, [subscription, publication]),
-    Qs = [?Q_API_DATA, ?Q_DATA],
     {Channel, MonitorRef, Tags} = listen(Qs),
     {ok, #state{host = Host,
                 connection = Connection,
@@ -108,7 +112,7 @@ init_state(Connection, RabbitMQE, Host, true) ->
                 tag = Tags,
                 channels = Channels,
                 monitor = #{Channel => MonitorRef}}};
-init_state(Connection, RabbitMQE, Host, false) ->
+init_state(Connection, RabbitMQE, Host, false, _) ->
     Channels = create_channel(Connection, publication),
     {ok, #state{host = Host, 
                 connection = Connection, 
@@ -149,20 +153,31 @@ listen(Q) ->
                with consumer tag: ~ts", [Q, Tag]),
     {Channel, MonitorRef, Tag}.
 
-listen(down, Host, OldChannel, Q) -> 
+listen(down, Host, OldChannel) -> 
 
     Proc = gen_mod:get_module_proc(Host, ?MODULE),
     NewChannel = gen_server:call(Proc, 
                     {channel, subscription, OldChannel}),
     MonitorRef = erlang:monitor(process, NewChannel),
 
-    #'basic.consume_ok'{consumer_tag = Tag} =
-    amqp_channel:call(NewChannel, 
-                #'basic.consume'{queue = Q, no_ack = true}),
+    ModOptions = gen_mod:get_module_opts(Host, ?MODULE),
+    Queues = maps:get(queues, ModOptions),
 
-    logger:info("re-subscribing to queue: ~ts 
-               with consumer tag: ~ts", [?Q_API_DATA, Tag]),
-    {NewChannel, MonitorRef}.
+    Tags =
+    lists:foldl(
+        fun(Q, Acc) ->
+            #'basic.consume_ok'{consumer_tag = Tag} =
+            amqp_channel:call(
+                NewChannel,
+                #'basic.consume'{queue = Q, no_ack = true}
+            ),
+            logger:info("re-subscribed to queue: ~ts", [Q]),
+
+            Acc#{Tag => Q}
+        end, 
+      #{}, Queues),
+
+    {NewChannel, MonitorRef, Tags}.
 
 handle_call({channel, Type, OldChannel}, _From, State) ->
     close_channels(OldChannel),
@@ -214,10 +229,11 @@ handle_info({'DOWN', _Ref, process, OldChannel, Reason}, State) ->
                  "reason => ~p", [OldChannel, Reason]),
 
     Map = maps:remove(OldChannel, State#state.channels),
-    {NewChannel, MonitorRef} = listen(down, State#state.host, 
-                                    OldChannel, ?Q_API_DATA),
+    {NewChannel, MonitorRef, Tags} = listen(down,
+                                        State#state.host, 
+                                        OldChannel),
     NewMap = maps:put(NewChannel, MonitorRef, Map),
-    {noreply, State#state{channels = NewMap}};
+    {noreply, State#state{channels = NewMap, tag = Tags}};
 handle_info(_, State) ->
     {noreply, State}.
 
