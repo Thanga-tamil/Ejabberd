@@ -16,14 +16,24 @@ delete(Host, Tables, WhereClauses) when is_list(Tables) ->
    Cmds =
        [construct(Table, 0, Where, delete)
         || {Table, Where} <- lists:zip(Tables, WhereClauses)],
-   call_transaction(Host, Cmds);
+   transaction(Host, Cmds);
 
 delete(Host, Table, WhereClause) ->
-   call_transaction(Host, 
+   transaction(Host, 
         [construct(Table, 0, WhereClause, delete)]).
 
-call_transaction(Host, Arg) ->
-    ejabberd_sql:sql_transaction(Host, Arg).
+transaction(Host, Arg) ->
+    Start = erlang:monotonic_time(millisecond),
+
+    Result = ejabberd_sql:sql_transaction(Host, Arg),
+
+    End = erlang:monotonic_time(millisecond),
+
+    logger:info("?mod: ~p " 
+                "SQL transaction took ~p ms", 
+                [?MODULE, End - Start]),
+
+    Result.
 
 
 %% Construct query dynamically based on the args %% 
