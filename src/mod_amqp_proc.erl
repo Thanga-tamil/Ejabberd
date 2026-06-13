@@ -372,13 +372,13 @@ send_receipt(_, AdminJid, _, ToJid, MessageId, Id, ChatType) ->
 
 send_user_left_iq(User, Chan, Host) ->
     Id = fly_mod_utils:get_iq_message_id(20),
-    UserJid = <<User/binary, Host/binary>>,
     GroupJid = <<Chan/binary, "@mix.", Host/binary>>,
+    UserJid = <<User/binary, "@", Host/binary>>,
 
     IQ = #iq{
         type = set,
         id = Id,
-        from = jid:from_string(UserJid),
+        from = jid:make(User, Host),
         to = jid:from_string(GroupJid),
         sub_els = [
             #xmlel{
