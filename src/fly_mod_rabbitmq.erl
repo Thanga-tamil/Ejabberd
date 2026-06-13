@@ -16,7 +16,7 @@
 -export([publish/3, is_channel_alive/2, create_channel/2]).
 
 -define(LISTENER_MOD, mod_amqp_proc).
--define(LISTENER_FUN, proc_listener_payload).
+-define(LISTENER_FUN, process_listener_payload).
 
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
