@@ -3,8 +3,12 @@
 -author('Thangatamil').
 
 %% internal functions %%
--export([process_listener_payload/3]).
+-export([process_listener_payload/3, update_license/2]).
 
+% q :: data
+% none
+
+% q :: api_data
 -define(CONTACT_PERMISSION, <<"Contact_Permission">>).
 -define(BLOCK_USER, <<"block_user">>).
 -define(USER_EXIT_GROUP, <<"userExitGroup">>).
@@ -45,6 +49,29 @@ process_listener_payload(Type, Map, Host) ->
             ?LOG_INFO("rabbit mq consumer payload has 
                       no matching type, 'skipping process'")
     end.
+
+update_license(LicenseData, Host) ->
+
+    Id = binary:part(base64:encode(crypto:strong_rand_bytes(8)),0,10),
+    AdminJid = jid:make(<<"123456789">>, Host),
+
+    IQ =
+    #iq{
+        type = set, id = Id, from = AdminJid, to = AdminJid, 
+        sub_els = [
+            #xmlel{
+                name = <<"query">>,
+                attrs = [
+                    {<<"xmlns">>, <<"jabber:iq:user_activities">>},
+                    {<<"license_data">>, LicenseData},
+                    {<<"status">>, <<"update_license_data">>}
+                ],
+                children = []
+            }
+        ]
+    },
+
+    ejabberd_router:route(IQ).
 
 handle_payload(Map, Host, Id, ?CONTACT_PERMISSION) ->
     CustomStrBin = maps:get(<<"customString">>, Map),

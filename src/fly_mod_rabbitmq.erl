@@ -16,20 +16,22 @@
 -export([publish/3, is_channel_alive/3, create_channel/2]).
 
 -define(LISTENER_MOD, mod_amqp_proc).
--define(LISTENER_FUN, process_listener_payload).
+-define(LISTENER_PROC_FUN, process_listener_payload).
+-define(LISTENER_LICENSE_DATA_FUN, update_license).
 
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
+-define(Q_DATA, <<"data">>).
 -define(Q_API_DATA, <<"api_data">>).
 
 -record(state, {host :: binary(),
                 connection :: pid(),
                 ex :: binary(),
+                tag = #{} :: #{any() => atom()},
                 channels = #{} :: #{atom() => pid()},
                 monitor = #{} :: #{pid() => reference()}}).
-
 
 start(Host, Opts) ->
     gen_mod:start_child(?MODULE, Host, Opts).
@@ -75,7 +77,7 @@ init([Host | _]) ->
     RabbitMQE = maps:get(rabbitmq_exchange, ModOptions),
     AmqpListner = maps:get(amqp_listener, ModOptions),
 
-    ?LOG_INFO("Initializing RabbitMQ module with host: ~p, 
+    logger:info("Initializing RabbitMQ module with host: ~p, 
                username: ~p, exchange: ~p, listener: ~p",
               [RabbitMQH, RabbitMQU, RabbitMQE, AmqpListner]),
 
@@ -87,29 +89,52 @@ init([Host | _]) ->
             heartbeat = 30
         }) of
         {ok, Connection} ->
-             ?LOG_INFO("rabbitMQ connection established: ~p", 
+             logger:info("rabbitMQ connection established: ~p", 
                        [Connection]),
             init_state(Connection, RabbitMQE, Host, AmqpListner);
         Error ->
-            ?LOG_ERROR("init rabbitMQ connection failure with 
+            logger:error("init rabbitMQ connection failure with 
                         error =>: ~p", [Error]),
             {stop, ignore}
     end.
 
 init_state(Connection, RabbitMQE, Host, true) ->
     Channels = create_channel(Connection, [subscription, publication]),
-    {Channel, MonitorRef} = listen(?Q_API_DATA),
-    {ok, #state{host = Host, 
-                       connection = Connection, 
-                       ex = RabbitMQE, 
-                       channels = Channels, 
-                       monitor = #{Channel => MonitorRef}}};
+    Qs = [?Q_API_DATA, ?Q_DATA],
+    {Channel, MonitorRef, Tags} = listen(Qs),
+    {ok, #state{host = Host,
+                connection = Connection,
+                ex = RabbitMQE,
+                tag = Tags,
+                channels = Channels,
+                monitor = #{Channel => MonitorRef}}};
 init_state(Connection, RabbitMQE, Host, false) ->
     Channels = create_channel(Connection, publication),
     {ok, #state{host = Host, 
                 connection = Connection, 
                 ex = RabbitMQE, 
                 channels = Channels}}.
+
+listen(Qs) when is_list(Qs) -> 
+    Key = channel_name(subscription),
+    [[Channel]] = ets:match(rabbitmq, {Key, '$1'}),
+    MonitorRef = erlang:monitor(process, Channel),
+    
+    Tags =
+    lists:foldl(
+        fun(Q, Acc) ->
+            #'basic.consume_ok'{consumer_tag = Tag} =
+            amqp_channel:call(
+                Channel,
+                #'basic.consume'{queue = Q, no_ack = true}
+            ),
+            logger:info("subscribed to queue: ~ts", [Q]),
+
+            Acc#{Tag => Q}
+        end, 
+      #{}, Qs),
+    
+    {Channel, MonitorRef, Tags};
 
 listen(Q) -> 
     Key = channel_name(subscription),
@@ -120,9 +145,9 @@ listen(Q) ->
     amqp_channel:call(Channel, 
                 #'basic.consume'{queue = Q, no_ack = true}),
 
-    ?LOG_INFO("subscribed to queue: ~ts 
+    logger:info("subscribed to queue: ~ts 
                with consumer tag: ~ts", [Q, Tag]),
-    {Channel, MonitorRef}.
+    {Channel, MonitorRef, Tag}.
 
 listen(down, Host, OldChannel, Q) -> 
 
@@ -135,7 +160,7 @@ listen(down, Host, OldChannel, Q) ->
     amqp_channel:call(NewChannel, 
                 #'basic.consume'{queue = Q, no_ack = true}),
 
-    ?LOG_INFO("re-subscribing to queue: ~ts 
+    logger:info("re-subscribing to queue: ~ts 
                with consumer tag: ~ts", [?Q_API_DATA, Tag]),
     {NewChannel, MonitorRef}.
 
@@ -167,32 +192,26 @@ handle_cast({Type, Arg, PayPac}, State) ->
 handle_cast(_, State) -> 
     {noreply, State}.
 
-handle_info({#'basic.deliver'{}, #amqp_msg{payload = Payload}}, State) ->
-    ?LOG_INFO("consumed:: ~p", [Payload]),
-    try
-        Map = jiffy:decode(Payload, [return_maps]),
-        ?LOG_INFO("decoded Map:: ~p", [Map]),
-        Type = maps:get(<<"type">>, Map),
+handle_info({#'basic.deliver'{consumer_tag = Tag},
+            #amqp_msg{payload = Payload}}, State) ->
 
-        if Type =:= false -> 
-            ok;
-        true ->
-            subscription(?LISTENER_MOD, ?LISTENER_FUN,
-            [Type, Map, State#state.host])
-        end,
+    try
+        Tags = State#state.tag,
+        Host = State#state.host,
+        consumer_info(Payload, Host, maps:get(Tag, Tags)),
         {noreply, State}
     catch
         error:{_, invalid_json} = Error ->
-            ?LOG_ERROR("invalid json payload => ~p error => ~p",
-            [Payload, Error]),
-            {noreply, State}
+            logger:error("invalid json payload => ~p " 
+                         "error => ~p", [Payload, Error]),
+        {noreply, State}
     end;
 handle_info({'basic.consume_ok', _Tag}, State) ->
     {noreply, State};
 
 handle_info({'DOWN', _Ref, process, OldChannel, Reason}, State) ->
-    ?LOG_ERROR("rabbbit mq channel down => ~p 
-                reason => ~p", [OldChannel, Reason]),
+    logger:error("rabbbit mq channel down => ~p "
+                 "reason => ~p", [OldChannel, Reason]),
 
     Map = maps:remove(OldChannel, State#state.channels),
     {NewChannel, MonitorRef} = listen(down, State#state.host, 
@@ -207,7 +226,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(Reason, State) ->
     close_connection(State#state.connection),
-    ?LOG_INFO("~p mod ~p terminated", [?MODULE, Reason]),
+    logger:warning("~p mod ~p terminated", [?MODULE, Reason]),
     ok.
 
 % ------------------ %
@@ -245,10 +264,10 @@ create_channel(_, _) ->
 is_channel_alive(Host, Channel, Type) ->
   case {is_pid(Channel), is_process_alive(Channel)} of
     {true, true} ->
-      ?LOG_INFO("channel ~p is alive", [Type]),
+      logger:info("channel ~p is alive", [Type]),
       Channel;
     {true, false} -> 
-      ?LOG_INFO(
+      logger:info(
       "channel ~p is down, close existing & create a new one",
       [Type]),
       Proc = gen_mod:get_module_proc(Host, ?MODULE),
@@ -303,16 +322,40 @@ publication({Host, RoutingKey}, {Payload, Packet}, Channel, Exchange)  ->
         #'basic.publish'{exchange = Exchange, routing_key = RoutingKey},
         #amqp_msg{payload = BinPayload}) of
         ok ->
-            ?LOG_INFO("publication success in routingkey=> ~p",
+            logger:info("publication success in routingkey=> ~p",
             [RoutingKey]),
             logger(Packet, Exchange, RoutingKey, "published"),
             
             {ok, <<"success">>};
         Error ->
             logger(Packet, Exchange, RoutingKey, "publish_failed"),
-            ?LOG_ERROR("Unable to send push messages to 
+            logger:info("Unable to send push messages to 
                         the rabbitmq: ~p", [Error])
     end.
+
+% ? let it crash if payload comes from unknown tag
+consumer_info(Payload, Host, ?Q_API_DATA) ->
+    logger:info("Q :: ~p consumed:: ~p", [?Q_API_DATA, Payload]),
+
+    Map = jiffy:decode(Payload, [return_maps]),
+    logger:info("decoded Map:: ~p", [Map]),
+    Type = maps:get(<<"type">>, Map),
+
+    if Type =:= false -> 
+        ok;
+    true ->
+        subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
+            [Type, Map, Host])
+    end;
+consumer_info(Payload, Host, ?Q_DATA) ->
+    logger:info("Q :: ~p consumed:: ~p", [?Q_DATA, Payload]),
+
+    Map = jiffy:decode(Payload, [return_maps]),
+    logger:info("decoded Map:: ~p", [Map]),
+    LicenseData = maps:get(<<"data">>, Map),
+
+    subscription(?LISTENER_MOD, ?LISTENER_LICENSE_DATA_FUN,
+        [LicenseData, Host]).
 
 subscription(Mod, Fun, Args) ->
     apply(Mod, Fun, Args).
