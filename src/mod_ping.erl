@@ -206,6 +206,10 @@ user_offline(_SID, JID, _Info) ->
 -spec user_send({stanza(), ejabberd_c2s:state()}) -> {stanza(), ejabberd_c2s:state()}.
 user_send({Packet, #{jid := JID} = C2SState}) ->
     start_ping(JID#jid.lserver, JID),
+    {Packet, C2SState};
+user_send({Packet, C2SState}) ->
+    logger:info("user_send:mod_ping for to_user=~p "
+        "with state: ~p", [Packet#message.to, C2SState]),
     {Packet, C2SState}.
 
 -spec c2s_handle_cast(ejabberd_c2s:state(), send_ping | term())
