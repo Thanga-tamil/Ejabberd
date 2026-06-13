@@ -315,10 +315,10 @@ handle_payload(Map, Host, Id, ?MEDIA_DELETE) ->
 
         FromJid = jid:make(FromUser, Host),
         ToJid = jid:make(ToUser, Host),
-        send_receipt(AdminJid, FromJid, ToJid, MessageId, Id, ChatType)
+        send_receipt(Host, AdminJid, FromJid, ToJid, MessageId, Id, ChatType)
       end || C <- CustomList].
 
-send_receipt(AdminJid, FromJid, ToJid, MessageId, Id, <<"chat">>) ->
+send_receipt(Host, AdminJid, FromJid, ToJid, MessageId, Id, <<"chat">>) ->
     Pkt1 = #message{
             from = AdminJid, to = FromJid, type = chat, id = Id,
             sub_els = [#xmlel{
@@ -337,13 +337,17 @@ send_receipt(AdminJid, FromJid, ToJid, MessageId, Id, <<"chat">>) ->
                     children = []
                 }]
         },
-    fly_mod_stanza_ack:process_receive(false, 
-    AdminJid, FromJid, Pkt1, false, xmpp:get_subtag(Pkt1, #recall{})),
-    fly_mod_stanza_ack:process_receive(false, 
-    AdminJid, ToJid, Pkt2, false, xmpp:get_subtag(Pkt2, #recall{})),
-    ejabberd_router:route(Pkt1),
-    ejabberd_router:route(Pkt2);
-send_receipt(AdminJid, _, ToJid, MessageId, Id, ChatType) ->
+    {Packet1, amqp} = ejabberd_hooks:run_fold(user_send_packet, 
+                                    Host, {Pkt1, amqp}, []),
+
+    ejabberd_router:route(Packet1),
+
+    {Packet2, amqp} = ejabberd_hooks:run_fold(user_send_packet, 
+                                    Host, {Pkt2, amqp}, []),
+    
+    ejabberd_router:route(Packet2);
+
+send_receipt(_, AdminJid, _, ToJid, MessageId, Id, ChatType) ->
 
     #jid{luser = TLuser, lserver = TLserver} = ToJid,
     TMixJid = <<TLuser/binary, "@mix.", TLserver/binary>>,
