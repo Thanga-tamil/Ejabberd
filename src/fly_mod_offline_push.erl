@@ -530,32 +530,32 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) ->
       end,
       
       lists:map(fun(G) -> 
-        [DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, _DeviceId, UserType,PushType ] = G,
+				[DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, _DeviceId, UserType,PushType ] = G,
 
-        case catch fly_mod_utils:check_blockedlist(Recipient#jid.server, Recipient#jid.luser, Sender#jid.luser) of
-          {selected, _, [[_T]]} ->
-            if ChatType == <<"poll">> ->
-              ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #poll{}),
-              {poll,_,_,_,_,Chattype,_,_} = ElementAcknowledge,
-              if Chattype =:=<<"normal">> ->
-                call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,
-                PushType,Sender, Recipient, ChatType, SubEl, Packet,TimestampValue);
-                true ->
-                  fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
-                  user_blocked
-              end;
-              true ->
-            fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
-            user_blocked
-            end;
-          {error,timeout}  ->
-            ok;
-          {selected, _, []} ->
-            call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType,
-            SubEl, Packet,TimestampValue)
-        end
+				case catch fly_mod_utils:check_blockedlist(Recipient#jid.server, Recipient#jid.luser, Sender#jid.luser) of
+					{selected, _, [[_T]]} ->
+						if ChatType == <<"poll">> ->
+							   ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #poll{}),
+							   {poll,_,_,_,_,Chattype,_,_} = ElementAcknowledge,
+							   if Chattype =:=<<"normal">> ->
+								      call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,
+										       PushType,Sender, Recipient, ChatType, SubEl, Packet,TimestampValue);
+							      true ->
+								      fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
+								      user_blocked
+							   end;
+						   true ->
+							   fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
+							   user_blocked
+						end;
+					{error,timeout}  ->
+						ok;
+					{selected, _, []} ->
+						call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType,
+								 SubEl, Packet,TimestampValue)
+				end
 
-       end,Tokens);
+		end,Tokens);
 
     _Error ->
       ?INFO_MSG("push_message get_user_device_details error is ~p", [_Error]),
@@ -563,29 +563,32 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) ->
   end.
 
 call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,
-Sender, Recipient, ChatType, SubEl, Packet,TimestampValue)->
+                 Sender, Recipient, ChatType, SubEl, Packet,TimestampValue)->
   case DeviceType of
-            <<"">> -> ?INFO_MSG("push_message user device is empty error is ~p", [Recipient#jid.luser]),
-              device_type_is_empty;
-            <<"android">> ->
-              gcm_single_push(DeviceType,DeviceToken, UserType, ChatType, Sender,
-                Recipient, SubEl, TimestampValue, Packet);
-              <<"web">> ->
-                  gcm_single_push(DeviceType, DeviceToken, UserType, ChatType, Sender,
-                    Recipient, SubEl, TimestampValue, Packet);
-              <<"ios">> ->
-                case ChatType of 
-                  <<"mediacall">> when VoipDeviceToken == <<>> ->
-                    ?INFO_MSG("voip token is empty ~p", [Recipient#jid.luser]);
-                  <<"recall">> ->
-                    ?INFO_MSG("(ios) recall restricted ~p", [Recipient#jid.luser]);
-                  _ ->
-                    apns_single_push(DeviceToken, UserType, VoipDeviceToken, IOSVersion, ChatType, Sender, 
-                    Recipient, SubEl, TimestampValue,Packet, Mode,PushType)
-                end;
-            _ -> ?INFO_MSG("push_message user device not found error is ~p", [Recipient#jid.luser]),
-              database_error
+    <<"">> -> 
+      ?INFO_MSG("push_message user device is empty error is ~p", [Recipient#jid.luser]),
+      device_type_is_empty;
+    <<"android">> ->
+      gcm_single_push(DeviceType,DeviceToken, UserType, ChatType, Sender,
+              Recipient, SubEl, TimestampValue, Packet);
+    <<"web">> ->
+      gcm_single_push(DeviceType, DeviceToken, UserType, ChatType, Sender,
+              Recipient, SubEl, TimestampValue, Packet);
+    <<"ios">> ->
+      case ChatType of 
+        <<"mediacall">> when VoipDeviceToken == <<>> ->
+          ?INFO_MSG("voip token is empty ~p", [Recipient#jid.luser]);
+        <<"recall">> ->
+          ?INFO_MSG("(ios) recall restricted ~p", [Recipient#jid.luser]);
+        _ ->
+          apns_single_push(DeviceToken, UserType, VoipDeviceToken, IOSVersion, ChatType, Sender,
+              Recipient, SubEl, TimestampValue,Packet, Mode,PushType)
+      end;
+    _ -> 
+      ?INFO_MSG("push_message user device not found error is ~p", [Recipient#jid.luser]),
+      database_error
   end.
+  
 %% Prepare and push message to android devices
 %%
 %% @param record Sender
@@ -593,462 +596,462 @@ Sender, Recipient, ChatType, SubEl, Packet,TimestampValue)->
 %% @param record Packet
 %% @return atom
 gcm_single_push(DeviceType, DeviceToken, PushType, ChatType, 
-  From, To, _Message, TimestampValue, Packet) ->
+		From, To, _Message, TimestampValue, Packet) ->
 
-  if ChatType == <<"chat">> ->
-    FromUser = From#jid.luser,
-    Server = To#jid.server,
-    ToUser = To#jid.luser,
-    MessageId = fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs),
-    ContentAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #chatcontent{}),
-  if ContentAcknowledge =:= false ->
-    MessageType = <<"">>,
-    _MentionList = <<"">>,
-    EditMsgId = MessageId;
-    true ->
-    {_,_,_,_,MessageType,_,_,EditMsgId,_MentionList,_DisappearAt,_} = ContentAcknowledge
-    end,
-    % DecryptedMessage = fly_mod_security:aes_decrpyt(binary_to_list(MessageId), Message),
-    % ParsedMessageJson = jiffy:decode(uri_string:unquote(binary_to_list(DecryptedMessage))),
-    % ParsedMessageJson = jiffy:decode(uri_string:unquote(binary_to_list(DecryptedMessage))),
-    % MessageType = proplists:get_value(<<"message_type">>,
-    %   element(1, ParsedMessageJson)),
-    SendFrom = list_to_binary(binary_to_list(FromUser) ++
-      "@" ++ binary_to_list(Server)),
-    SendTo = list_to_binary(binary_to_list(ToUser) ++
-      "@" ++ binary_to_list(Server)),
+	if ChatType == <<"chat">> ->
+		   FromUser = From#jid.luser,
+		   Server = To#jid.server,
+		   ToUser = To#jid.luser,
+		   MessageId = fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs),
+		   ContentAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #chatcontent{}),
+		   if ContentAcknowledge =:= false ->
+			      MessageType = <<"">>,
+			      _MentionList = <<"">>,
+			      EditMsgId = MessageId;
+		      true ->
+			      {_,_,_,_,MessageType,_,_,EditMsgId,_MentionList,_DisappearAt,_} = ContentAcknowledge
+		   end,
+		   % DecryptedMessage = fly_mod_security:aes_decrpyt(binary_to_list(MessageId), Message),
+		   % ParsedMessageJson = jiffy:decode(uri_string:unquote(binary_to_list(DecryptedMessage))),
+		   % ParsedMessageJson = jiffy:decode(uri_string:unquote(binary_to_list(DecryptedMessage))),
+		   % MessageType = proplists:get_value(<<"message_type">>,
+		   %   element(1, ParsedMessageJson)),
+		   SendFrom = list_to_binary(binary_to_list(FromUser) ++
+					     "@" ++ binary_to_list(Server)),
+		   SendTo = list_to_binary(binary_to_list(ToUser) ++
+					   "@" ++ binary_to_list(Server)),
 
-    ChangedMessage = case MessageType of
-                        <<"image">> -> <<"Image">>;
-                        <<"audio">> -> <<"Audio">>;
-                        <<"video">> -> <<"Video">>;
-                        <<"location">> -> <<"Location">>;
-                        <<"contact">> -> <<"Contact">>;
-                        <<"file">> -> <<"Document">>;
-                        <<"meet">> -> <<"Meet">>;
-                        _ ->
-                        <<"Text">>
-                      end,
+		   ChangedMessage = case MessageType of
+					    <<"image">> -> <<"Image">>;
+					    <<"audio">> -> <<"Audio">>;
+					    <<"video">> -> <<"Video">>;
+					    <<"location">> -> <<"Location">>;
+					    <<"contact">> -> <<"Contact">>;
+					    <<"file">> -> <<"Document">>;
+					    <<"meet">> -> <<"Meet">>;
+					    _ ->
+						    <<"Text">>
+				    end,
 
-    BF = [{<<"sent_from">>, binary_to_list(SendFrom)},
-      {<<"to_jid">>, binary_to_list(SendTo)},
-      {<<"message_time">>, binary_to_list(TimestampValue)},
-      {<<"chat_type">>, binary_to_list(ChatType)},
-      {<<"user_jid">>, binary_to_list(SendFrom)},
-      {<<"message_id">>, binary_to_list(MessageId)},
-      {<<"userDomain">>, binary_to_list(Server)},
-      {<<"user_type">>, binary_to_list(PushType)},
-      {<<"message_content">>, binary_to_list(ChangedMessage)},
-      {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
-      {<<"title">>, binary_to_list(ChangedMessage)},
-      {<<"type">>, binary_to_list(MessageType)}],
-    Payload = create_android_json(DeviceToken, BF),
-    if DeviceType ==  <<"android">> ->
-      send_payload(Payload, ChatType, false, Packet, android);
-    true ->
-      send_payload(Payload, ChatType, false, Packet, web)
-    end;
-    ChatType == <<"reaction">>; ChatType == <<"group_reaction">> ->
-    Server = To#jid.server,
-    ToUser = To#jid.luser, % message sender
-    ?LOG_INFO("message sender ~p from reaction pkt", [ToUser]),
-    FromUser = From#jid.luser,
-    StanzaId = fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs),
-    ReactionEl = fxml:get_subtag_with_xmlns(Packet, <<"reaction">>, <<"urn:xmpp:receipts">>),
-    case ReactionEl of
-        #xmlel{attrs = Attrs} ->
-            Action     = fxml:get_attr_s(<<"action">>, Attrs),
-            EmojiId    = fxml:get_attr_s(<<"emoji_id">>, Attrs),
-            MsgId      = fxml:get_attr_s(<<"message_id">>, Attrs),
-            FromUserJid= fxml:get_attr_s(<<"from_user">>, Attrs), % reaction sender
-            Timestamp  = fxml:get_attr_s(<<"timestamp">>, Attrs),
-            BF0 = [
-                {<<"type">>, binary_to_list(<<"reaction">>)},
-                {<<"chat_type">>, binary_to_list(if ChatType == <<"group_reaction">> -> <<"normal">>; true -> <<"chat">> end)},
-                {<<"action">>, binary_to_list(Action)},
-                {<<"message_id">>, binary_to_list(MsgId)},
-                {<<"reaction_id">>, binary_to_list(StanzaId)},
-                {<<"reaction_to">>, binary_to_list(jid:to_string(To))},
-                {<<"reaction_from">>, binary_to_list(FromUserJid)},
-                {<<"emoji_id">>, binary_to_list(EmojiId)},
-                {<<"timestamp">>, binary_to_list(Timestamp)},
-                {<<"userDomain">>, binary_to_list(Server)},
-                {<<"user_type">>, binary_to_list(PushType)},
-                {<<"chat_id">>, binary_to_list(jid:to_string(From))},
-                {<<"push_from">>, binary_to_list(<<"MirrorFly">>)}
-            ],
-            
-            
-        case ChatType of
-          <<"group_reaction">> ->
-            MsgSender = fxml:get_attr_s(<<"message_sender">>, Attrs),
-            
-            BF1 = BF0 ++ [{<<"message_sender">>,  binary_to_list(MsgSender)}],
-            ?LOG_INFO("MsgSender ~p ToUser ~p is equal? ~p", [MsgSender, ToUser, MsgSender =:= ToUser]),
+		   BF = [{<<"sent_from">>, binary_to_list(SendFrom)},
+			 {<<"to_jid">>, binary_to_list(SendTo)},
+			 {<<"message_time">>, binary_to_list(TimestampValue)},
+			 {<<"chat_type">>, binary_to_list(ChatType)},
+			 {<<"user_jid">>, binary_to_list(SendFrom)},
+			 {<<"message_id">>, binary_to_list(MessageId)},
+			 {<<"userDomain">>, binary_to_list(Server)},
+			 {<<"user_type">>, binary_to_list(PushType)},
+			 {<<"message_content">>, binary_to_list(ChangedMessage)},
+			 {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
+			 {<<"title">>, binary_to_list(ChangedMessage)},
+			 {<<"type">>, binary_to_list(MessageType)}],
+		   Payload = create_android_json(DeviceToken, BF),
+		   if DeviceType ==  <<"android">> ->
+			      send_payload(Payload, ChatType, false, Packet, android);
+		      true ->
+			      send_payload(Payload, ChatType, false, Packet, web)
+		   end;
+	   ChatType == <<"reaction">>; ChatType == <<"group_reaction">> ->
+		   Server = To#jid.server,
+		   ToUser = To#jid.luser, % message sender
+		   ?LOG_INFO("message sender ~p from reaction pkt", [ToUser]),
+		   FromUser = From#jid.luser,
+		   StanzaId = fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs),
+		   ReactionEl = fxml:get_subtag_with_xmlns(Packet, <<"reaction">>, <<"urn:xmpp:receipts">>),
+		   case ReactionEl of
+			   #xmlel{attrs = Attrs} ->
+				   Action     = fxml:get_attr_s(<<"action">>, Attrs),
+				   EmojiId    = fxml:get_attr_s(<<"emoji_id">>, Attrs),
+				   MsgId      = fxml:get_attr_s(<<"message_id">>, Attrs),
+				   FromUserJid= fxml:get_attr_s(<<"from_user">>, Attrs), % reaction sender
+				   Timestamp  = fxml:get_attr_s(<<"timestamp">>, Attrs),
+				   BF0 = [
+					  {<<"type">>, binary_to_list(<<"reaction">>)},
+					  {<<"chat_type">>, binary_to_list(if ChatType == <<"group_reaction">> -> <<"normal">>; true -> <<"chat">> end)},
+					  {<<"action">>, binary_to_list(Action)},
+					  {<<"message_id">>, binary_to_list(MsgId)},
+					  {<<"reaction_id">>, binary_to_list(StanzaId)},
+					  {<<"reaction_to">>, binary_to_list(jid:to_string(To))},
+					  {<<"reaction_from">>, binary_to_list(FromUserJid)},
+					  {<<"emoji_id">>, binary_to_list(EmojiId)},
+					  {<<"timestamp">>, binary_to_list(Timestamp)},
+					  {<<"userDomain">>, binary_to_list(Server)},
+					  {<<"user_type">>, binary_to_list(PushType)},
+					  {<<"chat_id">>, binary_to_list(jid:to_string(From))},
+					  {<<"push_from">>, binary_to_list(<<"MirrorFly">>)}
+					 ],
 
-            case MsgSender =:= ToUser of
-              true ->
-                Payload = create_android_json(DeviceToken, BF1),
-                ?LOG_INFO("[android_push] reaction payload : ~p", [Payload]),
-                case DeviceType of
-                    <<"android">> ->
-                          if Action == <<"update">>; Action == <<"remove">> ->  
-                            FUser = fly_mod_utils:get_user_from_string_jid(FromUserJid),
-                            ?LOG_INFO("Updating push sent status for reaction update, message id: ~p, user: ~p, toUser: ~p", [MsgId, FUser, ToUser]),
-                            fly_mod_utils:update_push_sent(Server, FUser, ToUser, MsgId);
-                            true -> 
-                            ok
-                          end,
-                          send_payload(Payload, ChatType, false, Packet, android);
-                    _ ->
-                      send_payload(Payload, ChatType, false, Packet, web)
-                end;
-              false ->
-                ?LOG_INFO("skipping push, reaction should only route for message sender ~p but got ~p",[MsgSender, ToUser]),
-                ok
-            end;
 
-          <<"reaction">> ->
-            Q = fly_mod_utils:chat_history_query(Server, MsgId),
-            ?LOG_INFO("Chat history query result for reaction push: ~p", [Q]),
+				   case ChatType of
+					   <<"group_reaction">> ->
+						   MsgSender = fxml:get_attr_s(<<"message_sender">>, Attrs),
 
-            case Q of 
-              {selected, _, [[F, _, _, _, _]]} -> 
-                if FromUser =/= F -> 
-                  Payload = create_android_json(DeviceToken, BF0),
-                  ?LOG_INFO("[android_push] reaction payload : ~p", [Payload]),
+						   BF1 = BF0 ++ [{<<"message_sender">>,  binary_to_list(MsgSender)}],
+						   ?LOG_INFO("MsgSender ~p ToUser ~p is equal? ~p", [MsgSender, ToUser, MsgSender =:= ToUser]),
 
-                  case DeviceType of
-                    <<"android">> ->
-                      send_payload(Payload, ChatType, false, Packet, android);
-                    _ ->
-                      send_payload(Payload, ChatType, false, Packet, web)
-                  end;
-                true -> 
-                  ok
-                end;
-              _ -> 
-                ok
-            end;
-          _ ->
-            ok
-        end;
-        _ -> ok
-      end;
-    ChatType == <<"poll">> ->
-    FromUser = From#jid.luser,
-    Server = To#jid.server,
-    MessageId = fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs),
-    SendFrom = list_to_binary(binary_to_list(FromUser) ++
-      "@" ++ binary_to_list(Server)),
-    ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #poll{}),
-    {poll,PollId,VoterUserId,VoteId,Status,_Chattype,PollOptionId,PollUser} = ElementAcknowledge,
-    VoterId = fly_mod_utils:get_user_from_string_jid(VoterUserId),
-    BF = [{<<"type">>, "poll"},
-        {<<"message_content">>, "Poll"},
-        {<<"send_from">>, binary_to_list(SendFrom)},
-        {<<"poll_id">>, binary_to_list(PollId)},
-        {<<"vote_id">>, binary_to_list(VoteId)},
-        {<<"voter_user_id">>, binary_to_list(VoterId)},
-        {<<"status">>, binary_to_list(Status)},
-        {<<"message_id">>, binary_to_list(MessageId)},
-        {<<"poll_option_id">>, binary_to_list(PollOptionId)},
-        {<<"poll_time">>, binary_to_list(TimestampValue)},
-        {<<"to_user">>, binary_to_list(PollUser)},
-        {<<"userDomain">>, binary_to_list(Server)},
-        {<<"user_type">>, binary_to_list(PushType)},
-        {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
-        {<<"title">>, "Poll"}],
-      Payload = create_android_json(DeviceToken, BF),
-      if DeviceType ==  <<"android">> ->
-        send_payload(Payload, ChatType, false, Packet, android);
-      true ->
-        send_payload(Payload, ChatType, false, Packet, web)
-      end;
-    ChatType == <<"seen">> ->
-    FromUser = From#jid.luser,
-    Server = To#jid.server,
-    ToUser = To#jid.luser,
-    ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #seen{}),
-    {seen,MessageId,_,_Time,_,_GroupId} = ElementAcknowledge,
-    SendFrom = list_to_binary(binary_to_list(FromUser) ++
-      "@" ++ binary_to_list(Server)),
-    SendTo = list_to_binary(binary_to_list(ToUser) ++
-      "@" ++ binary_to_list(Server)),
+						   case MsgSender =:= ToUser of
+							   true ->
+								   Payload = create_android_json(DeviceToken, BF1),
+								   ?LOG_INFO("[android_push] reaction payload : ~p", [Payload]),
+								   case DeviceType of
+									   <<"android">> ->
+										   if Action == <<"update">>; Action == <<"remove">> ->  
+											      FUser = fly_mod_utils:get_user_from_string_jid(FromUserJid),
+											      ?LOG_INFO("Updating push sent status for reaction update, message id: ~p, user: ~p, toUser: ~p", [MsgId, FUser, ToUser]),
+											      fly_mod_utils:update_push_sent(Server, FUser, ToUser, MsgId);
+										      true -> 
+											      ok
+										   end,
+										   send_payload(Payload, ChatType, false, Packet, android);
+									   _ ->
+										   send_payload(Payload, ChatType, false, Packet, web)
+								   end;
+							   false ->
+								   ?LOG_INFO("skipping push, reaction should only route for message sender ~p but got ~p",[MsgSender, ToUser]),
+								   ok
+						   end;
 
-    BF = [{<<"sent_from">>, binary_to_list(SendFrom)},
-      {<<"to_jid">>, binary_to_list(SendTo)},
-      {<<"message_time">>, binary_to_list(TimestampValue)},
-      {<<"chat_type">>, binary_to_list(ChatType)},
-      {<<"user_jid">>, binary_to_list(SendFrom)},
-      {<<"message_id">>, binary_to_list(MessageId)},
-      {<<"userDomain">>, binary_to_list(Server)},
-      {<<"user_type">>, binary_to_list(PushType)},
-      {<<"message_content">>, binary_to_list(ChatType)},
-      {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
-      {<<"title">>, binary_to_list(ChatType)},
-      {<<"type">>, binary_to_list(ChatType)}],
-    Payload = create_android_json(DeviceToken, BF),
-    if DeviceType ==  <<"android">> ->
-      send_payload(Payload, ChatType, false, Packet, android);
-      true ->
-        send_payload(Payload, ChatType, false, Packet, web)
-      end;
-    ChatType == <<"recall">> ->
-      FromUser = From#jid.luser,
-      Server = To#jid.server,
+					   <<"reaction">> ->
+						   Q = fly_mod_utils:chat_history_query(Server, MsgId),
+						   ?LOG_INFO("Chat history query result for reaction push: ~p", [Q]),
 
-      ReCall = fxml:get_subtag_with_xmlns(Packet, <<"recall">>,
-        <<"urn:xmpp:receipts">>),
-      {value, MessageId} = fxml:get_tag_attr(<<"id">>,
-        ReCall),
+						   case Q of 
+							   {selected, _, [[F, _, _, _, _]]} -> 
+								   if FromUser =/= F -> 
+									      Payload = create_android_json(DeviceToken, BF0),
+									      ?LOG_INFO("[android_push] reaction payload : ~p", [Payload]),
 
-      SendFrom = list_to_binary(binary_to_list(FromUser) ++
-        "@" ++ binary_to_list(Server)),
-      BF = [{<<"type">>, "recall"},
-        {<<"message_id">>, binary_to_list(MessageId)},
-        {<<"message_content">>, "This message was deleted"},
-        {<<"send_from">>, binary_to_list(SendFrom)},
-        {<<"userDomain">>, binary_to_list(Server)},
-        {<<"user_type">>, binary_to_list(PushType)},
-        {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
-        {<<"title">>, "This message was deleted"}],
-      Payload = create_android_json(DeviceToken, BF),
-      if DeviceType ==  <<"android">> ->
-        send_payload(Payload, ChatType, false, Packet, android);
-        true ->
-          send_payload(Payload, ChatType, false, Packet, web)
-        end;
+									      case DeviceType of
+										      <<"android">> ->
+											      send_payload(Payload, ChatType, false, Packet, android);
+										      _ ->
+											      send_payload(Payload, ChatType, false, Packet, web)
+									      end;
+								      true -> 
+									      ok
+								   end;
+							   _ -> 
+								   ok
+						   end;
+					   _ ->
+						   ok
+				   end;
+			   _ -> ok
+		   end;
+	   ChatType == <<"poll">> ->
+		   FromUser = From#jid.luser,
+		   Server = To#jid.server,
+		   MessageId = fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs),
+		   SendFrom = list_to_binary(binary_to_list(FromUser) ++
+					     "@" ++ binary_to_list(Server)),
+		   ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #poll{}),
+		   {poll,PollId,VoterUserId,VoteId,Status,_Chattype,PollOptionId,PollUser} = ElementAcknowledge,
+		   VoterId = fly_mod_utils:get_user_from_string_jid(VoterUserId),
+		   BF = [{<<"type">>, "poll"},
+			 {<<"message_content">>, "Poll"},
+			 {<<"send_from">>, binary_to_list(SendFrom)},
+			 {<<"poll_id">>, binary_to_list(PollId)},
+			 {<<"vote_id">>, binary_to_list(VoteId)},
+			 {<<"voter_user_id">>, binary_to_list(VoterId)},
+			 {<<"status">>, binary_to_list(Status)},
+			 {<<"message_id">>, binary_to_list(MessageId)},
+			 {<<"poll_option_id">>, binary_to_list(PollOptionId)},
+			 {<<"poll_time">>, binary_to_list(TimestampValue)},
+			 {<<"to_user">>, binary_to_list(PollUser)},
+			 {<<"userDomain">>, binary_to_list(Server)},
+			 {<<"user_type">>, binary_to_list(PushType)},
+			 {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
+			 {<<"title">>, "Poll"}],
+		   Payload = create_android_json(DeviceToken, BF),
+		   if DeviceType ==  <<"android">> ->
+			      send_payload(Payload, ChatType, false, Packet, android);
+		      true ->
+			      send_payload(Payload, ChatType, false, Packet, web)
+		   end;
+	   ChatType == <<"seen">> ->
+		   FromUser = From#jid.luser,
+		   Server = To#jid.server,
+		   ToUser = To#jid.luser,
+		   ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #seen{}),
+		   {seen,MessageId,_,_Time,_,_GroupId} = ElementAcknowledge,
+		   SendFrom = list_to_binary(binary_to_list(FromUser) ++
+					     "@" ++ binary_to_list(Server)),
+		   SendTo = list_to_binary(binary_to_list(ToUser) ++
+					   "@" ++ binary_to_list(Server)),
 
-    ChatType == <<"mediacall">> ->
-      FromUser = From#jid.luser,
-      Server = To#jid.server,
-      MediaCall = fxml:get_subtag_with_xmlns(Packet, <<"mediacall">>,
-        <<"urn:xmpp:call">>),
-      MessageId = fxml:get_attr_s(<<"id">>,
-      Packet#xmlel.attrs),
-      SendFrom = list_to_binary(binary_to_list(FromUser) ++
-        "@" ++ binary_to_list(Server)),
+		   BF = [{<<"sent_from">>, binary_to_list(SendFrom)},
+			 {<<"to_jid">>, binary_to_list(SendTo)},
+			 {<<"message_time">>, binary_to_list(TimestampValue)},
+			 {<<"chat_type">>, binary_to_list(ChatType)},
+			 {<<"user_jid">>, binary_to_list(SendFrom)},
+			 {<<"message_id">>, binary_to_list(MessageId)},
+			 {<<"userDomain">>, binary_to_list(Server)},
+			 {<<"user_type">>, binary_to_list(PushType)},
+			 {<<"message_content">>, binary_to_list(ChatType)},
+			 {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
+			 {<<"title">>, binary_to_list(ChatType)},
+			 {<<"type">>, binary_to_list(ChatType)}],
+		   Payload = create_android_json(DeviceToken, BF),
+		   if DeviceType ==  <<"android">> ->
+			      send_payload(Payload, ChatType, false, Packet, android);
+		      true ->
+			      send_payload(Payload, ChatType, false, Packet, web)
+		   end;
+	   ChatType == <<"recall">> ->
+		   FromUser = From#jid.luser,
+		   Server = To#jid.server,
 
-      RoomId = case fxml:get_tag_attr(<<"room_id">>, MediaCall) of
-        {value, Roomid} ->
-        Roomid;
-          _ ->
-          <<"">>
-      end,
-      CallType = case fxml:get_tag_attr(<<"call_type">>, MediaCall) of
-        {value, Calltype} ->
-          Calltype;
-        _ ->
-          <<"">>
-      end,
-      CallTime = case fxml:get_tag_attr(<<"call_time">>, MediaCall) of
-        {value, Calltime} ->
-          Calltime;
-        _ ->
-          <<"">>
-      end,
-      StartTime = case fxml:get_tag_attr(<<"start_time">>, MediaCall) of
-                    {value, Starttime} ->
-                    Starttime;
-                    _ ->
-                    <<"">>
-                  end,
-      EndTime = case fxml:get_tag_attr(<<"end_time">>, MediaCall) of
-                  {value, Endtime} ->
-                  Endtime;
-                  _ ->
-                  <<"">>
-                  end,
-      CallMode = case fxml:get_tag_attr(<<"call_mode">>, MediaCall) of
-        {value, Callmode} ->
-          Callmode;
-        _ ->
-          <<"">>
-      end,
-      CallStatus = case fxml:get_tag_attr(<<"call_status">>, MediaCall) of
-        {value, Callstatus} ->
-          Callstatus;
-        _ ->
-          <<"">>
-      end,
-      GroupCallId = case fxml:get_tag_attr(<<"group_id">>, MediaCall) of
-        {value, GroupcallId} ->
-          GroupcallId;
-        _ ->
-          <<"">>
-      end,
+		   ReCall = fxml:get_subtag_with_xmlns(Packet, <<"recall">>,
+						       <<"urn:xmpp:receipts">>),
+		   {value, MessageId} = fxml:get_tag_attr(<<"id">>,
+							  ReCall),
 
-      RoomLink = case fxml:get_tag_attr(<<"call_link">>, MediaCall) of
-        {value, Roomlink} ->
-          Roomlink;
-        _ ->
-          <<"">>
-      end,
+		   SendFrom = list_to_binary(binary_to_list(FromUser) ++
+					     "@" ++ binary_to_list(Server)),
+		   BF = [{<<"type">>, "recall"},
+			 {<<"message_id">>, binary_to_list(MessageId)},
+			 {<<"message_content">>, "This message was deleted"},
+			 {<<"send_from">>, binary_to_list(SendFrom)},
+			 {<<"userDomain">>, binary_to_list(Server)},
+			 {<<"user_type">>, binary_to_list(PushType)},
+			 {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
+			 {<<"title">>, "This message was deleted"}],
+		   Payload = create_android_json(DeviceToken, BF),
+		   if DeviceType ==  <<"android">> ->
+			      send_payload(Payload, ChatType, false, Packet, android);
+		      true ->
+			      send_payload(Payload, ChatType, false, Packet, web)
+		   end;
 
-      CallerName = case fxml:get_tag_attr(<<"caller_name">>, MediaCall) of
-      {value, Callername} ->
-        Callername;
-      _ ->
-        <<"">>
-    end,
-          Expiry = get_timestamp(),
+	   ChatType == <<"mediacall">> ->
+		   FromUser = From#jid.luser,
+		   Server = To#jid.server,
+		   MediaCall = fxml:get_subtag_with_xmlns(Packet, <<"mediacall">>,
+							  <<"urn:xmpp:call">>),
+		   MessageId = fxml:get_attr_s(<<"id">>,
+					       Packet#xmlel.attrs),
+		   SendFrom = list_to_binary(binary_to_list(FromUser) ++
+					     "@" ++ binary_to_list(Server)),
 
-    MetaData = case fxml:get_tag_attr(<<"meta_data">>, MediaCall) of
-    {value, Metadata} ->
-      Metadata;
-    _ ->
-      <<"">>
-  end,
-      SessionStatus = case fxml:get_tag_attr(<<"session_status">>, MediaCall) of
-                      {value, Sessionstatus} ->
-                      Sessionstatus;
-                      _ ->
-                      <<"">>
-                    end,
+		   RoomId = case fxml:get_tag_attr(<<"room_id">>, MediaCall) of
+				    {value, Roomid} ->
+					    Roomid;
+				    _ ->
+					    <<"">>
+			    end,
+		   CallType = case fxml:get_tag_attr(<<"call_type">>, MediaCall) of
+				      {value, Calltype} ->
+					      Calltype;
+				      _ ->
+					      <<"">>
+			      end,
+		   CallTime = case fxml:get_tag_attr(<<"call_time">>, MediaCall) of
+				      {value, Calltime} ->
+					      Calltime;
+				      _ ->
+					      <<"">>
+			      end,
+		   StartTime = case fxml:get_tag_attr(<<"start_time">>, MediaCall) of
+				       {value, Starttime} ->
+					       Starttime;
+				       _ ->
+					       <<"">>
+			       end,
+		   EndTime = case fxml:get_tag_attr(<<"end_time">>, MediaCall) of
+				     {value, Endtime} ->
+					     Endtime;
+				     _ ->
+					     <<"">>
+			     end,
+		   CallMode = case fxml:get_tag_attr(<<"call_mode">>, MediaCall) of
+				      {value, Callmode} ->
+					      Callmode;
+				      _ ->
+					      <<"">>
+			      end,
+		   CallStatus = case fxml:get_tag_attr(<<"call_status">>, MediaCall) of
+					{value, Callstatus} ->
+						Callstatus;
+					_ ->
+						<<"">>
+				end,
+		   GroupCallId = case fxml:get_tag_attr(<<"group_id">>, MediaCall) of
+					 {value, GroupcallId} ->
+						 GroupcallId;
+					 _ ->
+						 <<"">>
+				 end,
 
-      case fxml:get_subtag(MediaCall, <<"users">>) of
-        false  ->
+		   RoomLink = case fxml:get_tag_attr(<<"call_link">>, MediaCall) of
+				      {value, Roomlink} ->
+					      Roomlink;
+				      _ ->
+					      <<"">>
+			      end,
 
-          ok;
-        Users ->
-          User = lists:flatmap(fun(U) ->
-            [fxml:get_tag_cdata(U)] end, Users#xmlel.children),
+		   CallerName = case fxml:get_tag_attr(<<"caller_name">>, MediaCall) of
+					{value, Callername} ->
+						Callername;
+					_ ->
+						<<"">>
+				end,
+		   Expiry = get_timestamp(),
 
-          case fxml:get_subtag(MediaCall, <<"invite">>) of
-          false  ->
-            BF = [{<<"type">>, "mediacall"},
-              {<<"message_id">>, binary_to_list(MessageId)},
-              {<<"room_id">>, binary_to_list(RoomId)},
-              {<<"users">>, lists:flatten(lists:join(",", [binary_to_list(B) || B <- User]))},
-              {<<"caller_id">>, binary_to_list(SendFrom)},
-              {<<"call_type">>, binary_to_list(CallType)},
-              {<<"call_time">>, CallTime},
-              {<<"start_time">>, binary_to_list(StartTime)},
-              {<<"end_time">>, binary_to_list(EndTime)},
-              {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
-              {<<"call_status">>, binary_to_list(CallStatus)},
-              {<<"caller_name">>, binary_to_list(CallerName)},
-              {<<"group_id">>, binary_to_list(GroupCallId)},
-              {<<"session_status">>, binary_to_list(SessionStatus)},
-              {<<"userDomain">>, binary_to_list(Server)},
-              {<<"user_type">>, binary_to_list(PushType)},
-              {<<"call_mode">>, binary_to_list(CallMode)},
-              {<<"expiration">>, integer_to_list(Expiry)},
-              {<<"call_link">>, binary_to_list(RoomLink)},
-              {<<"meta_data">>, binary_to_list(MetaData)},
-              {<<"title">>, "Calling"}];
-          InviteUsers ->
-            InviteUser = lists:flatmap(fun(I) ->
-              [fxml:get_tag_cdata(I)] end, InviteUsers#xmlel.children),
-            BF = [{<<"type">>, "mediacall"},
-            {<<"message_id">>, binary_to_list(MessageId)},
-            {<<"room_id">>, binary_to_list(RoomId)},
-            {<<"users">>, lists:flatten(lists:join(",", [binary_to_list(B) || B <- User]))},
-            {<<"inviteusers">>, lists:flatten(lists:join(",", [binary_to_list(C) || C <- InviteUser]))},
-            {<<"caller_id">>, binary_to_list(SendFrom)},
-            {<<"call_type">>, binary_to_list(CallType)},
-            {<<"call_time">>, CallTime},
-            {<<"start_time">>, binary_to_list(StartTime)},
-            {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
-            {<<"userDomain">>, binary_to_list(Server)},
-            {<<"user_type">>, binary_to_list(PushType)},
-            {<<"end_time">>, binary_to_list(EndTime)},
-            {<<"call_status">>, binary_to_list(CallStatus)},
-            {<<"group_id">>, binary_to_list(GroupCallId)},
-            {<<"caller_name">>, binary_to_list(CallerName)},
-            {<<"session_status">>, binary_to_list(SessionStatus)},
-            {<<"call_mode">>, binary_to_list(CallMode)},
-            {<<"meta_data">>, binary_to_list(MetaData)},
-            {<<"expiration">>, integer_to_list(Expiry)},
-            {<<"call_link">>, binary_to_list(RoomLink)},
-            {<<"title">>, "Calling"}]
-          end,
-          Payload = create_android_json(DeviceToken, BF),
-          if DeviceType ==  <<"android">> ->
-            send_payload(Payload, ChatType, false, Packet, android);
-      true ->
-        send_payload(Payload, ChatType, false, Packet, web)
-      end
-      end;
-    ChatType == <<"adminblock">> ->
-      Server = To#jid.server,
-      AdminBlock = fxml:get_subtag_with_xmlns(Packet, <<"admin_block">>,
-        <<"urn:xmpp:receipts">>),
+		   MetaData = case fxml:get_tag_attr(<<"meta_data">>, MediaCall) of
+				      {value, Metadata} ->
+					      Metadata;
+				      _ ->
+					      <<"">>
+			      end,
+		   SessionStatus = case fxml:get_tag_attr(<<"session_status">>, MediaCall) of
+					   {value, Sessionstatus} ->
+						   Sessionstatus;
+					   _ ->
+						   <<"">>
+				   end,
 
-      BlockStatus = case fxml:get_tag_attr(<<"block_status">>, AdminBlock) of
-        {value, Blockstatus} ->
-        Blockstatus;
-          _ ->
-          <<"">>
-      end,
-        BlockUser = case fxml:get_tag_attr(<<"jid">>, AdminBlock) of
-        {value, Blockuser} ->
-        Blockuser;
-        _ ->
-        <<"">>
-      end,
+		   case fxml:get_subtag(MediaCall, <<"users">>) of
+			   false  ->
 
-            BF = [{<<"type">>, "adminblock"},
-              {<<"push_from">>, "MirrorFly"},
-              {<<"user_jid">>, binary_to_list(BlockUser)},
-              {<<"userDomain">>, binary_to_list(Server)},
-              {<<"user_type">>, binary_to_list(PushType)},
-              {<<"block_status">>, binary_to_list(BlockStatus)},
-              {<<"title">>, "Blocking"}],
+				   ok;
+			   Users ->
+				   User = lists:flatmap(fun(U) ->
+									[fxml:get_tag_cdata(U)] end, Users#xmlel.children),
 
-          Payload = create_android_json(DeviceToken, BF),
-          if DeviceType ==  <<"android">> ->
-            send_payload(Payload, ChatType, false, Packet, android);
-            true ->
-              send_payload(Payload, ChatType, false, Packet, web)
-            end;
-    ChatType == <<"meeting_reminder">> ->
-      Server = To#jid.server,
-      Meeting = fxml:get_subtag_with_xmlns(Packet, <<"meeting">>,
-        <<"urn:xmpp:receipts">>),
-      MessageId = fxml:get_attr_s(<<"message_id">>, Meeting#xmlel.attrs),
-      SessionId = fxml:get_attr_s(<<"session_id">>, Meeting#xmlel.attrs),
-      RoomId = fxml:get_attr_s(<<"room_id">>, Meeting#xmlel.attrs),
-      ChatId = fxml:get_attr_s(<<"chat_id">>, Meeting#xmlel.attrs),
-      CallMode = fxml:get_attr_s(<<"call_mode">>, Meeting#xmlel.attrs),
-      UserJid = fxml:get_attr_s(<<"user_jid">>, Meeting#xmlel.attrs),
-      CallType = fxml:get_attr_s(<<"call_type">>, Meeting#xmlel.attrs),
-      ScheduledAt = fxml:get_attr_s(<<"scheduled_at">>, Meeting#xmlel.attrs),
-      ReminderMins = fxml:get_attr_s(<<"reminder_before_minutes">>, Meeting#xmlel.attrs),
-      Status = fxml:get_attr_s(<<"status">>, Meeting#xmlel.attrs),
-      MessageFrom = fxml:get_attr_s(<<"message_from">>, Meeting#xmlel.attrs),
-      ChatTypeParam = fxml:get_attr_s(<<"chat_type">>, Meeting#xmlel.attrs),
-      MessageTo = fxml:get_attr_s(<<"message_to">>, Meeting#xmlel.attrs),
+				   case fxml:get_subtag(MediaCall, <<"invite">>) of
+					   false  ->
+						   BF = [{<<"type">>, "mediacall"},
+							 {<<"message_id">>, binary_to_list(MessageId)},
+							 {<<"room_id">>, binary_to_list(RoomId)},
+							 {<<"users">>, lists:flatten(lists:join(",", [binary_to_list(B) || B <- User]))},
+							 {<<"caller_id">>, binary_to_list(SendFrom)},
+							 {<<"call_type">>, binary_to_list(CallType)},
+							 {<<"call_time">>, CallTime},
+							 {<<"start_time">>, binary_to_list(StartTime)},
+							 {<<"end_time">>, binary_to_list(EndTime)},
+							 {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
+							 {<<"call_status">>, binary_to_list(CallStatus)},
+							 {<<"caller_name">>, binary_to_list(CallerName)},
+							 {<<"group_id">>, binary_to_list(GroupCallId)},
+							 {<<"session_status">>, binary_to_list(SessionStatus)},
+							 {<<"userDomain">>, binary_to_list(Server)},
+							 {<<"user_type">>, binary_to_list(PushType)},
+							 {<<"call_mode">>, binary_to_list(CallMode)},
+							 {<<"expiration">>, integer_to_list(Expiry)},
+							 {<<"call_link">>, binary_to_list(RoomLink)},
+							 {<<"meta_data">>, binary_to_list(MetaData)},
+							 {<<"title">>, "Calling"}];
+					   InviteUsers ->
+						   InviteUser = lists:flatmap(fun(I) ->
+											      [fxml:get_tag_cdata(I)] end, InviteUsers#xmlel.children),
+						   BF = [{<<"type">>, "mediacall"},
+							 {<<"message_id">>, binary_to_list(MessageId)},
+							 {<<"room_id">>, binary_to_list(RoomId)},
+							 {<<"users">>, lists:flatten(lists:join(",", [binary_to_list(B) || B <- User]))},
+							 {<<"inviteusers">>, lists:flatten(lists:join(",", [binary_to_list(C) || C <- InviteUser]))},
+							 {<<"caller_id">>, binary_to_list(SendFrom)},
+							 {<<"call_type">>, binary_to_list(CallType)},
+							 {<<"call_time">>, CallTime},
+							 {<<"start_time">>, binary_to_list(StartTime)},
+							 {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
+							 {<<"userDomain">>, binary_to_list(Server)},
+							 {<<"user_type">>, binary_to_list(PushType)},
+							 {<<"end_time">>, binary_to_list(EndTime)},
+							 {<<"call_status">>, binary_to_list(CallStatus)},
+							 {<<"group_id">>, binary_to_list(GroupCallId)},
+							 {<<"caller_name">>, binary_to_list(CallerName)},
+							 {<<"session_status">>, binary_to_list(SessionStatus)},
+							 {<<"call_mode">>, binary_to_list(CallMode)},
+							 {<<"meta_data">>, binary_to_list(MetaData)},
+							 {<<"expiration">>, integer_to_list(Expiry)},
+							 {<<"call_link">>, binary_to_list(RoomLink)},
+							 {<<"title">>, "Calling"}]
+				   end,
+				   Payload = create_android_json(DeviceToken, BF),
+				   if DeviceType ==  <<"android">> ->
+					      send_payload(Payload, ChatType, false, Packet, android);
+				      true ->
+					      send_payload(Payload, ChatType, false, Packet, web)
+				   end
+		   end;
+	   ChatType == <<"adminblock">> ->
+		   Server = To#jid.server,
+		   AdminBlock = fxml:get_subtag_with_xmlns(Packet, <<"admin_block">>,
+							   <<"urn:xmpp:receipts">>),
 
-      BF = [
-        {<<"type">>, "meeting_reminder"},
-        {<<"status">>, binary_to_list(Status)},
-        {<<"session_id">>, binary_to_list(SessionId)},
-        {<<"room_id">>, binary_to_list(RoomId)},
-        {<<"chat_id">>, binary_to_list(ChatId)},
-        {<<"user_jid">>, binary_to_list(UserJid)},
-        {<<"call_mode">>, binary_to_list(CallMode)},
-        {<<"call_type">>, binary_to_list(CallType)},
-        {<<"scheduled_at">>, binary_to_list(ScheduledAt)},
-        {<<"message_id">>, binary_to_list(MessageId)},
-        {<<"reminder_before_minutes">>, binary_to_list(ReminderMins)},
-        {<<"userDomain">>, binary_to_list(Server)},
-        {<<"user_type">>, binary_to_list(PushType)},
-        {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
-        {<<"title">>, "Meeting Reminder"},
-        {<<"message_from">>, binary_to_list(MessageFrom)},
-        {<<"chat_type">>, binary_to_list(ChatTypeParam)},
-        {<<"message_to">>, binary_to_list(MessageTo)}
-      ],
-      Payload = create_android_json(DeviceToken, BF),
-      if DeviceType == <<"android">> ->
-        send_payload(Payload, ChatType, false, Packet, android);
-      true ->
-        send_payload(Payload, ChatType, false, Packet, web)
-      end;
-    true -> {ok, <<"chat type is different gcm">>}
-  end.
+		   BlockStatus = case fxml:get_tag_attr(<<"block_status">>, AdminBlock) of
+					 {value, Blockstatus} ->
+						 Blockstatus;
+					 _ ->
+						 <<"">>
+				 end,
+		   BlockUser = case fxml:get_tag_attr(<<"jid">>, AdminBlock) of
+				       {value, Blockuser} ->
+					       Blockuser;
+				       _ ->
+					       <<"">>
+			       end,
+
+		   BF = [{<<"type">>, "adminblock"},
+			 {<<"push_from">>, "MirrorFly"},
+			 {<<"user_jid">>, binary_to_list(BlockUser)},
+			 {<<"userDomain">>, binary_to_list(Server)},
+			 {<<"user_type">>, binary_to_list(PushType)},
+			 {<<"block_status">>, binary_to_list(BlockStatus)},
+			 {<<"title">>, "Blocking"}],
+
+		   Payload = create_android_json(DeviceToken, BF),
+		   if DeviceType ==  <<"android">> ->
+			      send_payload(Payload, ChatType, false, Packet, android);
+		      true ->
+			      send_payload(Payload, ChatType, false, Packet, web)
+		   end;
+	   ChatType == <<"meeting_reminder">> ->
+		   Server = To#jid.server,
+		   Meeting = fxml:get_subtag_with_xmlns(Packet, <<"meeting">>,
+							<<"urn:xmpp:receipts">>),
+		   MessageId = fxml:get_attr_s(<<"message_id">>, Meeting#xmlel.attrs),
+		   SessionId = fxml:get_attr_s(<<"session_id">>, Meeting#xmlel.attrs),
+		   RoomId = fxml:get_attr_s(<<"room_id">>, Meeting#xmlel.attrs),
+		   ChatId = fxml:get_attr_s(<<"chat_id">>, Meeting#xmlel.attrs),
+		   CallMode = fxml:get_attr_s(<<"call_mode">>, Meeting#xmlel.attrs),
+		   UserJid = fxml:get_attr_s(<<"user_jid">>, Meeting#xmlel.attrs),
+		   CallType = fxml:get_attr_s(<<"call_type">>, Meeting#xmlel.attrs),
+		   ScheduledAt = fxml:get_attr_s(<<"scheduled_at">>, Meeting#xmlel.attrs),
+		   ReminderMins = fxml:get_attr_s(<<"reminder_before_minutes">>, Meeting#xmlel.attrs),
+		   Status = fxml:get_attr_s(<<"status">>, Meeting#xmlel.attrs),
+		   MessageFrom = fxml:get_attr_s(<<"message_from">>, Meeting#xmlel.attrs),
+		   ChatTypeParam = fxml:get_attr_s(<<"chat_type">>, Meeting#xmlel.attrs),
+		   MessageTo = fxml:get_attr_s(<<"message_to">>, Meeting#xmlel.attrs),
+
+		   BF = [
+			 {<<"type">>, "meeting_reminder"},
+			 {<<"status">>, binary_to_list(Status)},
+			 {<<"session_id">>, binary_to_list(SessionId)},
+			 {<<"room_id">>, binary_to_list(RoomId)},
+			 {<<"chat_id">>, binary_to_list(ChatId)},
+			 {<<"user_jid">>, binary_to_list(UserJid)},
+			 {<<"call_mode">>, binary_to_list(CallMode)},
+			 {<<"call_type">>, binary_to_list(CallType)},
+			 {<<"scheduled_at">>, binary_to_list(ScheduledAt)},
+			 {<<"message_id">>, binary_to_list(MessageId)},
+			 {<<"reminder_before_minutes">>, binary_to_list(ReminderMins)},
+			 {<<"userDomain">>, binary_to_list(Server)},
+			 {<<"user_type">>, binary_to_list(PushType)},
+			 {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
+			 {<<"title">>, "Meeting Reminder"},
+			 {<<"message_from">>, binary_to_list(MessageFrom)},
+			 {<<"chat_type">>, binary_to_list(ChatTypeParam)},
+			 {<<"message_to">>, binary_to_list(MessageTo)}
+			],
+		   Payload = create_android_json(DeviceToken, BF),
+		   if DeviceType == <<"android">> ->
+			      send_payload(Payload, ChatType, false, Packet, android);
+		      true ->
+			      send_payload(Payload, ChatType, false, Packet, web)
+		   end;
+	   true -> {ok, <<"chat type is different gcm">>}
+	end.
 
 %% Prepare and push message to android devices
 %%
