@@ -647,9 +647,9 @@ gcm_single_push(DeviceType, DeviceToken, PushType, ChatType,
 			 {<<"type">>, binary_to_list(MessageType)}],
 		   Payload = create_android_json(DeviceToken, BF),
 		   if DeviceType ==  <<"android">> ->
-			      send_payload(Payload, ChatType, false, Packet, android);
+			      send_payload(Server, Payload, ChatType, false, Packet, android);
 		      true ->
-			      send_payload(Payload, ChatType, false, Packet, web)
+			      send_payload(Server, Payload, ChatType, false, Packet, web)
 		   end;
 	   ChatType == <<"reaction">>; ChatType == <<"group_reaction">> ->
 		   Server = To#jid.server,
@@ -702,9 +702,9 @@ gcm_single_push(DeviceType, DeviceToken, PushType, ChatType,
 										      true -> 
 											      ok
 										   end,
-										   send_payload(Payload, ChatType, false, Packet, android);
+										   send_payload(Server, Payload, ChatType, false, Packet, android);
 									   _ ->
-										   send_payload(Payload, ChatType, false, Packet, web)
+										   send_payload(Server, Payload, ChatType, false, Packet, web)
 								   end;
 							   false ->
 								   ?LOG_INFO("skipping push, reaction should only route for message sender ~p but got ~p",[MsgSender, ToUser]),
@@ -723,9 +723,9 @@ gcm_single_push(DeviceType, DeviceToken, PushType, ChatType,
 
 									      case DeviceType of
 										      <<"android">> ->
-											      send_payload(Payload, ChatType, false, Packet, android);
+											      send_payload(Server, Payload, ChatType, false, Packet, android);
 										      _ ->
-											      send_payload(Payload, ChatType, false, Packet, web)
+											      send_payload(Server, Payload, ChatType, false, Packet, web)
 									      end;
 								      true -> 
 									      ok
@@ -764,9 +764,9 @@ gcm_single_push(DeviceType, DeviceToken, PushType, ChatType,
 			 {<<"title">>, "Poll"}],
 		   Payload = create_android_json(DeviceToken, BF),
 		   if DeviceType ==  <<"android">> ->
-			      send_payload(Payload, ChatType, false, Packet, android);
+			      send_payload(Server, Payload, ChatType, false, Packet, android);
 		      true ->
-			      send_payload(Payload, ChatType, false, Packet, web)
+			      send_payload(Server, Payload, ChatType, false, Packet, web)
 		   end;
 	   ChatType == <<"seen">> ->
 		   FromUser = From#jid.luser,
@@ -793,9 +793,9 @@ gcm_single_push(DeviceType, DeviceToken, PushType, ChatType,
 			 {<<"type">>, binary_to_list(ChatType)}],
 		   Payload = create_android_json(DeviceToken, BF),
 		   if DeviceType ==  <<"android">> ->
-			      send_payload(Payload, ChatType, false, Packet, android);
+			      send_payload(Server, Payload, ChatType, false, Packet, android);
 		      true ->
-			      send_payload(Payload, ChatType, false, Packet, web)
+			      send_payload(Server, Payload, ChatType, false, Packet, web)
 		   end;
 	   ChatType == <<"recall">> ->
 		   FromUser = From#jid.luser,
@@ -818,9 +818,9 @@ gcm_single_push(DeviceType, DeviceToken, PushType, ChatType,
 			 {<<"title">>, "This message was deleted"}],
 		   Payload = create_android_json(DeviceToken, BF),
 		   if DeviceType ==  <<"android">> ->
-			      send_payload(Payload, ChatType, false, Packet, android);
+			      send_payload(Server, Payload, ChatType, false, Packet, android);
 		      true ->
-			      send_payload(Payload, ChatType, false, Packet, web)
+			      send_payload(Server, Payload, ChatType, false, Packet, web)
 		   end;
 
 	   ChatType == <<"mediacall">> ->
@@ -969,9 +969,9 @@ gcm_single_push(DeviceType, DeviceToken, PushType, ChatType,
 				   end,
 				   Payload = create_android_json(DeviceToken, BF),
 				   if DeviceType ==  <<"android">> ->
-					      send_payload(Payload, ChatType, false, Packet, android);
+					      send_payload(Server, Payload, ChatType, false, Packet, android);
 				      true ->
-					      send_payload(Payload, ChatType, false, Packet, web)
+					      send_payload(Server, Payload, ChatType, false, Packet, web)
 				   end
 		   end;
 	   ChatType == <<"adminblock">> ->
@@ -1002,9 +1002,9 @@ gcm_single_push(DeviceType, DeviceToken, PushType, ChatType,
 
 		   Payload = create_android_json(DeviceToken, BF),
 		   if DeviceType ==  <<"android">> ->
-			      send_payload(Payload, ChatType, false, Packet, android);
+			      send_payload(Server, Payload, ChatType, false, Packet, android);
 		      true ->
-			      send_payload(Payload, ChatType, false, Packet, web)
+			      send_payload(Server, Payload, ChatType, false, Packet, web)
 		   end;
 	   ChatType == <<"meeting_reminder">> ->
 		   Server = To#jid.server,
@@ -1046,9 +1046,9 @@ gcm_single_push(DeviceType, DeviceToken, PushType, ChatType,
 			],
 		   Payload = create_android_json(DeviceToken, BF),
 		   if DeviceType == <<"android">> ->
-			      send_payload(Payload, ChatType, false, Packet, android);
+			      send_payload(Server, Payload, ChatType, false, Packet, android);
 		      true ->
-			      send_payload(Payload, ChatType, false, Packet, web)
+			      send_payload(Server, Payload, ChatType, false, Packet, web)
 		   end;
 	   true -> {ok, <<"chat type is different gcm">>}
 	end.
@@ -1110,7 +1110,7 @@ gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
         {<<"push_from">>, binary_to_list(<<"MirrorFly">>)},
         {<<"type">>, binary_to_list(MessageType)}],
       Payload = create_android_json(DeviceToken, BF),
-      send_payload(Payload, ChatType, false, Packet, android);
+      send_payload(LServer, Payload, ChatType, false, Packet, android);
       (Items =/= false) and
         (NameSpace =:= <<"urn:xmpp:mix:nodes:participants">>) ->
         #jid{luser = LUser, lserver = LServer} = ToUser,
@@ -1192,7 +1192,7 @@ gcm_group_push(DeviceToken, PushType, ChatType, GroupName,
             {<<"type">>, "normal"}],
           Payload = create_android_json(DeviceToken, BF),
           
-          send_payload(Payload, ChatType, false, Packet, android);
+          send_payload(LServer, Payload, ChatType, false, Packet, android);
           
           true -> {ok, <<"ParticipantJid =/= SendFrom gcm">>}
         end;
@@ -1308,7 +1308,7 @@ end,
         {mode, binary_to_list(Mode)},
         {sound, binary_to_list(<<"default">>)}],
       JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
-      send_payload(JSON, ChatType, PushType, Packet, ios);
+      send_payload(Server, JSON, ChatType, PushType, Packet, ios);
     ChatType == <<"adminblock">> ->
 
       Server = Recipient#jid.server,
@@ -1349,7 +1349,7 @@ end,
           {mode, binary_to_list(Mode)},
           {sound, binary_to_list(<<"default">>)}],
         JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
-        send_payload(JSON, ChatType, PushType, Packet, ios);
+        send_payload(Server, JSON, ChatType, PushType, Packet, ios);
 
     ChatType == <<"recall">> ->
       RecallChattype = fxml:get_attr_s(<<"type">>, Packet#xmlel.attrs),
@@ -1398,7 +1398,7 @@ end,
           {sound, binary_to_list(<<"default">>)}],
         JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
 
-        send_payload(JSON, ChatType, PushType, Packet, ios)
+        send_payload(Server, JSON, ChatType, PushType, Packet, ios)
                       end, Range);
       ChatType == <<"reaction">>; ChatType == <<"group_reaction">> ->
 
@@ -1477,7 +1477,7 @@ end,
                              true -> 
                               ok
                             end,
-                            send_payload(JSON, ChatType, PushType, Packet, ios);
+                            send_payload(Server, JSON, ChatType, PushType, Packet, ios);
                         false ->
                           ?LOG_INFO("skipping ios group push, reaction should only route for message sender ~p but got ~p",[MsgSender, ToUser]),
                           ok
@@ -1492,7 +1492,7 @@ end,
                             JSON = create_json(Msg, Args0, binary_to_list(DeviceToken), Mode, 0, 0, PushType),
 
                             ?LOG_INFO("[ios_push]] reaction payload: ~p", [JSON]),
-                            send_payload(JSON, ChatType, PushType, Packet, ios);
+                            send_payload(Server, JSON, ChatType, PushType, Packet, ios);
                           true ->
                             ?LOG_INFO("skipping ios push, reaction is from message sender ~p",[FromUser]),
                             ok
@@ -1556,7 +1556,7 @@ end,
                             {mode, binary_to_list(Mode)},
                             {sound, binary_to_list(<<"default">>)}],
                           JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
-                          send_payload(JSON, ChatType, PushType, Packet, ios);
+                          send_payload(Server, JSON, ChatType, PushType, Packet, ios);
     ChatType == <<"mediacall">> ->
       Server = Recipient#jid.server,
       FromUser = Sender#jid.luser,
@@ -1725,7 +1725,7 @@ end,
                 {sound, binary_to_list(<<"default">>)}],
                 JSON = create_json(Msg, Args, binary_to_list(VoipDeviceToken), Mode,1,Expiry,PushType),
 
-          send_payload(JSON, ChatType, PushType, Packet, ios)
+          send_payload(Server, JSON, ChatType, PushType, Packet, ios)
       end;
     ChatType == <<"meeting_reminder">> ->
       Server = Recipient#jid.server,
@@ -1773,7 +1773,7 @@ end,
         {sound, binary_to_list(<<"default">>)}
       ],
       JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode, 0, 0, PushType),
-      send_payload(JSON, ChatType, PushType, Packet, ios);
+      send_payload(Server, JSON, ChatType, PushType, Packet, ios);
     true -> {ok, <<"chat type is different in ios">>,ChatType}
   end.
 
@@ -1856,6 +1856,7 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
                             "@" ++
                             binary_to_list(GroupName)
                         end,
+      Server = Recipient#jid.server,
       Msg = [{<<"mutable-content">>, integer_to_list(1)},
         {alert, ChangedMessage},  {mode, binary_to_list(Mode)},
         {sound, binary_to_list(<<"default">>)}],
@@ -1868,11 +1869,11 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
         {user_name,binary_to_list(UserNickName)},
         {user_type, binary_to_list(UserType)},
         {push_from, binary_to_list(<<"MirrorFly">>)},
-        {userDomain, binary_to_list(Recipient#jid.server)},
+        {userDomain, binary_to_list(Server)},
         {sent_from, binary_to_list(MsgFrom)},
         {type, binary_to_list(MessageType)}],
       JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,0,PushType),
-      send_payload(JSON, ChatType, PushType, Packet, ios);
+      send_payload(Server, JSON, ChatType, PushType, Packet, ios);
       (Items =/= false) and
         (NameSpace =:= <<"urn:xmpp:mix:nodes:participants">>) ->
         Item = fxml:get_subtag(Items, <<"item">>),
@@ -1898,6 +1899,7 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
             MessageContent = <<GroupName / binary, <<":">> / binary,  UserNickName / binary, <<" removed you">> / binary>>
         end,
 
+        Server = Recipient#jid.server,
         if ParticipantJid =:= SendFrom ->
           Msg = [{<<"mutable-content">>, integer_to_list(1)},
             {alert, binary_to_list(MessageContent)},
@@ -1913,12 +1915,12 @@ apns_group_push(DeviceToken, UserType, ChatType, Sender,
             {user_type, binary_to_list(UserType)},
             {added_at, binary_to_list(TimestampValue)},
             {push_from, binary_to_list(<<"MirrorFly">>)},
-            {userDomain, binary_to_list(Recipient#jid.server)},
+            {userDomain, binary_to_list(Server)},
             {node_id, binary_to_list(NodeId)},
             {group_id, binary_to_list(GroupId)}],
           JSON = create_json(Msg, Args, binary_to_list(DeviceToken), Mode,0,Expiry,PushType),
          
-          send_payload(JSON, ChatType, PushType, Packet, ios);
+          send_payload(Server, JSON, ChatType, PushType, Packet, ios);
          
           true -> {ok, <<"ParticipantJid =/= SendFrom ios">>}
         end;
@@ -2084,7 +2086,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
           {<<"title">>, ChangedMessage},
           {<<"type">>, binary_to_list(MessageType)}],
         AndPayload = create_android_json(AndroidDeviceToken, Load),
-        send_payload(AndPayload, <<"normal">>, false, Stanza, android)
+        send_payload(Server, AndPayload, <<"normal">>, false, Stanza, android)
       end,ATokens)
     end,
     case catch fly_mod_utils:get_bulk_user_device(Server,
@@ -2283,7 +2285,7 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
           end,
           AndPayload = create_android_json(AndroidDeviceToken, Load),
           
-        send_payload(AndPayload, <<"normal">>, false, Stanza, android)          
+        send_payload(Server, AndPayload, <<"normal">>, false, Stanza, android)          
         end,
         ATokens)
       end,
@@ -2385,11 +2387,11 @@ ios_group_create_push(Touser, MessageContent, Server, Members, _Group, FlatTimeS
   if  IOSPushType =:= <<"13above">> ->
     Msg = [{<<"mutable-content">>, integer_to_list(1)}, {alert, binary_to_list(Message)}, {mode, binary_to_list(Mode)}, {sound, binary_to_list(<<"default">>)}],
     IOSPayLoad = create_json(Msg, Args, binary_to_list(IOSDeviceToken),Mode,0,0,PushType),
-    send_payload(IOSPayLoad, ChatType, PushType, Packet, ios);
+    send_payload(Server, IOSPayLoad, ChatType, PushType, Packet, ios);
     true ->
       Msg = [{<<"content-available">>, integer_to_list(1)},{is_voip, integer_to_list(1)},{alert, binary_to_list(Message)}, {mode, binary_to_list(Mode)}, {sound, binary_to_list(<<"default">>)}],
       IOSPayLoad = create_json(Msg, Args, binary_to_list(IOSDeviceToken),Mode,1,0,PushType),
-      send_payload(IOSPayLoad, ChatType, PushType, Packet, ios)
+      send_payload(Server, IOSPayLoad, ChatType, PushType, Packet, ios)
 
 end.
 ios_send_bulk_push(Server, Stanza, ToUser, MessageContent, _FromUser, FlatTimeStamp, ChatType, GroupID, Mode, IOSDeviceToken, _Expiry, _State, IOSPushType, UserType, PushType) ->
@@ -2424,11 +2426,11 @@ ios_send_bulk_push(Server, Stanza, ToUser, MessageContent, _FromUser, FlatTimeSt
   if IOSPushType =:= <<"13above">> ->
     Msg = [{<<"mutable-content">>, integer_to_list(1)}, {alert, ChangedMessage},{mode, binary_to_list(Mode)}, {sound, binary_to_list(<<"default">>)}],
     IOSPayLoad = create_json(Msg, Args, binary_to_list(IOSDeviceToken), Mode,0,0,PushType),
-    send_payload(IOSPayLoad, ChatType, PushType, Stanza, ios);
+    send_payload(Server, IOSPayLoad, ChatType, PushType, Stanza, ios);
     true ->
       Msg = [{<<"content-available">>, integer_to_list(1)},{is_voip, integer_to_list(1)}, {alert, ChangedMessage}, {mode, binary_to_list(Mode)},{sound, binary_to_list(<<"default">>)}],
       IOSPayLoad = create_json(Msg, Args, binary_to_list(IOSDeviceToken), Mode, 1,0,PushType),
-      send_payload(IOSPayLoad, ChatType, PushType, Stanza, ios)
+      send_payload(Server, IOSPayLoad, ChatType, PushType, Stanza, ios)
   end.
 
 get_status(Members) ->
@@ -2516,7 +2518,7 @@ create_android_json(DeviceToken, BF) ->
   "\",\"collapse_key\":\"", binary_to_list(RandomId),  "\",\"data\":{", create_keyvalue(BF), "}}"]).
 
 
-send_payload(Payload, ChatType, _, Packet, android) ->
+send_payload(Host, Payload, ChatType, _, Packet, android) ->
   RoutingKey =
   if ChatType =:= <<"call">>; 
      ChatType =:= <<"mediacall">> ->
@@ -2526,8 +2528,8 @@ send_payload(Payload, ChatType, _, Packet, android) ->
   true ->
       <<"android_message">>
   end,
-  publish(RoutingKey, {Payload, Packet});
-send_payload(Payload, ChatType, _, Packet, web) ->
+  publish({Host, RoutingKey}, {Payload, Packet});
+send_payload(Host, Payload, ChatType, _, Packet, web) ->
   RoutingKey =
   if ChatType =:= <<"call">>; 
      ChatType =:= <<"mediacall">> ->
@@ -2535,8 +2537,8 @@ send_payload(Payload, ChatType, _, Packet, web) ->
   true ->
       <<"web_message">>
   end,
-  publish(RoutingKey, {Payload, Packet});
-send_payload(Payload, ChatType, PushType, Packet, ios) ->
+  publish({Host, RoutingKey}, {Payload, Packet});
+send_payload(Host, Payload, ChatType, PushType, Packet, ios) ->
   RoutingKey =
   if ChatType =:= <<"mediacall">> ->
     <<"ios_call">>;
@@ -2550,10 +2552,10 @@ send_payload(Payload, ChatType, PushType, Packet, ios) ->
           <<"ios_message">>
     end
   end,
-  publish(RoutingKey, {Payload, Packet}).
+  publish({Host, RoutingKey}, {Payload, Packet}).
 
-publish(RoutingKey, PayPac) ->
-  Args = [?MOD_PURPOSE, RoutingKey, PayPac],
+publish(Arg, PayPac) ->
+  Args = [?MOD_PURPOSE, Arg, PayPac],
   apply(?MOD_AMQP, ?MOD_AMQP_FUN, Args).
   
 mod_opt_type(db_type) ->

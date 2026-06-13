@@ -13,7 +13,7 @@
 -export([init/1, handle_call/3, handle_cast/2, 
          handle_info/2, terminate/2, code_change/3]).
 
--export([publish/3, is_channel_alive/2, create_channel/2]).
+-export([publish/3, is_channel_alive/3, create_channel/2]).
 
 -define(LISTENER_MOD, mod_amqp_proc).
 -define(LISTENER_FUN, process_listener_payload).
@@ -89,7 +89,6 @@ init([Host | _]) ->
         {ok, Connection} ->
              ?LOG_INFO("rabbitMQ connection established: ~p", 
                        [Connection]),
-            [Host] = ejabberd_option:hosts(),
             init_state(Connection, RabbitMQE, Host, AmqpListner);
         Error ->
             ?LOG_ERROR("init rabbitMQ connection failure with 
@@ -125,8 +124,9 @@ listen(Q) ->
                with consumer tag: ~ts", [Q, Tag]),
     {Channel, MonitorRef}.
 
-listen(down, OldChannel, Q) -> 
+listen(down, Host, OldChannel, Q) -> 
 
+    Proc = gen_mod:get_module_proc(Host, ?MODULE),
     NewChannel = gen_server:call(?MODULE, 
                     {channel, subscription, OldChannel}),
     MonitorRef = erlang:monitor(process, NewChannel),
@@ -157,11 +157,11 @@ handle_call(Key, _From, State) ->
             {reply, ChannelVal, State}
     end.
 
-handle_cast({Type, RoutingKey, PayPac}, State) ->
+handle_cast({Type, Arg, PayPac}, State) ->
     Key = channel_name(Type),
     case State#state.channels of
         #{Key := Channel} ->
-            publication(RoutingKey, PayPac, Channel, State#state.ex)
+            publication(Arg, PayPac, Channel, State#state.ex)
     end,
     {noreply, State};
 handle_cast(_, State) -> 
@@ -195,7 +195,8 @@ handle_info({'DOWN', _Ref, process, OldChannel, Reason}, State) ->
                 reason => ~p", [OldChannel, Reason]),
 
     Map = maps:remove(OldChannel, State#state.channels),
-    {NewChannel, MonitorRef} = listen(down, OldChannel, ?Q_API_DATA),
+    {NewChannel, MonitorRef} = listen(down, State#state.host, 
+                                    OldChannel, ?Q_API_DATA),
     NewMap = maps:put(NewChannel, MonitorRef, Map),
     {noreply, State#state{channels = NewMap}};
 handle_info(_, State) ->
@@ -241,7 +242,7 @@ create_channel(Connection, Type) when is_atom(Type) ->
 create_channel(_, _) ->
     #{}.
 
-is_channel_alive(Channel, Type) ->
+is_channel_alive(Host, Channel, Type) ->
   case {is_pid(Channel), is_process_alive(Channel)} of
     {true, true} ->
       ?LOG_INFO("channel ~p is alive", [Type]),
@@ -250,7 +251,8 @@ is_channel_alive(Channel, Type) ->
       ?LOG_INFO(
       "channel ~p is down, close existing & create a new one",
       [Type]),
-      gen_server:call(?MODULE, {channel, Type, Channel})
+      Proc = gen_mod:get_module_proc(Host, ?MODULE),
+      gen_server:call(Proc, {channel, Type, Channel})
   end.
 
 
@@ -283,11 +285,12 @@ close_channels({_Mod, Channel}) when is_pid(Channel) ->
 close_channels(_) ->
     bad_return.
 
-publish(Type, RoutingKey, PayPac) -> 
-    gen_server:cast(?MODULE, 
-        {Type, RoutingKey, PayPac}).
+publish(Type, Arg, PayPac) -> 
+    {Host, _} = Arg,
+    Proc = gen_mod:get_module_proc(Host, ?MODULE),
+    gen_server:cast(Proc, {Type, Arg, PayPac}).
 
-publication(RoutingKey, {Payload, Packet}, Channel, Exchange)  ->
+publication({Host, RoutingKey}, {Payload, Packet}, Channel, Exchange)  ->
     BinPayload =
     case is_binary(Payload) of
         true -> Payload;
@@ -295,7 +298,7 @@ publication(RoutingKey, {Payload, Packet}, Channel, Exchange)  ->
     end,
     logger(Packet, Exchange, RoutingKey, "publishing"),
 
-    ActiveChannel = is_channel_alive(Channel, publication),
+    ActiveChannel = is_channel_alive(Host, Channel, publication),
     case amqp_channel:cast(ActiveChannel, 
         #'basic.publish'{exchange = Exchange, routing_key = RoutingKey},
         #amqp_msg{payload = BinPayload}) of
