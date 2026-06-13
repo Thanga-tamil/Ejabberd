@@ -372,7 +372,7 @@ send_receipt(_, AdminJid, _, ToJid, MessageId, Id, ChatType) ->
 
 send_user_left_iq(User, Chan, Host) ->
     Id = fly_mod_utils:get_iq_message_id(20),
-    UserJid = User ++ <<"@mix.">> ++ Host,
+    UserJid = <<User/binary, "@mix.", Host/binary>>,
 
     IQ = #iq{
         type = set,
