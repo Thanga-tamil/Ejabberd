@@ -491,8 +491,8 @@ handle_payload(Map, Host, Id, ?MSG_DELIVERY) ->
     MsgFrom = maps:get(<<"messageFrom">>, Map),
     MsgTo = maps:get(<<"messageTo">>, Map),
     MsgId = maps:get(<<"messageId">>, Map),
-    GroupId = maps:get(<<"groupId">>, Map),
-    DeviceId = maps:get(<<"deviceId">>, Map),
+    GroupId = maps:get(<<"groupId">>, Map, <<>>),
+    DeviceId = maps:get(<<"deviceId">>, Map, <<>>),
 
     FromUser =
     case binary:split(MsgFrom, <<"@">>) of
