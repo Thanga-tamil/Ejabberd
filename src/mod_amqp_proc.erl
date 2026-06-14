@@ -117,7 +117,7 @@ get_msg_data(Payload, Host) ->
 
     Table = <<"message_status">>,
     Selects = <<"*">>,
-    Where = [<<"WHERE message_id = '">>,MessageId,<<"' AND to_user = '">>,UserId,<<"' LIMIT 1;">>],
+    Where = [<<"message_id = '">>,MessageId,<<"' AND to_user = '">>,UserId,<<"' LIMIT 1">>],
 
     fly_sql:get_map(Host, Table, Selects, Where).
 
