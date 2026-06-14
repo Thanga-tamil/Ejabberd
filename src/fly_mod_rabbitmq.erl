@@ -33,6 +33,8 @@
                 channels = #{} :: #{atom() => pid()},
                 monitor = #{} :: #{pid() => reference()}}).
 
+%% gen_mod callbacks %%
+
 start(Host, Opts) ->
     gen_mod:start_child(?MODULE, Host, Opts).
 
@@ -71,6 +73,8 @@ mod_options(_Host) ->
      {rabbitmq_password, undefined},
      {amqp_listener, false},
      {queues, undefined}].
+
+%% gen_serve callbacks %%
 
 init([Host | _]) ->
     ModOptions = gen_mod:get_module_opts(Host, ?MODULE),
@@ -245,9 +249,9 @@ terminate(Reason, State) ->
     logger:warning("~p mod ~p terminated", [?MODULE, Reason]),
     ok.
 
-% ------------------ %
-% Internal functions % 
-% ------------------ %
+% ------------------------------------------------------------ %
+% Functions to create | check alive | close rabbit-mq channels % 
+% ------------------------------------------------------------ %
 create_channel(Connection, Types) when is_list(Types) ->
     ets:new(rabbitmq, 
             [set, public, 
@@ -320,12 +324,16 @@ close_channels({_Mod, Channel}) when is_pid(Channel) ->
 close_channels(_) ->
     bad_return.
 
+%% publication handlers starts %%
+
 publish(Type, Arg, PayPac) -> 
     {Host, _} = Arg,
     Proc = gen_mod:get_module_proc(Host, ?MODULE),
     gen_server:cast(Proc, {Type, Arg, PayPac}).
 
-publication({Host, RoutingKey}, {Payload, Packet}, Channel, Exchange)  ->
+publication({Host, RoutingKey}, 
+            {Payload, Packet}, 
+            Channel, Exchange)  ->
     BinPayload =
     case is_binary(Payload) of
         true -> Payload;
@@ -349,12 +357,16 @@ publication({Host, RoutingKey}, {Payload, Packet}, Channel, Exchange)  ->
                         the rabbitmq: ~p", [Error])
     end.
 
-% ? let it crash if payload comes from unknown tag
-consumer_info(Payload, Host, ?Q_API_DATA) ->
-    logger:info("Q :: ~p consumed:: ~p", [?Q_API_DATA, Payload]),
+%% publication handlers ends %%
+
+
+%% subscription handlers starts %%
+
+consumer_info(Payload, Host, Q) when Q =:= ?Q_API_DATA ->
+    logger:info("Q :: ~p consumed :: ~p", [Q, Payload]),
 
     Map = jiffy:decode(Payload, [return_maps]),
-    logger:info("decoded Map:: ~p", [Map]),
+    logger:info("decoded Map :: ~p", [Map]),
     Type = maps:get(<<"type">>, Map),
 
     if Type =:= false -> 
@@ -363,18 +375,25 @@ consumer_info(Payload, Host, ?Q_API_DATA) ->
         subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
             [Type, Map, Host])
     end;
-consumer_info(Payload, Host, ?Q_DATA) ->
-    logger:info("Q :: ~p consumed:: ~p", [?Q_DATA, Payload]),
+consumer_info(Payload, Host, Q) when Q =:= ?Q_DATA ->
+    logger:info("Q :: ~p consumed :: ~p", [Q, Payload]),
 
     Map = jiffy:decode(Payload, [return_maps]),
-    logger:info("decoded Map:: ~p", [Map]),
+    logger:info("decoded Map :: ~p", [Map]),
     LicenseData = maps:get(<<"data">>, Map),
 
     subscription(?LISTENER_MOD, ?LISTENER_LICENSE_DATA_FUN,
-        [LicenseData, Host]).
+        [LicenseData, Host]);
+
+consumer_info(Payload, _, UnknownTag) ->
+    logger:info("consumed unknown tag :: ~p "
+           "payload :: ~p", [UnknownTag, Payload]),
+    ok.
 
 subscription(Mod, Fun, Args) ->
     apply(Mod, Fun, Args).
+
+%% subscription handlers ends %%
 
 logger(Pkt, Exchange, RoutingKey, Msg) ->
     Packet = xmpp:decode(Pkt),
