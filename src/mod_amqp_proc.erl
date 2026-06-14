@@ -99,7 +99,13 @@ process_push(Payload, Host) ->
             ok;
         {#{<<"device_type">> := DeviceType}, #{}} ->
             logger:warning("unknow deviceType ~p, " 
-                    "skip push processing", [DeviceType])
+                    "skip push processing", [DeviceType]);
+        _ ->    
+            logger:warning("user details data not "
+                "sufficient to process push, "
+                "user_details ::~p "
+                "message_details :: ~p ", 
+                [UserDetails, MessageData])
     end.
 
 get_user_details(Payload, Host) ->
