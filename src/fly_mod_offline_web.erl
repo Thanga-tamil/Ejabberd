@@ -12,7 +12,6 @@
 %% API
 
 -include("logger.hrl").
--include_lib("include/fly_log.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
 
 -type host() :: string().
