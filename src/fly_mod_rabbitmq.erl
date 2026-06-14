@@ -72,7 +72,7 @@ mod_options(_Host) ->
      {rabbitmq_exchange, undefined},
      {rabbitmq_password, undefined},
      {amqp_listener, false},
-     {queues, undefined}].
+     {queues, []}].
 
 %% gen_serve callbacks %%
 
