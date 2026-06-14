@@ -3,7 +3,8 @@
 -author('Thangatamil').
 
 %% internal functions %%
--export([process_listener_payload/3, update_license/2]).
+-export([process_listener_payload/3, update_license/2,
+         process_push/2]).
 
 % q :: data
 % none
@@ -72,6 +73,49 @@ update_license(LicenseData, Host) ->
     },
 
     ejabberd_router:route(IQ).
+
+process_push(Payload, Host) ->
+
+    UserDetails = get_user_details(Payload, Host),
+    MessageData = get_msg_data(Payload, Host),
+
+    case {UserDetails, MessageData} of 
+        {#{<<"device_type">> := DeviceType}, #{}} 
+            when DeviceType =:= <<"ios">> -> 
+
+            %% send ios push payload to rabbit-mq
+            ok;
+        {#{<<"device_type">> := DeviceType}, #{}} 
+            when DeviceType =:= <<"android">> -> 
+            
+            %% send android push payload to rabbit-mq
+            ok;
+        {#{<<"device_type">> := DeviceType}, #{}} ->
+            logger:warning("unknow deviceType ~p, " 
+                    "skip push processing", [DeviceType])
+    end.
+
+get_user_details(Payload, Host) ->
+
+    UserId = maps:get(<<"username">>, Payload),
+    DeviceId = maps:get(<<"deviceId">>, Payload),
+
+    Table = <<"chat_users_details">>,
+    Selects = <<"*">>,
+    Where = [<<"username = '">>,UserId,<<"' and device_id = '">>,DeviceId,<<"'">>],
+
+    fly_sql:get_map(Host, Table, Selects, Where).
+
+get_msg_data(Payload, Host) ->
+
+    UserId = maps:get(<<"username">>, Payload),
+    MessageId = maps:get(<<"messageId">>, Payload),
+
+    Table = <<"message_status">>,
+    Selects = <<"*">>,
+    Where = [<<"WHERE message_id = '">>,MessageId,<<"' AND to_user = '">>,UserId,<<"' LIMIT 1;">>],
+
+    fly_sql:get_map(Host, Table, Selects, Where).
 
 handle_payload(Map, Host, Id, ?CONTACT_PERMISSION) ->
     CustomStrBin = maps:get(<<"customString">>, Map),

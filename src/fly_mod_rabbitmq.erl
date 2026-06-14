@@ -17,10 +17,12 @@
 
 -define(Q_DATA, <<"data">>).
 -define(Q_API_DATA, <<"api_data">>).
+-define(Q_API_MESSAGE, <<"api_message">>).
 
 -define(LISTENER_MOD, mod_amqp_proc).
 -define(LISTENER_PROC_FUN, process_listener_payload).
 -define(LISTENER_LICENSE_DATA_FUN, update_license).
+-define(LISTENER_PUSH_FUN, process_push).
 
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
@@ -384,6 +386,20 @@ consumer_info(Payload, Host, Q) when Q =:= ?Q_DATA ->
 
     subscription(?LISTENER_MOD, ?LISTENER_LICENSE_DATA_FUN,
         [LicenseData, Host]);
+
+consumer_info(Payload, Host, Q) when Q =:= ?Q_API_MESSAGE ->
+    logger:info("Q :: ~p consumed :: ~p", [Q, Payload]),
+
+    Map = jiffy:decode(Payload, [return_maps]),
+    logger:info("decoded Map :: ~p", [Map]),
+    IsNotification = maps:get(<<"notification">>, Map),
+
+    if IsNotification -> 
+        subscription(?LISTENER_MOD, ?LISTENER_PUSH_FUN,
+            [Map, Host]);
+    true ->
+        ok
+    end;
 
 consumer_info(Payload, _, UnknownTag) ->
     logger:info("consumed unknown tag :: ~p "
