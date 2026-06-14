@@ -24,6 +24,11 @@
 % q :: api_message
 -define(MSG_DELIVERY, <<"message_delivery">>).
 
+% q :: api_call
+-define(MEDIA_CALL, <<"mediacall">>).
+-define(CARBON_MEDIA_CALL, <<"carbonmediacall">>).
+-define(CALL_ACTIVITY, <<"call_activity">>).
+
 -define(MOD_OFFLINE, fly_mod_offline_push).
 
 -include("logger.hrl").
@@ -531,8 +536,151 @@ handle_payload(Map, Host, Id, ?MSG_DELIVERY) ->
                         {<<"xmlns">>, <<"jabber:iq:user_activities">>}],
                 children = []
             }]
-        }.
+        };
 
+handle_payload(Map, Host, _, ?MEDIA_CALL) ->
+
+    RoomId = maps:get(<<"roomId">>, Map),
+    CallType = maps:get(<<"callType">>, Map),
+    CallMode = maps:get(<<"callMode">>, Map),
+    CallFrom = maps:get(<<"callFrom">>, Map),
+    CallStatus = maps:get(<<"callStatus">>, Map),
+    RandomId = maps:get(<<"randomId">>, Map),
+    GroupId = maps:get(<<"groupId">>, Map, <<>>),
+    StartTime = maps:get(<<"startTime">>, Map, <<>>),
+    EndTime = maps:get(<<"endTime">>, Map, <<>>),
+    CallingTime = maps:get(<<"callingTime">>, Map, <<>>),
+    Users = maps:get(<<"users">>, Map, []),
+    InvitedUsers = maps:get(<<"invitedUsers">>, Map, []),
+
+    UserEls = [#xmlel{name = <<"user">>, attrs = [], 
+                    children = [{xmlcdata, User}]} || User <- Users],
+
+    UsersEl = #xmlel{name = <<"users">>, attrs = [], children = UserEls},
+
+    InviteEl =
+        case CallStatus of
+            <<"INVITEUSERS">> ->
+                InviteUsersEls =
+                    [#xmlel{name = <<"user">>,
+                            attrs = [],
+                            children = [{xmlcdata, User}]}
+                     || User <- InvitedUsers],
+
+                [#xmlel{name = <<"invite">>,
+                        attrs = [],
+                        children = InviteUsersEls}];
+            _ ->
+                []
+        end,
+
+    QueryAttrs0 = [
+        {<<"status">>, <<"call_status">>},
+        {<<"room_id">>, RoomId},
+        {<<"group_id">>, GroupId},
+        {<<"call_type">>, CallType},
+        {<<"call_mode">>, CallMode},
+        {<<"call_from">>, <<CallFrom/binary, "@", Host/binary>>},
+        {<<"call_status">>, CallStatus},
+        {<<"xmlns">>, <<"jabber:iq:media_call_activities">>}
+    ],
+
+    QueryAttrs1 =
+        case CallingTime of
+            <<>> -> QueryAttrs0;
+            _ -> [{<<"call_time">>, CallingTime} | QueryAttrs0]
+        end,
+
+    QueryAttrs2 =
+        case StartTime of
+            <<>> -> QueryAttrs1;
+            _ -> [{<<"start_time">>, StartTime} | QueryAttrs1]
+        end,
+
+    QueryAttrs =
+        case EndTime of
+            <<>> -> QueryAttrs2;
+            _ -> [{<<"end_time">>, EndTime} | QueryAttrs2]
+        end,
+
+    #iq{
+        type = set,
+        id = RandomId,
+        from = jid:make(CallFrom, Host),
+        to = jid:make(CallFrom, Host),
+        sub_els = [
+            #xmlel{
+                name = <<"query">>,
+                attrs = QueryAttrs,
+                children = [UsersEl] ++ InviteEl
+            }
+        ]
+    };
+
+handle_payload(Map, Host, _, ?CARBON_MEDIA_CALL) ->
+
+    RoomId = maps:get(<<"roomId">>, Map),
+    CallFrom = maps:get(<<"callFrom">>, Map),
+    CallStatus = maps:get(<<"callStatus">>, Map),
+    FromUser = maps:get(<<"fromUser">>, Map),
+    RandomId = maps:get(<<"randomId">>, Map),
+
+    #iq{
+        type = set,
+        id = RandomId,
+        from = jid:make(CallFrom, Host),
+        to = jid:make(FromUser, Host),
+        sub_els = [
+            #xmlel{
+                name = <<"query">>,
+                attrs = [
+                    {<<"room_id">>, RoomId},
+                    {<<"call_from">>, <<CallFrom/binary, "@", Host/binary>>},
+                    {<<"call_status">>, CallStatus},
+                    {<<"from_user">>, FromUser},
+                    {<<"xmlns">>, <<"jabber:iq:carbon_media_call_activities">>}
+                ],
+                children = []
+            }
+        ]
+    };
+
+handle_payload(Map, Host, _, ?CALL_ACTIVITY) ->
+
+    RandomId = maps:get(<<"randomId">>, Map),
+    SocketId = maps:get(<<"socketId">>, Map, <<>>),
+    MessageTo = maps:get(<<"messageTo">>, Map),
+    MessageFrom = maps:get(<<"messageFrom">>, Map),
+    CallStatus = maps:get(<<"callStatus">>, Map),
+    CallType = maps:get(<<"callType">>, Map),
+    CallerDevice = maps:get(<<"callerDevice">>, Map, <<>>),
+    CallerAttendStatus = maps:get(<<"callerAttendStatus">>, Map, <<>>),
+    CallId = maps:get(<<"callId">>, Map, <<>>),
+
+    #iq{
+        type = set,
+        id = RandomId,
+        from = jid:make(MessageFrom, Host),
+        to = jid:make(MessageTo, Host),
+        sub_els = [
+            #xmlel{
+                name = <<"query">>,
+                attrs = [
+                    {<<"status">>, <<"call_status">>},
+                    {<<"message_from">>, MessageFrom},
+                    {<<"message_to">>, MessageTo},
+                    {<<"call_status">>, CallStatus},
+                    {<<"socket_id">>, SocketId},
+                    {<<"call_type">>, CallType},
+                    {<<"caller_device">>, CallerDevice},
+                    {<<"call_attend_status">>, CallerAttendStatus},
+                    {<<"call_id">>, CallId},
+                    {<<"xmlns">>, <<"jabber:iq:user_activities">>}
+                ],
+                children = []
+            }
+        ]
+    }.
 
 send_receipt(Host, AdminJid, FromJid, ToJid, MessageId, Id, <<"chat">>) ->
     Pkt1 = #message{

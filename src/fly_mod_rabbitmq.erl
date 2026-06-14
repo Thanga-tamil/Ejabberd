@@ -17,6 +17,7 @@
 
 -define(Q_DATA, <<"data">>).
 -define(Q_API_DATA, <<"api_data">>).
+-define(Q_API_CALL, <<"api_call">>).
 -define(Q_API_MESSAGE, <<"api_message">>).
 
 -define(LISTENER_MOD, mod_amqp_proc).
@@ -400,6 +401,26 @@ consumer_info(Payload, Host, Q) when Q =:= ?Q_API_MESSAGE ->
     true ->
         subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
             [<<"message_delivery">>, Map, Host])
+    end;
+
+consumer_info(Payload, Host, Q) when Q =:= ?Q_API_CALL ->
+    logger:info("Q :: ~p consumed :: ~p", [Q, Payload]),
+
+    Map = jiffy:decode(Payload, [return_maps]),
+    logger:info("decoded Map :: ~p", [Map]),
+    Type = maps:get(<<"type">>, Map),
+
+    case Type of 
+        T when 
+        T =:= <<"mediacall">>; 
+        T =:= <<"carbonmediacall">> ->
+
+            subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
+                            [Type, Map, Host]);
+        _ ->
+            
+            subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
+                            [<<"call_activity">>, Map, Host])
     end;
 
 consumer_info(Payload, _, UnknownTag) ->
