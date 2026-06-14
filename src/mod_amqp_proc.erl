@@ -21,6 +21,8 @@
 -define(LOGOUT_SESSIONS, <<"logout_sessions">>).
 -define(MEDIA_DELETE, <<"media_delete">>).
 
+-define(MOD_OFFLINE, fly_mod_offline_push).
+
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
 
@@ -84,6 +86,8 @@ process_push(Payload, Host) ->
             when DeviceType =:= <<"ios">> -> 
 
             %% send ios push payload to rabbit-mq
+            prep_and_send(Host, Payload, UserDetails, MessageData, ios),
+
             ok;
         {#{<<"device_type">> := DeviceType}, #{}} 
             when DeviceType =:= <<"android">> -> 
@@ -116,6 +120,89 @@ get_msg_data(Payload, Host) ->
     Where = [<<"WHERE message_id = '">>,MessageId,<<"' AND to_user = '">>,UserId,<<"' LIMIT 1;">>],
 
     fly_sql:get_map(Host, Table, Selects, Where).
+
+prep_and_send(Host, Payload, UserDetails, MessageData, ios) ->
+
+    case {UserDetails, MessageData} of 
+        {#{<<"device_token">> := DeviceToken,
+          <<"mode">> := Mode,
+          <<"user_type">> := UserType,
+          <<"push_server_type">> := PushType},
+
+         #{<<"message_id">> := MessageId,
+           <<"message_time">> := MessageTime,
+           <<"chat_type">> := ChatType,
+           <<"txt">> := Txt,
+           <<"from_notification">> := FromNotification,
+           <<"from_user">> := FromUser,
+           <<"to_user">> := ToUser,
+           <<"message_type">> := MessageType}} ->
+
+            From =
+                if ChatType =:= <<"normal">> -> 
+                    <<FromNotification/binary, "@mix-", Host/binary>>;
+                true -> 
+                    FromUser
+                end,
+            
+            DeviceId = maps:get(<<"deviceId">>, Payload),
+
+            Args = to_list_values([
+                {push_from, <<"MirrorFly">>},
+                {to_user, ToUser},
+                {from_user, From},
+                {userDomain, Host},
+                {type, MessageType},
+                {user_type, UserType},
+                {chat_type, ChatType},
+                {message_content, Txt},
+                {message_id, MessageId},
+                {message_time, MessageTime}
+            ]),
+
+            Msg = to_list_values([
+                   {<<"mutable-content">>, 
+                            integer_to_list(1)},
+                   {alert, DeviceId},
+                   {mode, Mode},
+                   {sound, <<"default">>}
+                  ]),
+
+            Token = binary_to_list(DeviceToken),
+
+            Json = ?MOD_OFFLINE:create_json(Msg, 
+                        Args, Token, Mode, 0, 0, PushType),
+
+            ?MOD_OFFLINE:send_payload(Host, Json, 
+                        ChatType, PushType, false, ios);
+
+        _ ->    
+            logger:warning("data not sufficient "
+                "to send payload to rabbit-mq, "
+                "user_details ::~p "
+                "message_details :: ~p ", 
+                [UserDetails, MessageData])
+    end;
+prep_and_send(Host, _, UserDetails, _, android) ->
+    
+    case UserDetails of 
+        #{<<"device_token">> := DeviceToken,
+          <<"push_server_type">> := PushType} ->
+            Json = ?MOD_OFFLINE:create_android_json(DeviceToken, <<>>),
+
+            ?MOD_OFFLINE:send_payload(Host, Json, <<>>, 
+                            PushType, false, ios);
+        _->
+            ok
+    end.
+
+to_list_values(Props) ->
+    [{K, to_list(V)} || {K, V} <- Props].
+
+to_list(Bin) when is_binary(Bin) ->
+    binary_to_list(Bin);
+to_list(Value) ->
+    Value.
 
 handle_payload(Map, Host, Id, ?CONTACT_PERMISSION) ->
     CustomStrBin = maps:get(<<"customString">>, Map),

@@ -410,7 +410,8 @@ subscription(Mod, Fun, Args) ->
     apply(Mod, Fun, Args).
 
 %% subscription handlers ends %%
-
+logger(false, _, _, _) ->
+    ok;
 logger(Pkt, Exchange, RoutingKey, Msg) ->
     Packet = xmpp:decode(Pkt),
     case Packet of
