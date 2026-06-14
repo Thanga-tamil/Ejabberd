@@ -39,10 +39,12 @@
 %%====================================================================%%
 process_listener_payload(Type, Map, Host) ->
 
-    TypeList = [ ?CONTACT_PERMISSION, ?BLOCK_USER, ?USER_EXIT_GROUP,
+    TypeList = [ 
+                 ?CONTACT_PERMISSION, ?BLOCK_USER, ?USER_EXIT_GROUP,
                  ?DELETE_CONTACT, ?USER_LOGOUT, ?USER_LEVEL_UNBLOCK, 
                  ?USER_LEVEL_BLOCK, ?MUTE_CHAT, ?LOGOUT_SESSIONS,
-                 ?MEDIA_DELETE, ?MSG_DELIVERY
+                 ?MEDIA_DELETE, ?MSG_DELIVERY, ?CARBON_MEDIA_CALL,
+                 ?MEDIA_CALL, ?CALL_ACTIVITY
                ],
     
     case lists:member(Type, TypeList) of
