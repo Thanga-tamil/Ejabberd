@@ -21,6 +21,9 @@
 -define(LOGOUT_SESSIONS, <<"logout_sessions">>).
 -define(MEDIA_DELETE, <<"media_delete">>).
 
+% q :: api_message
+-define(MSG_DELIVERY, <<"message_delivery">>).
+
 -define(MOD_OFFLINE, fly_mod_offline_push).
 
 -include("logger.hrl").
@@ -34,7 +37,7 @@ process_listener_payload(Type, Map, Host) ->
     TypeList = [ ?CONTACT_PERMISSION, ?BLOCK_USER, ?USER_EXIT_GROUP,
                  ?DELETE_CONTACT, ?USER_LOGOUT, ?USER_LEVEL_UNBLOCK, 
                  ?USER_LEVEL_BLOCK, ?MUTE_CHAT, ?LOGOUT_SESSIONS,
-                 ?MEDIA_DELETE
+                 ?MEDIA_DELETE, ?MSG_DELIVERY
                ],
     
     case lists:member(Type, TypeList) of
@@ -116,7 +119,8 @@ get_msg_data(Payload, Host) ->
     MessageId = maps:get(<<"messageId">>, Payload),
 
     Table = <<"message_status">>,
-    Selects = <<"*">>,
+    Selects = <<"message_id, message_time, chat_type, txt, from_notification, "
+                "from_user, to_user, message_type">>,
     Where = [<<"message_id = '">>,MessageId,<<"' AND to_user = '">>,UserId,<<"' LIMIT 1">>],
 
     fly_sql:get_map(Host, Table, Selects, Where).
@@ -474,7 +478,55 @@ handle_payload(Map, Host, Id, ?MEDIA_DELETE) ->
         FromJid = jid:make(FromUser, Host),
         ToJid = jid:make(ToUser, Host),
         send_receipt(Host, AdminJid, FromJid, ToJid, MessageId, Id, ChatType)
-      end || C <- CustomList].
+      end || C <- CustomList];
+
+handle_payload(Map, Host, Id, ?MSG_DELIVERY) ->
+
+    MsgFrom = maps:get(<<"messageFrom">>, Map),
+    MsgTo = maps:get(<<"messageTo">>, Map),
+    MsgId = maps:get(<<"messageId">>, Map),
+    GroupId = maps:get(<<"groupId">>, Map),
+    DeviceId = maps:get(<<"deviceId">>, Map),
+
+    FromUser =
+    case binary:split(MsgFrom, <<"@">>) of
+        [MFrom, _] ->
+            jid:nodeprep(MFrom);
+        [_] ->
+            MsgFrom
+    end,
+
+    ToUser =
+    case binary:split(MsgTo, <<"@">>) of
+        [MTo, _] ->
+            jid:nodeprep(MTo);
+        [_] ->
+            MsgTo
+    end,
+
+    From = <<FromUser/binary, "@", Host/binary>>,
+    To = <<ToUser/binary, "@", Host/binary>>,
+
+    AdminJid = jid:make(<<"123456789">>, Host),
+
+    #iq{type = set,
+        id = Id,
+        from = AdminJid,
+        to = AdminJid,
+        sub_els = [
+                #xmlel{name = <<"query">>, 
+                       attrs = [
+                        {<<"message_from">>, From},
+                        {<<"message_to">>, To},
+                        {<<"message_id">>, MsgId},
+                        {<<"group_id">>, GroupId},
+                        {<<"device_id">>, DeviceId},
+                        {<<"status">>, <<"send_delivery">>},
+                        {<<"xmlns">>, <<"jabber:iq:user_activities">>}],
+                children = []
+            }]
+        }.
+
 
 send_receipt(Host, AdminJid, FromJid, ToJid, MessageId, Id, <<"chat">>) ->
     Pkt1 = #message{

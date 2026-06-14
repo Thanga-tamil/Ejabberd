@@ -398,7 +398,8 @@ consumer_info(Payload, Host, Q) when Q =:= ?Q_API_MESSAGE ->
         subscription(?LISTENER_MOD, ?LISTENER_PUSH_FUN,
             [Map, Host]);
     true ->
-        ok
+        subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
+            [<<"message_delivery">>, Map, Host])
     end;
 
 consumer_info(Payload, _, UnknownTag) ->
