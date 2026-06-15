@@ -1492,7 +1492,7 @@ end,
                           if FromUser =/= F -> 
                             JSON = create_json(Msg, Args0, binary_to_list(DeviceToken), Mode, 0, 0, PushType),
 
-                            ?LOG_INFO("[ios_push]] reaction payload: ~p", [JSON]),
+                            ?LOG_INFO("[ios_push] reaction payload: ~p", [JSON]),
                             send_payload(Server, JSON, ChatType, PushType, Packet, ios);
                           true ->
                             ?LOG_INFO("skipping ios push, reaction is from message sender ~p",[FromUser]),
