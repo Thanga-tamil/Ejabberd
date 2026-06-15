@@ -3256,7 +3256,10 @@ MessageId) when Status =:= 0; Status =:= <<"0">> ->
         Fun(FServer, FUser, MsgSender, MessageId);
       <<"remove">> -> 
         Fun(FServer, FUser, MsgSender, MessageId)
-    end.
+    end;
+process_action(Status, _, _, _, _, _, _, _) 
+    when Status =:= 0; Status =:= <<"0">> ->
+  ok.
 
 user_send_reaction_carboncall(Packet, 
 #jid{luser = FUser, lserver = FServer, lresource = Lresource} = From, To) ->
