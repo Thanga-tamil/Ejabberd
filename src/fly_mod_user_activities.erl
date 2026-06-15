@@ -3194,9 +3194,8 @@ process_message_reaction(#jid{lserver = FServer} = From,
                                         {<<"timestamp">>, Timestamp}, 
                                         {<<"message_sender">>, MsgSender}],
                               children = []},
-                FromJid = jid:to_string(ToJid),
                 GrpPkt = #message{
-                                  from = FromJid,
+                                  from = ToJid,
                                   to = jid:make(LUser, LServer), 
                                   type = normal, 
                                   id = StanzaId, 
@@ -3204,7 +3203,7 @@ process_message_reaction(#jid{lserver = FServer} = From,
                                 },
 
                 spawn(fly_mix_group_chat, carboncall_message, 
-                      [LUser, LServer, GrpPkt, FromJid]),
+                      [LUser, LServer, GrpPkt, ToJid]),
                 
                 DeletedStatus = (fun fly_mod_utils:get_msg_deleted_status/4)
                                 (LServer, LUser, MessageId, <<"normal">>),
