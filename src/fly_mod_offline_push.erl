@@ -12,7 +12,8 @@
 %% gen_mod callbacks
 -export([start/2, start_link/2, depends/2, stop/1, send_offline_message/1, 
          queryexecfunction/5, queryfunction/6, groupcreationfunction/8, 
-         has_more_resources/2, send_bulk_group_push/7, send_own_offline_message/3]).
+         has_more_resources/2, send_bulk_group_push/7, send_own_offline_message/3,
+         create_json/7, send_payload/6]).
 
 -export([init/1, code_change/3, handle_call/3, handle_cast/2,
          handle_info/2, mod_opt_type/1, terminate/2, mod_options/1,
