@@ -2294,14 +2294,12 @@ update_license_lookup(LServer) ->
       ets:insert(ClientName, {expiry, 0});
 
     {selected, _, [[Lkey]]} ->
-      ?INFO_MSG("Lkey: ~p ", [Lkey]),
       DecryptedMessage = fly_mod_security:aes_decrpyt_license(list_to_binary(ClientKeyValue++ClientKeyValue++ClientKeyValue), <<"k%$/@B[jqAx}>8H@">>, binary_to_list(Lkey)),
-      ?LOG_INFO("DecryptedMessage: ~p ", [DecryptedMessage]),
       {ParsedMessageJson} = jiffy:decode(list_to_binary(http_uri:decode(binary_to_list(DecryptedMessage)))),
       AvailableModules = proplists:get_value(<<"modulesPurchased">>, ParsedMessageJson),
       Expiry = proplists:get_value(<<"expiresAt">>, ParsedMessageJson),
       Domains = proplists:get_value(<<"domains">>, ParsedMessageJson),
-      ?INFO_MSG("AvailableModules: ~p , Expire: ~p, Domain: ~p", [AvailableModules, Expiry, Domains]),
+      ?INFO_MSG("available_modules: ~p , expire: ~p, domain: ~p", [AvailableModules, Expiry, Domains]),
       ets:insert(ClientName, {module, AvailableModules}),
       ets:insert(ClientName, {expiry, Expiry})
   end.
