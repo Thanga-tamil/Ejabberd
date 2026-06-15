@@ -437,9 +437,10 @@ logger(false, _, _, _) ->
 logger(Pkt, Exchange, RoutingKey, Msg) ->
     Packet = xmpp:decode(Pkt),
     case Packet of
-        #message{id = Id, from = From, to = To, type = Type} ->
-            {FUser, _, FRes} = jid:tolower(From),
-            {TUser, _, TRes} = jid:tolower(To),
+        #message{id = Id, 
+                 from = #jid{user = FUser, lresource = FRes}, 
+                 to = #jid{user = TUser, lresource = TRes}, 
+                 type = Type} ->
 
         logger:info(Msg ++ 
                     " rabbitmq payload"

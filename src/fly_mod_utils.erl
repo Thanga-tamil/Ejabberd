@@ -31,6 +31,7 @@
   get_vcard/2,
   get_vcard_from_search/2,
   get_user_device/2,
+  get_msg_deleted_status/4,
   get_user_device/4,
   get_user_device_exclude_restricted_countries/4,
   get_user_for_ios_group_device/3,
@@ -3126,6 +3127,25 @@ get_unread_from_chat_recent(Server, From, To) ->
       Unread;
     _ -> 
       <<"0">>
+  end.
+
+get_msg_deleted_status(Server, ToUser, MessageId, ChatType) ->
+
+  if ChatType =:= <<"chat">> ->
+     case ejabberd_sql:sql_query(Server, [<<"SELECT deleted_status FROM message_status WHERE message_id = '">>,MessageId,<<"' AND chat_type = 'chat';">>]) of 
+      {selected, _, [[Id]]} -> 
+        Id;
+      _ -> 
+        0
+      end;
+  true -> 
+     case ejabberd_sql:sql_query(Server, [<<"SELECT deleted_status FROM message_status WHERE message_id = '">>,MessageId,<<"' AND to_user = '">>,ToUser,<<"' AND chat_type = 'normal';">>]) of 
+      {selected, _, [[Id]]} -> 
+        Id;
+      _ -> 
+        0
+    end
+
   end.
 
 get_reacted_msg_ids(Server, User) ->
