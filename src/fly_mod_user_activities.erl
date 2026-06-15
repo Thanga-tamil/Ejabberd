@@ -3235,7 +3235,12 @@ process_action(Action, Pkt, LUser, LServer, MsgSender) ->
                 ok
             end;
       <<"remove">> ->
-        ok
+        ok;
+      _ -> 
+        % since we check both 'add' and 'update' 
+        % in the first clause with message sender condition
+        % so, don't let it crash; 
+        ok 
   end.
 
 % route to active client | send push payload
