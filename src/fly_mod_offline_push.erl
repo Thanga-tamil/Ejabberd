@@ -11,7 +11,7 @@
 
 %% gen_mod callbacks
 -export([start/2, start_link/2, depends/2, stop/1, send_offline_message/1, 
-         queryexecfunction/5, queryfunction/6, groupcreationfunction/8, 
+         queryexecfunction/5, queryfunction/6, groupcreationfunction/9, 
          has_more_resources/2, send_bulk_group_push/7, send_own_offline_message/3,
          create_json/7, send_payload/6]).
 
@@ -248,14 +248,13 @@ queryfunction(Proc, Type, From, Chat_Type, Delete_Type, XMLBody) ->
     {queryexecution, Type,
       { From, Chat_Type, Delete_Type,XMLBody}}).
 
-groupcreationfunction(From, Type, Participants, 
-  GroupJID, SubEl, IQ, MessageId1, CustomAttributes) ->
+groupcreationfunction(From, Type, Participants, _Channel, GroupJID, 
+                      SubEl, IQ, MessageId1, CustomAttributes) ->
 
     Proc = gen_mod:get_module_proc(From#jid.lserver, ?PROCNAME),
     gen_server:cast(Proc,
       {groupcreationexecutions, Type, {From, Participants,  
        GroupJID, SubEl, IQ, MessageId1,CustomAttributes}}).
-
 %% Hook lisenter to for offline message hook
 %%
 %% @param record Sender
