@@ -167,8 +167,9 @@ handle_cast({queryexecution, <<"call_log">>,
   clear_call_log(From, Chat_Type, Delete_Type, XMLBody),
   {noreply, State};
 handle_cast({groupcreationexecutions, <<"group_creation">>,
-  {From, Participants,  GroupJID, SubEl, IQ, MessageId1, CustomAttributes}},State) ->
-  group_create_query(From, Participants,  GroupJID, SubEl, IQ, MessageId1, CustomAttributes),
+  {From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1, CustomAttributes}},State) ->
+    
+  group_create_query(From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes, State),
   {noreply, State};
 
 handle_cast({own_pushnotification, <<"chat">>,
@@ -248,12 +249,12 @@ queryfunction(Proc, Type, From, Chat_Type, Delete_Type, XMLBody) ->
     {queryexecution, Type,
       { From, Chat_Type, Delete_Type,XMLBody}}).
 
-groupcreationfunction(From, Type, Participants, _Channel, GroupJID, 
+groupcreationfunction(From, Type, Participants, Channel, GroupJID, 
                       SubEl, IQ, MessageId1, CustomAttributes) ->
 
     Proc = gen_mod:get_module_proc(From#jid.lserver, ?PROCNAME),
     gen_server:cast(Proc,
-      {groupcreationexecutions, Type, {From, Participants,  
+      {groupcreationexecutions, Type, {From, Participants, Channel,
        GroupJID, SubEl, IQ, MessageId1,CustomAttributes}}).
 %% Hook lisenter to for offline message hook
 %%
@@ -420,56 +421,30 @@ get_string() ->
   R = rand:uniform(16#10000000000000000) - 1,
   integer_to_binary(R).
 
-group_create_query(From, Participants,  GroupJID, SubEl, IQ, MessageId1, CustomAttributes)->
+group_create_query(From, Participants, Channel, GroupJID, 
+  SubEl, IQ, MessageId1,CustomAttributes, State) ->
 
-  #jid{user = FUser, lserver = FServer} = From,
-  Profile = fxml:get_subtag(SubEl, <<"profile">>),
-  VCard = fxml:get_subtag(Profile, <<"vCard">>),
-  NickName = fxml:get_subtag(VCard, <<"nickName">>),
-  GroupName = fxml:get_tag_cdata(NickName),
-  fly_mod_utils:group_notify_message(From, From, FUser,  <<"1">>, <<"create_group">>, MessageId1,<<"">>, <<"">>, <<"">>),
-  % Adds Participant
-  lists:foreach(fun(Participant) ->
-
+    #jid{user = FUser, lserver = FServer} = From,
+    Profile = fxml:get_subtag(SubEl, <<"profile">>),
+    VCard = fxml:get_subtag(Profile, <<"vCard">>),
+    NickName = fxml:get_subtag(VCard, <<"nickName">>),
+    GroupName = fxml:get_tag_cdata(NickName),
+    fly_mod_utils:group_notify_message(From, From, FUser, Channel, <<"1">>, <<"create_group">>, MessageId1,<<"">>,<<"">>),
+    % Adds Participant
+    lists:foreach(fun(Participant) ->
       ParticipantData = fxml:get_tag_cdata(Participant),
       FromJID = jid:make(fly_mod_utils:get_user_from_string_jid(ParticipantData),FServer,<<"">>),
       MessageID = <<(get_string()) / binary>>,
       GroupCreateID = <<(get_string()) / binary>>,
       #jid{user = PUser} = FromJID,
-      fly_mod_utils:group_notify_message(From, FromJID, PUser,  <<"1">>, <<"create_group">>, GroupCreateID, <<"">>, <<"">>, <<"">>),
-
-      mod_mix_pam:process_iq(
-                    #iq{
-                    from = FromJID, 
-                    to = FromJID,type = set,
-                    id = MessageID,
-                    sub_els = [build_mix_client_join_record(GroupJID, {From, MessageID, GroupName, CustomAttributes})]
-                    }),
-
+      fly_mod_utils:group_notify_message(From, FromJID, PUser, Channel, <<"1">>, <<"create_group">>, GroupCreateID,<<"">>,<<"">>),
+      mod_mix_pam:process_iq(#iq{from = FromJID, to = FromJID,type = set,id = MessageID,
+        sub_els = [#mix_client_join{channel = GroupJID,  xmlns = <<"urn:xmpp:mix:pam:0">>,affiliation = <<"n">>,
+        join = #mix_join{owner = jid:to_string(From),message_id = MessageID, nick = GroupName, group_create = <<"y">>, custom_attributes = #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, xmlns = <<"urn:xmpp:mix:core:0">>, subscribe = [<<"urn:xmpp:mix:nodes:messages">>,<<"urn:xmpp:mix:nodes:presence">>,
+        <<"urn:xmpp:mix:nodes:participants">>,<<"urn:xmpp:mix:nodes:info">>,<<"urn:xmpp:mix:nodes:config">>]}}]}),
       fly_mix_group_chat:update_group_status(From, GroupJID, SubEl, IQ, <<"2">>, Participant, MessageID)
+    end, Participants#xmlel.children).
 
-  end, Participants#xmlel.children).
-
-build_mix_client_join_record(GroupJID, {From, MessageID, GroupName, CustomAttributes}) ->
-  #mix_client_join{channel = GroupJID,  
-                   xmlns = <<"urn:xmpp:mix:pam:0">>, 
-                   affiliation = <<"n">>,
-                   join = build_join_record(From, MessageID, GroupName, CustomAttributes)}.
-
-build_join_record(_From, _MessageID, GroupName, _Attrs) ->
-#mix_join{owner = jid:to_string(_From),
-          message_id = _MessageID, 
-          nick = GroupName, 
-          group_create = <<"y">>, 
-          custom_attributes = 
-          #xmlel{name = <<"custom_attributes">>, 
-                 children = [{xmlcdata, _Attrs}]}, 
-                 xmlns = <<"urn:xmpp:mix:core:0">>, 
-                 subscribe = [<<"urn:xmpp:mix:nodes:messages">>,
-                              <<"urn:xmpp:mix:nodes:presence">>,
-                              <<"urn:xmpp:mix:nodes:participants">>,
-                              <<"urn:xmpp:mix:nodes:info">>,
-                              <<"urn:xmpp:mix:nodes:config">>]}.
 
 %% send_push_notifications
 %%
