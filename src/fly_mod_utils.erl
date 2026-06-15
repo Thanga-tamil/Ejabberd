@@ -547,7 +547,14 @@ get_roster_and_recent_jid(#jid{luser = User,lserver = Server})->
   ejabberd_sql:sql_query(Server,[<<" select from_user as jid from chat_recent where to_user = '">>,User,<<"' and chat_type = 'chat';" >>]).
 
 get_roster_from_recent_jid(#jid{luser = User,lserver = Server})->
-  ejabberd_sql:sql_query(Server,[<<"select to_user as jid from chat_recent where from_user = '">>,User,<<"' and chat_type = 'chat' union select username from rosterusers  where jid_username = '">>,User,<<"' and username != '">>,User,<<"' union SELECT cp2.user_id FROM call_participants cp2 JOIN ( SELECT DISTINCT room_id FROM call_participants WHERE user_id = '">>,User,<<"' AND created_at >= NOW() - INTERVAL 24 HOUR ) cp1 ON cp1.room_id = cp2.room_id WHERE cp2.user_id != '">>,User,<<"';" >>]).
+  ejabberd_sql:sql_query(Server,[<<"select to_user as jid from chat_recent where from_user = '">>,User,<<"' 
+                                    and chat_type = 'chat' union select case when username like '%@%' then 
+                                    substring_index(username, '@', 1) else username
+                                    end as username from rosterusers  where jid_username = '">>,User,<<"' and 
+                                    username != '">>,User,<<"' union SELECT cp2.user_id FROM call_participants 
+                                    cp2 JOIN ( SELECT DISTINCT room_id FROM call_participants 
+                                    WHERE user_id = '">>,User,<<"' AND created_at >= NOW() - INTERVAL 24 HOUR ) cp1 
+                                    ON cp1.room_id = cp2.room_id WHERE cp2.user_id != '">>,User,<<"';" >>]).
 
 get_email_contacts(#jid{luser = User, lserver = Server})->
   ejabberd_sql:sql_query(Server,[<<"select username as jid from contus_chat_users contus_chat_users where username not in (select jid from rosterusers  where username = '">>,User,<<"' union select CONCAT(from_user,'@','">>,Server,<<"') as jid from chat_recent where to_user = '">>,User,<<"' and chat_type = 'chat') GROUP BY jid;" >>]).
@@ -2546,9 +2553,23 @@ get_hide_profile_privacy(Server, User) ->
   ejabberd_sql:sql_query(Server,[<<"select hide_profile from privacy_settings where username='">>,User,<<"';">>]).
 
 get_rosters_to_update_privacy(User, Server) -> 
-  case ejabberd_sql:sql_query(Server,
-  [<<"select case when r.username = '">>,User,<<"' then r.jid when r.jid_username = '">>,User,<<"' then concat(r.username, c.domain, c.xmpp_host) end as jids 
-     from rosterusers as r left join chat_settings as c on c.domain = '@' where (r.username = '">>,User,<<"' or r.jid_username = '">>,User,<<"') group by jids;">>]) of 
+
+   Q = [
+    <<"select 
+            case
+                when r.username = '">>,User,<<"' then r.jid
+                when r.jid_username = '">>,User,<<"' then
+                  case
+                    when r.username like '%@%' then r.username
+                    else concat(r.username, c.domain, c.xmpp_host)
+                  end
+            end as jids
+      from rosterusers as r 
+      left join chat_settings as c on c.domain = '@' 
+      where (r.username = '">>,User,<<"' or r.jid_username = '">>,User,<<"') 
+      group by jids;">>
+    ],
+  case ejabberd_sql:sql_query(Server, Q) of 
     {selected, _Cols, Rows} ->
       Rows;
     _ ->
