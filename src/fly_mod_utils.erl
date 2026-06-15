@@ -2883,7 +2883,8 @@ generate_uuid_v4() ->
     <<A:32, B:16, C:16, D:16, E:48>> = crypto:strong_rand_bytes(16),
     C1 = (C band 16#0FFF) bor 16#4000,
     D1 = (D band 16#3FFF) bor 16#8000,
-    io_lib:format("~8.16.0b-~4.16.0b-~4.16.0b-~4.16.0b-~12.16.0b",[A, B, C1, D1, E]).
+    list_to_binary(io_lib:format("~8.16.0b-~4.16.0b-~4.16.0b-~4.16.0b-~12.16.0b",[A, B, C1, D1, E])).
+
 
 upsert_recent_chat(LServer, SUser, BarePeer, MessageId, MessageFrom, Body, SType, MessageType, Topicid, MetaData, Notification_to, Unread, FlatTimeStamp, Status) ->
 
