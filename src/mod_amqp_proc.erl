@@ -406,8 +406,10 @@ handle_payload(Map, Host, Id, ?MUTE_CHAT) ->
     FromUser = maps:get(<<"fromUser">>, CustomMap),
     Action = maps:get(<<"action">>, CustomMap),
 
+    Mute = finalize_mute(MuteSetting),
+
     CommaSeparatedIds = 
-    if MuteSetting =:= <<"false">> ->
+    if Mute =:= <<"false">> ->
         UserIds = maps:get(<<"userIds">>, CustomMap),
         GroupIds = maps:get(<<"groupIds">>, CustomMap),
 
@@ -435,7 +437,7 @@ handle_payload(Map, Host, Id, ?MUTE_CHAT) ->
                 attrs = [
                     {<<"xmlns">>, <<"jabber:iq:user_activities">>}, 
                     {<<"from_user">>, FromUser}, 
-                    {<<"mute_setting">>, MuteSetting}, 
+                    {<<"mute_setting">>, Mute}, 
                     {<<"user_list">>, CommaSeparatedIds}, 
                     {<<"status">>, <<"mute_chat">>}, 
                     {<<"action">>, Action} 
@@ -777,3 +779,17 @@ delete_in_tables(Host, User, DeletedChannels) ->
     WhereClauses = [Clause, Clause, Clause],
 
     fly_sql:delete(Host, Tables, WhereClauses).
+
+
+finalize_mute(MS) 
+    when is_boolean(MS); is_atom(MS) ->
+    atom_to_binary(MS);
+
+finalize_mute(MS) when is_list(MS) -> 
+    list_to_binary(MS);
+
+finalize_mute(MS) when is_binary(MS) -> 
+    MS;
+
+finalize_mute(_) -> 
+    false.
