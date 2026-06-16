@@ -404,8 +404,9 @@ handle_payload(Map, Host, Id, ?MUTE_CHAT) ->
 
     MuteSetting = maps:get(<<"muteSetting">>, CustomMap),
     FromUser = maps:get(<<"fromUser">>, CustomMap),
-    Action = maps:get(<<"action">>, CustomMap),
+    ActionInt = maps:get(<<"action">>, CustomMap),
 
+    Action = finalize_action(ActionInt),
     Mute = finalize_mute(MuteSetting),
 
     CommaSeparatedIds = 
@@ -793,3 +794,12 @@ finalize_mute(MS) when is_binary(MS) ->
 
 finalize_mute(_) -> 
     false.
+
+finalize_action(A) when is_integer(A) -> 
+    integer_to_binary(A);
+
+finalize_action(A) when is_atom(A) -> 
+    atom_to_binary(A);
+
+finalize_action(A) when is_binary(A) -> 
+    A.
