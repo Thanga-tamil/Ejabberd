@@ -133,7 +133,6 @@ send(#{lserver := LServer} = State, Pkt) ->
 	{drop, State1} -> 
 			State1;
 	{Pkt2, State1} ->
-		?LOGX(Pkt2, " ::xmpp_stream_in:: message sent to recipient"),
 		xmpp_stream_in:send(State1, Pkt2)
     end.
 
