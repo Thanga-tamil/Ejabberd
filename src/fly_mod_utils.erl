@@ -31,7 +31,8 @@
   get_vcard/2,
   get_vcard_from_search/2,
   get_user_device/2,
-  get_user_device/4,
+  get_msg_deleted_status/4,
+  get_user_device/3,
   get_user_device_exclude_restricted_countries/4,
   get_user_for_ios_group_device/3,
   get_group_participants/2,
@@ -321,30 +322,19 @@ get_user_device(LServer, LUser) ->
     LServer,
     [<<"SELECT IFNULL(device_type,'') as device_type, IFNULL(device_token,'')as device_token,IFNULL(voip_device_token,'')as voip_device_token ,  mode, device_os_version,device_id ,user_type  FROM chat_users_details WHERE  username = '">>, LUser, <<"' and (device_type !='Web' and device_type !='') and  device_token != '' and device_token != 'null';">>]).
 
-% get_user_device(LServer, LUser, LResource) ->
-%   Substring = string:str((LResource), binary_to_list(<<"Web">>)),
-%   if Substring =:= 1 ->
-%       ejabberd_sql:sql_query(LServer,
-%       [<<"SELECT IFNULL(device_type,'') as device_type, IFNULL(device_token,'')as device_token,IFNULL(voip_device_token,'')as voip_device_token ,mode, device_os_version, device_id  FROM chat_users_details WHERE (device_type !='Web' and device_type !='') and device_id != ''and username = '">>, LUser, <<"';">>]);
-%   true ->
-%       Resource = get_device_from_resource(LResource),
-%       ejabberd_sql:sql_query(LServer,
-%       [<<"SELECT IFNULL(device_type,'') as device_type, IFNULL(device_token,'')as device_token,IFNULL(voip_device_token,'')as voip_device_token , mode, device_os_version, device_id  FROM chat_users_details WHERE (device_type !='Web' and device_type !='') and device_id != '' and device_id != '">>, Resource, <<"' and username = '">>, LUser, <<"';">>])
-%   end.
 
-get_user_device(LServer, LUser, LResource, ChatType) ->
-  % if ChatType == <<"mediacall">> ->
-  %    ejabberd_sql:sql_query(LServer,
-  %     [<<"SELECT IFNULL(device_type,'') as device_type, IFNULL(device_token,'')as device_token,IFNULL(voip_device_token,'')as voip_device_token , mode, device_os_version, device_id  FROM chat_users_details WHERE (device_type !='Web' and device_type !='') and device_id != ''  and username = '">>, LUser, <<"';">>]);
-  % true ->
-    if LResource =:= "" ->
-      ejabberd_sql:sql_query(LServer,
-      [<<"SELECT  device_type, device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE username = '">>, LUser, <<"' and ( device_token != '' and device_token != 'null'  and device_type !='') and device_id != ''  ;">>]);
-      true ->
-      ejabberd_sql:sql_query(LServer,
-      [<<"SELECT  device_type,device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE  username = '">>, LUser, <<"'  and ( device_token != '' and device_token != 'null'  and device_type !='') and device_id != ''  and device_id not in  ('">>, LResource, <<"' );">>])
-      % end
-  end.
+get_user_device(LServer, LUser, LResource) ->
+
+    ejabberd_sql:sql_query(LServer,
+    [<<"SELECT 
+            device_type, device_token, voip_device_token, 
+            mode, device_os_version, device_id, user_type, 
+            push_server_type
+        FROM chat_users_details 
+        WHERE username = '">>,LUser,<<"' 
+        and ( device_token != '' and device_token != 'null'  and device_type != '') 
+        and device_id != '' and device_id not in  ('">>, LResource, <<"' );">>]).
+
 
 get_user_device_exclude_restricted_countries(LServer, LUser, LResource, Codes) ->
     if LResource =:= "" ->
@@ -547,7 +537,14 @@ get_roster_and_recent_jid(#jid{luser = User,lserver = Server})->
   ejabberd_sql:sql_query(Server,[<<" select from_user as jid from chat_recent where to_user = '">>,User,<<"' and chat_type = 'chat';" >>]).
 
 get_roster_from_recent_jid(#jid{luser = User,lserver = Server})->
-  ejabberd_sql:sql_query(Server,[<<"select to_user as jid from chat_recent where from_user = '">>,User,<<"' and chat_type = 'chat' union select username from rosterusers  where jid_username = '">>,User,<<"' and username != '">>,User,<<"' union SELECT cp2.user_id FROM call_participants cp2 JOIN ( SELECT DISTINCT room_id FROM call_participants WHERE user_id = '">>,User,<<"' AND created_at >= NOW() - INTERVAL 24 HOUR ) cp1 ON cp1.room_id = cp2.room_id WHERE cp2.user_id != '">>,User,<<"';" >>]).
+  ejabberd_sql:sql_query(Server,[<<"select to_user as jid from chat_recent where from_user = '">>,User,<<"' 
+                                    and chat_type = 'chat' union select case when username like '%@%' then 
+                                    substring_index(username, '@', 1) else username
+                                    end as username from rosterusers  where jid_username = '">>,User,<<"' and 
+                                    username != '">>,User,<<"' union SELECT cp2.user_id FROM call_participants 
+                                    cp2 JOIN ( SELECT DISTINCT room_id FROM call_participants 
+                                    WHERE user_id = '">>,User,<<"' AND created_at >= NOW() - INTERVAL 24 HOUR ) cp1 
+                                    ON cp1.room_id = cp2.room_id WHERE cp2.user_id != '">>,User,<<"';" >>]).
 
 get_email_contacts(#jid{luser = User, lserver = Server})->
   ejabberd_sql:sql_query(Server,[<<"select username as jid from contus_chat_users contus_chat_users where username not in (select jid from rosterusers  where username = '">>,User,<<"' union select CONCAT(from_user,'@','">>,Server,<<"') as jid from chat_recent where to_user = '">>,User,<<"' and chat_type = 'chat') GROUP BY jid;" >>]).
@@ -924,10 +921,14 @@ get_my_all_broadcast_details(LServer,LUser) ->
 %% &param  userid
 %% @return list
 
-check_blockedlist(LServer,FUser, TUser) ->
-  Value = list_to_binary(binary_to_list(TUser) ++ "@" ++ binary_to_list(LServer)),
-  ejabberd_sql:sql_query(LServer,
-  [<<"SELECT E.t from privacy_list_data E JOIN privacy_list S ON E.id = S.id and E.value = '">>,Value, <<"' and  S.username = '">>,FUser, <<"';">>]).
+check_blockedlist(LServer, FUser, TUser) ->
+  ToJid = <<TUser/binary, "@", LServer/binary>>,
+
+  Q = [<<"SELECT e.t FROM privacy_list_data e JOIN privacy_list s ON e.id = s.id
+          AND e.value = '">>,ToJid,<<"' AND s.username = '">>,FUser,<<"';">>],
+
+  ejabberd_sql:sql_query(LServer, Q).
+
 
 check_chatmuted(LServer,FUser, TUser) ->
     ejabberd_sql:sql_query(LServer,
@@ -2294,14 +2295,12 @@ update_license_lookup(LServer) ->
       ets:insert(ClientName, {expiry, 0});
 
     {selected, _, [[Lkey]]} ->
-      ?INFO_MSG("Lkey: ~p ", [Lkey]),
       DecryptedMessage = fly_mod_security:aes_decrpyt_license(list_to_binary(ClientKeyValue++ClientKeyValue++ClientKeyValue), <<"k%$/@B[jqAx}>8H@">>, binary_to_list(Lkey)),
-      ?LOG_INFO("DecryptedMessage: ~p ", [DecryptedMessage]),
       {ParsedMessageJson} = jiffy:decode(list_to_binary(http_uri:decode(binary_to_list(DecryptedMessage)))),
       AvailableModules = proplists:get_value(<<"modulesPurchased">>, ParsedMessageJson),
       Expiry = proplists:get_value(<<"expiresAt">>, ParsedMessageJson),
       Domains = proplists:get_value(<<"domains">>, ParsedMessageJson),
-      ?INFO_MSG("AvailableModules: ~p , Expire: ~p, Domain: ~p", [AvailableModules, Expiry, Domains]),
+      ?INFO_MSG("available_modules: ~p , expire: ~p, domain: ~p", [AvailableModules, Expiry, Domains]),
       ets:insert(ClientName, {module, AvailableModules}),
       ets:insert(ClientName, {expiry, Expiry})
   end.
@@ -2548,9 +2547,23 @@ get_hide_profile_privacy(Server, User) ->
   ejabberd_sql:sql_query(Server,[<<"select hide_profile from privacy_settings where username='">>,User,<<"';">>]).
 
 get_rosters_to_update_privacy(User, Server) -> 
-  case ejabberd_sql:sql_query(Server,
-  [<<"select case when r.username = '">>,User,<<"' then r.jid when r.jid_username = '">>,User,<<"' then concat(r.username, c.domain, c.xmpp_host) end as jids 
-     from rosterusers as r left join chat_settings as c on c.domain = '@' where (r.username = '">>,User,<<"' or r.jid_username = '">>,User,<<"') group by jids;">>]) of 
+
+   Q = [
+    <<"select 
+            case
+                when r.username = '">>,User,<<"' then r.jid
+                when r.jid_username = '">>,User,<<"' then
+                  case
+                    when r.username like '%@%' then r.username
+                    else concat(r.username, c.domain, c.xmpp_host)
+                  end
+            end as jids
+      from rosterusers as r 
+      left join chat_settings as c on c.domain = '@' 
+      where (r.username = '">>,User,<<"' or r.jid_username = '">>,User,<<"') 
+      group by jids;">>
+    ],
+  case ejabberd_sql:sql_query(Server, Q) of 
     {selected, _Cols, Rows} ->
       Rows;
     _ ->
@@ -2863,7 +2876,8 @@ generate_uuid_v4() ->
     <<A:32, B:16, C:16, D:16, E:48>> = crypto:strong_rand_bytes(16),
     C1 = (C band 16#0FFF) bor 16#4000,
     D1 = (D band 16#3FFF) bor 16#8000,
-    io_lib:format("~8.16.0b-~4.16.0b-~4.16.0b-~4.16.0b-~12.16.0b",[A, B, C1, D1, E]).
+    list_to_binary(io_lib:format("~8.16.0b-~4.16.0b-~4.16.0b-~4.16.0b-~12.16.0b",[A, B, C1, D1, E])).
+
 
 upsert_recent_chat(LServer, SUser, BarePeer, MessageId, MessageFrom, Body, SType, MessageType, Topicid, MetaData, Notification_to, Unread, FlatTimeStamp, Status) ->
 
@@ -3107,6 +3121,25 @@ get_unread_from_chat_recent(Server, From, To) ->
       Unread;
     _ -> 
       <<"0">>
+  end.
+
+get_msg_deleted_status(Server, ToUser, MessageId, ChatType) ->
+
+  if ChatType =:= <<"chat">> ->
+     case ejabberd_sql:sql_query(Server, [<<"SELECT deleted_status FROM message_status WHERE message_id = '">>,MessageId,<<"' AND chat_type = 'chat';">>]) of 
+      {selected, _, [[Id]]} -> 
+        Id;
+      _ -> 
+        0
+      end;
+  true -> 
+     case ejabberd_sql:sql_query(Server, [<<"SELECT deleted_status FROM message_status WHERE message_id = '">>,MessageId,<<"' AND to_user = '">>,ToUser,<<"' AND chat_type = 'normal';">>]) of 
+      {selected, _, [[Id]]} -> 
+        Id;
+      _ -> 
+        0
+    end
+
   end.
 
 get_reacted_msg_ids(Server, User) ->

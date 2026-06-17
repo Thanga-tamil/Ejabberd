@@ -437,20 +437,6 @@ user_send_packet({#iq{type = Type,
 %% For client with no active privacy list, see if there is
 %% one about to be activated in this packet and update client state
 user_send_packet({#message{} = Packet, State}) ->
-    StanzaId = xmpp:get_id(Packet),
-    From = xmpp:get_from(Packet),
-    To = xmpp:get_to(Packet),
-    Type = xmpp:get_type(Packet),
-    {FUserId, _, FResource} = jid:tolower(From),
-    {TUserId, _, TResource} = jid:tolower(To),
-		?LOG_INFO(
-			"user_send_packet:mod_privacy for to_user=~p with message details: ~p",
-			[TUserId, #{stanza_id => StanzaId,
-				 type => Type,
-				 from_user_id => FUserId,
-				 from_resource => FResource,
-				 to_user_id => TUserId,
-				 to_resource => TResource}]),
     {Packet, update_c2s_state_with_privacy_list(Packet, State)};
 user_send_packet({Packet, State}) ->
     {Packet, update_c2s_state_with_privacy_list(Packet, State)}.

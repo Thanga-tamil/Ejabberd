@@ -208,7 +208,8 @@ create_group(From, To, SubEl, IQ) ->
           <<"urn:xmpp:mix:nodes:participants">>,<<"urn:xmpp:mix:nodes:subject">>,<<"urn:xmpp:mix:nodes:config">>]}}]}),
   process_set_group_info(From, GroupJID, SubEl, IQ, <<"new">>),
 
-  fly_mod_offline_push:groupcreationfunction(From, groupcreation, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes),
+  fly_mod_offline_push:groupcreationfunction(From, 
+  <<"group_creation">>, Participants, Channel, GroupJID, SubEl, IQ, MessageId1, CustomAttributes),
  
   fly_mod_utils:generate_subel(IQ, #group_query{type = RequestType, group_id = Channel, result_type = <<"Group Created successfully">>}).
 

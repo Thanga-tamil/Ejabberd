@@ -396,16 +396,7 @@ filter_packet({#message{from = From,to = To} = XML, State} = _Acc) ->
   #jid{user = FUser, lserver = FServer} = From,
   #jid{user = TUser, lserver = _TServer} = To,
   Type = XML#message.type,
-  {FUserId, _, FResource} = jid:tolower(From),
-  {TUserId, _, TResource} = jid:tolower(To),
-  % ?LOG_INFO(
-  %   "user_send_packet:fly_mod_media for to_user=~p with message details: ~p",
-  %   [TUserId, #{stanza_id => xmpp:get_id(XML),
-  %      type => Type,
-  %      from_user_id => FUserId,
-  %      from_resource => FResource,
-  %      to_user_id => TUserId,
-  %      to_resource => TResource}]),
+
   %% Add timestamp to chat message and where no DataTag exist
   case Type of
     chat ->

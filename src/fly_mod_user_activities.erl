@@ -1033,8 +1033,6 @@ send_seen_message(_From, RequestType, SubEl,IQ) ->
               attrs = [{<<"xmlns">>, <<"jabber:iq:user_activities">>}, {<<"status">>, RequestType},{<<"type">>, Type},{<<"action">>, Action}],
               children = []}]
             },
-            ?LOG_INFO("hide_profile: pkt: ~p", [Packet]),
-            ?LOG_INFO("hide_profile: ToJid: ~p", [ToJid]),
         ejabberd_router:route(jid:make({FUser, FServer, <<>>}), ToJid, Packet)
       end, fly_mod_utils:get_rosters_to_update_privacy(FUser, FServer) );
       <<"hide_online">> ->
@@ -3196,9 +3194,8 @@ process_message_reaction(#jid{lserver = FServer} = From,
                                         {<<"timestamp">>, Timestamp}, 
                                         {<<"message_sender">>, MsgSender}],
                               children = []},
-                FromJid = jid:to_string(ToJid),
                 GrpPkt = #message{
-                                  from = FromJid,
+                                  from = ToJid,
                                   to = jid:make(LUser, LServer), 
                                   type = normal, 
                                   id = StanzaId, 
@@ -3206,7 +3203,7 @@ process_message_reaction(#jid{lserver = FServer} = From,
                                 },
 
                 spawn(fly_mix_group_chat, carboncall_message, 
-                      [LUser, LServer, GrpPkt, FromJid]),
+                      [LUser, LServer, GrpPkt, ToJid]),
                 
                 DeletedStatus = (fun fly_mod_utils:get_msg_deleted_status/4)
                                 (LServer, LUser, MessageId, <<"normal">>),
@@ -3238,7 +3235,12 @@ process_action(Action, Pkt, LUser, LServer, MsgSender) ->
                 ok
             end;
       <<"remove">> ->
-        ok
+        ok;
+      _ -> 
+        % since we check both 'add' and 'update' 
+        % in the first clause with message sender condition
+        % so, don't let it crash; 
+        ok 
   end.
 
 % route to active client | send push payload
@@ -3258,7 +3260,10 @@ MessageId) when Status =:= 0; Status =:= <<"0">> ->
         Fun(FServer, FUser, MsgSender, MessageId);
       <<"remove">> -> 
         Fun(FServer, FUser, MsgSender, MessageId)
-    end.
+    end;
+process_action(Status, _, _, _, _, _, _, _) 
+    when Status =:= 0; Status =:= <<"0">> ->
+  ok.
 
 user_send_reaction_carboncall(Packet, 
 #jid{luser = FUser, lserver = FServer, lresource = Lresource} = From, To) ->
