@@ -751,7 +751,7 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
 		   []
 	   end,
 
-    route_total_count(State, Msgs);
+    route_popped_msg_count_and_server_time(State, Msgs);
 
     Substring =:= 0 ->
   case catch fly_mod_utils:get_not_delivered_message(LServer,LUser) of
@@ -812,22 +812,40 @@ route_offline_messages(#{jid := #jid{luser = LUser, lserver = LServer, lresource
 	 ok
 end.
 
-route_total_count(#{jid := U} = State, Msgs) ->
+route_popped_msg_count_and_server_time(#{jid := U} = State, Msgs) ->
 
-        C = length(Msgs),
-        % ?LOG_INFO("routing [~p] offline records for jid: ~p", [C, U]),
-        Packet =
-        #xmlel{
-                name = <<"message">>,
-                attrs = [{<<"from">>, jid:to_string(U)}, {<<"to">>, jid:to_string(U)}, {<<"id">>, fly_mod_utils:get_iq_message_id(7)}, {<<"type">>, <<"chat">>}],
-                children = [
-                        #xmlel{name = <<"spool">>,
-                        attrs = [{<<"xmlns">>, <<"urn:xmpp:delay">>}, {<<"type">>, <<"offline_storage">>}, {<<"count">>, integer_to_binary(C)}],
-                        children = []}
-                        ]
-                },
+	Timestamp = (calendar:datetime_to_gregorian_seconds(erlang:universaltime()) - 62167219200) * 1000000,
+  	FlatTimeStamp = lists:flatten(io_lib:format("~p", [Timestamp])),
+	Id1 = fly_mod_utils:get_iq_message_id(7),
+	Id2 = fly_mod_utils:get_iq_message_id(7),
 
-        ejabberd_router:route(U, U, Packet),
+    	ServerTime = 
+    	#message{from = U, to = U, id = Id1, type = chat, 
+		 sub_els = [#xmlel{
+		     name = <<"servertime">>, 
+		     attrs = [
+			      {<<"xmlns">>, <<"urn:xmpp:messagetime">>}, 
+			      {<<"time">>, list_to_binary(FlatTimeStamp)}
+			     ],
+		     children = []
+		    }]
+		},
+	ejabberd_router:route(ServerTime),
+
+	PoppedMsgCount =
+	#message{from = U, to = U, id = Id2, type = chat, 
+		 sub_els = [#xmlel{
+			   name = <<"spool">>,
+			   attrs = [
+				    {<<"xmlns">>, <<"urn:xmpp:delay">>}, 
+				    {<<"type">>, <<"offline_storage">>}, 
+				    {<<"count">>, integer_to_binary(length(Msgs))}
+				   ],
+                           children = []
+			}]
+		},
+        
+        ejabberd_router:route(PoppedMsgCount),
         route_in_batches(State, Msgs, 100).
 
 route_in_batches(_State, [], _BatchSize) ->

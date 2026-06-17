@@ -1,17 +1,16 @@
 -module(fly_mod_offline_push).
 
--behavior(gen_server).
-
 -behaviour(gen_mod).
+-behaviour(gen_server).
 
--define(PROCNAME, fly_mod_offline_push).
+-define(MOD_AMQP_FUN, publish).
 -define(MOD_PURPOSE, publication).
 -define(MOD_AMQP, fly_mod_rabbitmq).
--define(MOD_AMQP_FUN, publish).
+-define(PROCNAME, fly_mod_offline_push).
 
 %% gen_mod callbacks
 -export([start/2, start_link/2, depends/2, stop/1, send_offline_message/1, 
-         queryexecfunction/5, queryfunction/6, groupcreationfunction/8, 
+         queryexecfunction/5, queryfunction/6, groupcreationfunction/9, 
          has_more_resources/2, send_bulk_group_push/7, send_own_offline_message/3,
          create_json/7, send_payload/6]).
 
@@ -97,37 +96,48 @@ handle_call(stop, _From, State) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%=========================================================================
-handle_cast({pushnotification, <<"chat">>,
-  {Sender, Recipient, ChatType, SubEl, Packet}},
-    State) ->
-      case catch fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser,
-      Sender#jid.luser)
-    of
+handle_cast({pushnotification, 
+            <<"chat">>,
+	          {Sender, Recipient, ChatType, SubEl, Packet}},
+            State) ->
+
+    Server = Recipient#jid.server, 
+    TUser = Recipient#jid.luser,
+    FUser = Sender#jid.luser,
+
+    IsMuted = fly_mod_utils:check_chatmuted(Server, TUser, FUser),
+
+    ProcessPush = 
+    case IsMuted of
       {selected, _, []} ->
-        Call = true;
-      {selected, _, [[_T]]} ->
-      if ChatType =:= <<"mediacall">> ->
-        Call = true;
-        true ->
-          Call = false,
-        ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
-        ok
-      end
-      end,
-      if Call =:= true ->
-        case catch send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) of
+        true;
+      {selected, _, [[_]]} ->
+
+        if ChatType =:= <<"mediacall">> ->
+            true;
+          true ->
+            logger:info("push muted ~p", [TUser]),
+            false
+        end
+    end,
+
+    case ProcessPush of 
+      true -> 
+        case send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) of
           {ok, _Result} -> ok;
           {error, Error} ->
-            ?WARNING_MSG("push error ~p", [Error]),
+            logger:warning("push error ~p", [Error]),
             ok;
           _ ->
             ok
         end;
-      true ->
-        ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
+
+      false -> 
+        logger:info("push muted ~p", [TUser]),
         ok
-        end,
-  {noreply, State};
+    end,
+
+	{noreply, State};
 handle_cast({pushnotification, <<"normal">>, {Sender, Recipient, ChatType, SubEl, Packet}}, State) ->
 	case catch fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser, Sender#jid.luser) of
 		{selected, _, []} ->
@@ -153,7 +163,7 @@ handle_cast({pushnotification, <<"normal">>, {Sender, Recipient, ChatType, SubEl
 		   ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
 		   ok
 	end,
-  {noreply, State};
+	{noreply, State};
 handle_cast({queryexecution, <<"clear_all">>,
   {From, Last_Msg_Id, Delete_Type, XMLBody}},
     State) ->
@@ -167,8 +177,9 @@ handle_cast({queryexecution, <<"call_log">>,
   clear_call_log(From, Chat_Type, Delete_Type, XMLBody),
   {noreply, State};
 handle_cast({groupcreationexecutions, <<"group_creation">>,
-  {From, Participants,  GroupJID, SubEl, IQ, MessageId1, CustomAttributes}},State) ->
-  group_create_query(From, Participants,  GroupJID, SubEl, IQ, MessageId1, CustomAttributes),
+  {From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1, CustomAttributes}},State) ->
+    
+  group_create_query(From, Participants, Channel, GroupJID, SubEl, IQ, MessageId1,CustomAttributes, State),
   {noreply, State};
 
 handle_cast({own_pushnotification, <<"chat">>,
@@ -248,14 +259,13 @@ queryfunction(Proc, Type, From, Chat_Type, Delete_Type, XMLBody) ->
     {queryexecution, Type,
       { From, Chat_Type, Delete_Type,XMLBody}}).
 
-groupcreationfunction(From, Type, Participants, 
-  GroupJID, SubEl, IQ, MessageId1, CustomAttributes) ->
+groupcreationfunction(From, Type, Participants, Channel, GroupJID, 
+                      SubEl, IQ, MessageId1, CustomAttributes) ->
 
     Proc = gen_mod:get_module_proc(From#jid.lserver, ?PROCNAME),
     gen_server:cast(Proc,
-      {groupcreationexecutions, Type, {From, Participants,  
+      {groupcreationexecutions, Type, {From, Participants, Channel,
        GroupJID, SubEl, IQ, MessageId1,CustomAttributes}}).
-
 %% Hook lisenter to for offline message hook
 %%
 %% @param record Sender
@@ -421,56 +431,30 @@ get_string() ->
   R = rand:uniform(16#10000000000000000) - 1,
   integer_to_binary(R).
 
-group_create_query(From, Participants,  GroupJID, SubEl, IQ, MessageId1, CustomAttributes)->
+group_create_query(From, Participants, Channel, GroupJID, 
+  SubEl, IQ, MessageId1,CustomAttributes, State) ->
 
-  #jid{user = FUser, lserver = FServer} = From,
-  Profile = fxml:get_subtag(SubEl, <<"profile">>),
-  VCard = fxml:get_subtag(Profile, <<"vCard">>),
-  NickName = fxml:get_subtag(VCard, <<"nickName">>),
-  GroupName = fxml:get_tag_cdata(NickName),
-  fly_mod_utils:group_notify_message(From, From, FUser,  <<"1">>, <<"create_group">>, MessageId1,<<"">>, <<"">>, <<"">>),
-  % Adds Participant
-  lists:foreach(fun(Participant) ->
-
+    #jid{user = FUser, lserver = FServer} = From,
+    Profile = fxml:get_subtag(SubEl, <<"profile">>),
+    VCard = fxml:get_subtag(Profile, <<"vCard">>),
+    NickName = fxml:get_subtag(VCard, <<"nickName">>),
+    GroupName = fxml:get_tag_cdata(NickName),
+    fly_mod_utils:group_notify_message(From, From, FUser, Channel, <<"1">>, <<"create_group">>, MessageId1,<<"">>,<<"">>),
+    % Adds Participant
+    lists:foreach(fun(Participant) ->
       ParticipantData = fxml:get_tag_cdata(Participant),
       FromJID = jid:make(fly_mod_utils:get_user_from_string_jid(ParticipantData),FServer,<<"">>),
       MessageID = <<(get_string()) / binary>>,
       GroupCreateID = <<(get_string()) / binary>>,
       #jid{user = PUser} = FromJID,
-      fly_mod_utils:group_notify_message(From, FromJID, PUser,  <<"1">>, <<"create_group">>, GroupCreateID, <<"">>, <<"">>, <<"">>),
-
-      mod_mix_pam:process_iq(
-                    #iq{
-                    from = FromJID, 
-                    to = FromJID,type = set,
-                    id = MessageID,
-                    sub_els = [build_mix_client_join_record(GroupJID, {From, MessageID, GroupName, CustomAttributes})]
-                    }),
-
+      fly_mod_utils:group_notify_message(From, FromJID, PUser, Channel, <<"1">>, <<"create_group">>, GroupCreateID,<<"">>,<<"">>),
+      mod_mix_pam:process_iq(#iq{from = FromJID, to = FromJID,type = set,id = MessageID,
+        sub_els = [#mix_client_join{channel = GroupJID,  xmlns = <<"urn:xmpp:mix:pam:0">>,affiliation = <<"n">>,
+        join = #mix_join{owner = jid:to_string(From),message_id = MessageID, nick = GroupName, group_create = <<"y">>, custom_attributes = #xmlel{name = <<"custom_attributes">>, children = [{xmlcdata, CustomAttributes}]}, xmlns = <<"urn:xmpp:mix:core:0">>, subscribe = [<<"urn:xmpp:mix:nodes:messages">>,<<"urn:xmpp:mix:nodes:presence">>,
+        <<"urn:xmpp:mix:nodes:participants">>,<<"urn:xmpp:mix:nodes:info">>,<<"urn:xmpp:mix:nodes:config">>]}}]}),
       fly_mix_group_chat:update_group_status(From, GroupJID, SubEl, IQ, <<"2">>, Participant, MessageID)
+    end, Participants#xmlel.children).
 
-  end, Participants#xmlel.children).
-
-build_mix_client_join_record(GroupJID, {From, MessageID, GroupName, CustomAttributes}) ->
-  #mix_client_join{channel = GroupJID,  
-                   xmlns = <<"urn:xmpp:mix:pam:0">>, 
-                   affiliation = <<"n">>,
-                   join = build_join_record(From, MessageID, GroupName, CustomAttributes)}.
-
-build_join_record(_From, _MessageID, GroupName, _Attrs) ->
-#mix_join{owner = jid:to_string(_From),
-          message_id = _MessageID, 
-          nick = GroupName, 
-          group_create = <<"y">>, 
-          custom_attributes = 
-          #xmlel{name = <<"custom_attributes">>, 
-                 children = [{xmlcdata, _Attrs}]}, 
-                 xmlns = <<"urn:xmpp:mix:core:0">>, 
-                 subscribe = [<<"urn:xmpp:mix:nodes:messages">>,
-                              <<"urn:xmpp:mix:nodes:presence">>,
-                              <<"urn:xmpp:mix:nodes:participants">>,
-                              <<"urn:xmpp:mix:nodes:info">>,
-                              <<"urn:xmpp:mix:nodes:config">>]}.
 
 %% send_push_notifications
 %%
@@ -499,7 +483,7 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) ->
   if CallMode =:= <<"onetoone">> ->
     fly_mod_utils:get_user_device_exclude_restricted_countries(Recipient#jid.server, Recipient#jid.luser, Rs, fly_mod_media:sql_in(Ccodes));
     true ->
-      fly_mod_utils:get_user_device(Recipient#jid.server, Recipient#jid.luser, Rs, ChatType)
+      fly_mod_utils:get_user_device(Recipient#jid.server, Recipient#jid.luser, Rs)
   end,
 
   ?LOG_INFO("DeviceDetails: ~p", [DeviceDetails]),
@@ -2009,7 +1993,7 @@ send_own_push_notifications(Sender, Recipient, ChatType,
   Rs = has_more_resources(Sender#jid.luser,Sender#jid.server),
   case catch
     fly_mod_utils:get_user_device(Sender#jid.server,
-      Sender#jid.luser,Rs,ChatType)
+      Sender#jid.luser,Rs)
   of
     {selected, _, []} ->
       device_token_is_empty;
@@ -2149,7 +2133,8 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
         Members)
       of {selected, _, []} ->
 
-        ?INFO_MSG("token is empty ~p", []),
+        logger:info("send_bulk_group_push_notification "
+                    "get_bulk_group_create_android_user_device token is empty"),
         ok;
           {selected, _, ATokens} ->
           lists:map(fun(G) ->
@@ -2466,7 +2451,7 @@ send_own_group_push_notifications(FromUser, ToUser,
     ChatType, SubEl, Packet, GroupName, _State) ->
     Rs = has_more_resources(FromUser#jid.luser,FromUser#jid.server),
   case catch fly_mod_utils:get_user_device(FromUser#jid.server,
-    FromUser#jid.luser,Rs,ChatType)
+    FromUser#jid.luser,Rs)
   of
     {selected, _, []} -> ok;
     {selected, _, Tokens} ->
