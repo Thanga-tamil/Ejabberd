@@ -3017,7 +3017,7 @@ set_message_disappear(From, SubEl, IQ) ->
             end,
             
             if NotifyId =/= <<"">> ->
-                MessageId = list_to_binary(fly_mod_utils:generate_uuid_v4()),
+                MessageId = fly_mod_utils:generate_uuid_v4(),
                 fly_mod_utils:single_notify_message(From, ToJid, NotifyId, MessageId, <<"">>, <<"">>, MsgDisappear);
             true ->
                 ok
