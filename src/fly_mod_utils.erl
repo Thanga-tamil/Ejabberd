@@ -32,7 +32,7 @@
   get_vcard_from_search/2,
   get_user_device/2,
   get_msg_deleted_status/4,
-  get_user_device/4,
+  get_user_device/3,
   get_user_device_exclude_restricted_countries/4,
   get_user_for_ios_group_device/3,
   get_group_participants/2,
@@ -322,30 +322,19 @@ get_user_device(LServer, LUser) ->
     LServer,
     [<<"SELECT IFNULL(device_type,'') as device_type, IFNULL(device_token,'')as device_token,IFNULL(voip_device_token,'')as voip_device_token ,  mode, device_os_version,device_id ,user_type  FROM chat_users_details WHERE  username = '">>, LUser, <<"' and (device_type !='Web' and device_type !='') and  device_token != '' and device_token != 'null';">>]).
 
-% get_user_device(LServer, LUser, LResource) ->
-%   Substring = string:str((LResource), binary_to_list(<<"Web">>)),
-%   if Substring =:= 1 ->
-%       ejabberd_sql:sql_query(LServer,
-%       [<<"SELECT IFNULL(device_type,'') as device_type, IFNULL(device_token,'')as device_token,IFNULL(voip_device_token,'')as voip_device_token ,mode, device_os_version, device_id  FROM chat_users_details WHERE (device_type !='Web' and device_type !='') and device_id != ''and username = '">>, LUser, <<"';">>]);
-%   true ->
-%       Resource = get_device_from_resource(LResource),
-%       ejabberd_sql:sql_query(LServer,
-%       [<<"SELECT IFNULL(device_type,'') as device_type, IFNULL(device_token,'')as device_token,IFNULL(voip_device_token,'')as voip_device_token , mode, device_os_version, device_id  FROM chat_users_details WHERE (device_type !='Web' and device_type !='') and device_id != '' and device_id != '">>, Resource, <<"' and username = '">>, LUser, <<"';">>])
-%   end.
 
-get_user_device(LServer, LUser, LResource, ChatType) ->
-  % if ChatType == <<"mediacall">> ->
-  %    ejabberd_sql:sql_query(LServer,
-  %     [<<"SELECT IFNULL(device_type,'') as device_type, IFNULL(device_token,'')as device_token,IFNULL(voip_device_token,'')as voip_device_token , mode, device_os_version, device_id  FROM chat_users_details WHERE (device_type !='Web' and device_type !='') and device_id != ''  and username = '">>, LUser, <<"';">>]);
-  % true ->
-    if LResource =:= "" ->
-      ejabberd_sql:sql_query(LServer,
-      [<<"SELECT  device_type, device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE username = '">>, LUser, <<"' and ( device_token != '' and device_token != 'null'  and device_type !='') and device_id != ''  ;">>]);
-      true ->
-      ejabberd_sql:sql_query(LServer,
-      [<<"SELECT  device_type,device_token, voip_device_token , mode, device_os_version, device_id ,user_type, push_server_type  FROM chat_users_details WHERE  username = '">>, LUser, <<"'  and ( device_token != '' and device_token != 'null'  and device_type !='') and device_id != ''  and device_id not in  ('">>, LResource, <<"' );">>])
-      % end
-  end.
+get_user_device(LServer, LUser, LResource) ->
+
+    ejabberd_sql:sql_query(LServer,
+    [<<"SELECT 
+            device_type, device_token, voip_device_token, 
+            mode, device_os_version, device_id, user_type, 
+            push_server_type
+        FROM chat_users_details 
+        WHERE username = '">>,LUser,<<"' 
+        and ( device_token != '' and device_token != 'null'  and device_type != '') 
+        and device_id != '' and device_id not in  ('">>, LResource, <<"' );">>]).
+
 
 get_user_device_exclude_restricted_countries(LServer, LUser, LResource, Codes) ->
     if LResource =:= "" ->
@@ -932,10 +921,14 @@ get_my_all_broadcast_details(LServer,LUser) ->
 %% &param  userid
 %% @return list
 
-check_blockedlist(LServer,FUser, TUser) ->
-  Value = list_to_binary(binary_to_list(TUser) ++ "@" ++ binary_to_list(LServer)),
-  ejabberd_sql:sql_query(LServer,
-  [<<"SELECT E.t from privacy_list_data E JOIN privacy_list S ON E.id = S.id and E.value = '">>,Value, <<"' and  S.username = '">>,FUser, <<"';">>]).
+check_blockedlist(LServer, FUser, TUser) ->
+  ToJid = <<TUser/binary, "@", LServer/binary>>,
+
+  Q = [<<"SELECT e.t FROM privacy_list_data e JOIN privacy_list s ON e.id = s.id
+          AND e.value = '">>,ToJid,<<"' AND s.username = '">>,FUser,<<"';">>],
+
+  ejabberd_sql:sql_query(LServer, Q).
+
 
 check_chatmuted(LServer,FUser, TUser) ->
     ejabberd_sql:sql_query(LServer,

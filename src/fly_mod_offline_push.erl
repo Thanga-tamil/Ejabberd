@@ -1,13 +1,12 @@
 -module(fly_mod_offline_push).
 
--behavior(gen_server).
-
 -behaviour(gen_mod).
+-behaviour(gen_server).
 
--define(PROCNAME, fly_mod_offline_push).
+-define(MOD_AMQP_FUN, publish).
 -define(MOD_PURPOSE, publication).
 -define(MOD_AMQP, fly_mod_rabbitmq).
--define(MOD_AMQP_FUN, publish).
+-define(PROCNAME, fly_mod_offline_push).
 
 %% gen_mod callbacks
 -export([start/2, start_link/2, depends/2, stop/1, send_offline_message/1, 
@@ -97,37 +96,48 @@ handle_call(stop, _From, State) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%=========================================================================
-handle_cast({pushnotification, <<"chat">>,
-  {Sender, Recipient, ChatType, SubEl, Packet}},
-    State) ->
-      case catch fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser,
-      Sender#jid.luser)
-    of
+handle_cast({pushnotification, 
+            <<"chat">>,
+	          {Sender, Recipient, ChatType, SubEl, Packet}},
+            State) ->
+
+    Server = Recipient#jid.server, 
+    TUser = Recipient#jid.luser,
+    FUser = Sender#jid.luser,
+
+    IsMuted = fly_mod_utils:check_chatmuted(Server, TUser, FUser),
+
+    ProcessPush = 
+    case IsMuted of
       {selected, _, []} ->
-        Call = true;
-      {selected, _, [[_T]]} ->
-      if ChatType =:= <<"mediacall">> ->
-        Call = true;
-        true ->
-          Call = false,
-        ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
-        ok
-      end
-      end,
-      if Call =:= true ->
-        case catch send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) of
+        true;
+      {selected, _, [[_]]} ->
+
+        if ChatType =:= <<"mediacall">> ->
+            true;
+          true ->
+            logger:info("push muted ~p", [TUser]),
+            false
+        end
+    end,
+
+    case ProcessPush of 
+      true -> 
+        case send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) of
           {ok, _Result} -> ok;
           {error, Error} ->
-            ?WARNING_MSG("push error ~p", [Error]),
+            logger:warning("push error ~p", [Error]),
             ok;
           _ ->
             ok
         end;
-      true ->
-        ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
+
+      false -> 
+        logger:info("push muted ~p", [TUser]),
         ok
-        end,
-  {noreply, State};
+    end,
+
+	{noreply, State};
 handle_cast({pushnotification, <<"normal">>, {Sender, Recipient, ChatType, SubEl, Packet}}, State) ->
 	case catch fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser, Sender#jid.luser) of
 		{selected, _, []} ->
@@ -153,7 +163,7 @@ handle_cast({pushnotification, <<"normal">>, {Sender, Recipient, ChatType, SubEl
 		   ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
 		   ok
 	end,
-  {noreply, State};
+	{noreply, State};
 handle_cast({queryexecution, <<"clear_all">>,
   {From, Last_Msg_Id, Delete_Type, XMLBody}},
     State) ->
@@ -473,7 +483,7 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) ->
   if CallMode =:= <<"onetoone">> ->
     fly_mod_utils:get_user_device_exclude_restricted_countries(Recipient#jid.server, Recipient#jid.luser, Rs, fly_mod_media:sql_in(Ccodes));
     true ->
-      fly_mod_utils:get_user_device(Recipient#jid.server, Recipient#jid.luser, Rs, ChatType)
+      fly_mod_utils:get_user_device(Recipient#jid.server, Recipient#jid.luser, Rs)
   end,
 
   ?LOG_INFO("DeviceDetails: ~p", [DeviceDetails]),
@@ -1983,7 +1993,7 @@ send_own_push_notifications(Sender, Recipient, ChatType,
   Rs = has_more_resources(Sender#jid.luser,Sender#jid.server),
   case catch
     fly_mod_utils:get_user_device(Sender#jid.server,
-      Sender#jid.luser,Rs,ChatType)
+      Sender#jid.luser,Rs)
   of
     {selected, _, []} ->
       device_token_is_empty;
@@ -2123,7 +2133,8 @@ send_bulk_group_push_notification(FromUser, Server, MessageContent, Members, Nod
         Members)
       of {selected, _, []} ->
 
-        ?INFO_MSG("token is empty ~p", []),
+        logger:info("send_bulk_group_push_notification "
+                    "get_bulk_group_create_android_user_device token is empty"),
         ok;
           {selected, _, ATokens} ->
           lists:map(fun(G) ->
@@ -2440,7 +2451,7 @@ send_own_group_push_notifications(FromUser, ToUser,
     ChatType, SubEl, Packet, GroupName, _State) ->
     Rs = has_more_resources(FromUser#jid.luser,FromUser#jid.server),
   case catch fly_mod_utils:get_user_device(FromUser#jid.server,
-    FromUser#jid.luser,Rs,ChatType)
+    FromUser#jid.luser,Rs)
   of
     {selected, _, []} -> ok;
     {selected, _, Tokens} ->
