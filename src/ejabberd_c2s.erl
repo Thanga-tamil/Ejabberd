@@ -132,8 +132,9 @@ send(#{lserver := LServer} = State, Pkt) ->
     case ejabberd_hooks:run_fold(c2s_filter_send, LServer, {Pkt1, State}, []) of
 	{drop, State1} -> 
 			State1;
-	{Pkt2, State1} -> 
-	xmpp_stream_in:send(State1, Pkt2)
+	{Pkt2, State1} ->
+		?LOGX(Pkt2, " ::xmpp_stream_in:: message sent to recipient"),
+		xmpp_stream_in:send(State1, Pkt2)
     end.
 
 -spec send_error(state(), xmpp_element(), stanza_error()) -> state().
