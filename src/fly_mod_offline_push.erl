@@ -520,39 +520,43 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) ->
           Tokens);
         
         not_allow ->
-          lists:map(fun(#{
-                        <<"device_type">> := DeviceType,
-                        <<"device_token">> := DeviceToken,
-                        <<"voip_device_token">> := VoipDeviceToken,
-                        <<"mode">> := Mode,
-                        <<"device_os_version">> := IOSVersion,
-                        <<"user_type">> := UserType,
-                        <<"push_server_type">> := PushServerType
-                      }) -> 
-                        
-              if ChatType =:= <<"poll">> ->
-                case xmpp:get_subtag(xmpp:decode(Packet), #poll{}) of 
-                  #poll{chat_type = <<"normal">>} ->
-                    call_push_method(DeviceType, DeviceToken, VoipDeviceToken, 
-                        Mode, IOSVersion, UserType, PushServerType, Sender, Recipient, 
-                        ChatType, SubEl, Packet, TimestampValue);
-                  _ ->
-                    fly_mod_utils:remove_offline(Server, MsgId),
-                    user_blocked
-                end;
-              true ->
-                fly_mod_utils:remove_offline(Server, MsgId),
-                user_blocked
-              end
-            end,
-          Tokens)
-
+          handle_poll(Tokens, Server, ChatType, Sender, 
+            Recipient, MsgId, SubEl, Packet, TimestampValue)
         end;
 
     _Error ->
       ?INFO_MSG("push_message get_user_device_details error is ~p", [_Error]),
       database_error
   end.
+
+handle_poll(Tokens, Server, ChatType, Sender, Recipient, MsgId, SubEl, Packet, TimestampValue) -> 
+
+    lists:map(fun(#{
+                    <<"device_type">> := DeviceType,
+                    <<"device_token">> := DeviceToken,
+                    <<"voip_device_token">> := VoipDeviceToken,
+                    <<"mode">> := Mode,
+                    <<"device_os_version">> := IOSVersion,
+                    <<"user_type">> := UserType,
+                    <<"push_server_type">> := PushServerType
+                  }) -> 
+                        
+        if ChatType =:= <<"poll">> ->
+          case xmpp:get_subtag(xmpp:decode(Packet), #poll{}) of 
+            #poll{chat_type = <<"normal">>} ->
+              call_push_method(DeviceType, DeviceToken, VoipDeviceToken, 
+                  Mode, IOSVersion, UserType, PushServerType, Sender, Recipient, 
+                  ChatType, SubEl, Packet, TimestampValue);
+            _ ->
+              fly_mod_utils:remove_offline(Server, MsgId),
+              user_blocked
+          end;
+        true ->
+            fly_mod_utils:remove_offline(Server, MsgId),
+            user_blocked
+          end
+      end,
+    Tokens).
 
 get_user_details(Host, User, Resource, Codes) ->
 
@@ -612,7 +616,7 @@ check_block(Host, FUser, TUser) ->
           {[], []}
       end,
 
-      FromJid = jid:make(FUser, Host),
+      FromJid = jid:make(TUser, Host),
       fly_redis:store_block(FromJid, JIDs, <<"SADD">>, "blocked"),
 
       case lists:member(FUser, LUserList) of 
