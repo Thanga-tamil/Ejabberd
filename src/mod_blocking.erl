@@ -113,7 +113,7 @@ process_iq_set(#iq{lang = Lang, from = From, sub_els = [SubEl]} = IQ) ->
 			FromUser =  FromJid
 		end,
 		fly_mod_user_activities:send_block_list(FromUser, JIDs, <<"unblock_user">>),
-		fly_mod_utils:store_in_redis(FromUser, JIDs, <<"SADD">>, "unblocked"),
+		fly_mod_utils:store_in_redis(FromUser, JIDs, <<"SREM">>, "unblocked"),
 		process_unblock(IQ, FromUser, JIDs);
 	_ ->
 	    Txt = ?T("No module is handling this query"),
