@@ -220,7 +220,7 @@
   get_hide_profile_privacy/2, update_mix_participant/3, batch_remove_spool/4, is_session_exists/2,is_group_admin/3, get_spool_seq/4,
   update_story_view/3, update_story_like/3,
   get_message_chat_info/2, get_all_group_participants/2, update_call_session_reminder_status/2, update_call_session_schedule/9,
-  delete_story_like/3, validate_datetime/1]).
+  delete_story_like/3, validate_datetime/1, store_in_redis/4]).
 
 -include("logger.hrl").
 
@@ -235,6 +235,21 @@
 %%% Author  : Contus <ejabberd@contus.in>
 %%% Purpose : Check whether the user is exist or not in the particular server
 %%%================================================================================
+
+store_in_redis(FromUser, JIDs, Type, Msg) -> 
+
+  FUser = FromUser#jid.luser,
+
+  Key = <<"user:", FUser/binary, ":block">>,
+
+  BlockedUsers =
+      [BlockedUser || {BlockedUser, _, _} <- JIDs],
+
+  Res = ejabberd_redis:q([Type, Key] ++ BlockedUsers),
+
+  logger:info(
+      "user:: ~p " ++ Msg ++ " user/s:: ~p result:: ~p",
+      [FUser, BlockedUsers, Res]).
 
 -spec is_carbon_copy(stanza()) -> boolean().
 is_carbon_copy(#message{meta = #{carbon_copy := true}}) ->
