@@ -594,23 +594,26 @@ check_block(Host, FUser, TUser) ->
 
       logger:info("BlockedUserList from db:: ~p", [BlockedUserList]),
 
-      {JIDs, LUserList} = 
+      LUserList = 
       case BlockedUserList of 
+        {selected, _, []} -> 
+            [];
         {selected, _, BUsers} ->
-            {[jid:tolower(JID) || 
+            JIDs = 
+            [jid:tolower(JID) || 
              [B] <- BUsers, JID <- [jid:from_string(B)], 
              JID =/= error],
-             
+
+             FromJid = jid:make(TUser, Host),
+             fly_redis:store_block(FromJid, JIDs, <<"SADD">>, "blocked"),
+
             [LUser || [B] <- BUsers, 
              JID <- [jid:from_string(B)], 
              JID =/= error, {LUser, _, _} 
-             <- [jid:tolower(JID)]]};
+             <- [jid:tolower(JID)]];
         _ -> 
-          {[], []}
+          []
       end,
-
-      FromJid = jid:make(TUser, Host),
-      fly_redis:store_block(FromJid, JIDs, <<"SADD">>, "blocked"),
 
       case lists:member(FUser, LUserList) of 
         true -> 
