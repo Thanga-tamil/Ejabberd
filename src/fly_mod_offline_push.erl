@@ -498,18 +498,19 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) ->
       device_token_is_empty;
     
     Tokens ->
-      
+
       TimestampValue = finalize_timestamp(Packet, ChatType),
 
       case check_block(Server, FUser, TUser) of 
         allow ->
-          lists:map(fun(#{device_type := DeviceType,
-                          device_token := DeviceToken,
-                          voip_device_token := VoipDeviceToken,
-                          mode := Mode,
-                          device_os_version := IOSVersion,
-                          user_type := UserType,
-                          push_server_type := PushServerType
+          lists:map(fun(#{
+                        <<"device_type">> := DeviceType,
+                        <<"device_token">> := DeviceToken,
+                        <<"voip_device_token">> := VoipDeviceToken,
+                        <<"mode">> := Mode,
+                        <<"device_os_version">> := IOSVersion,
+                        <<"user_type">> := UserType,
+                        <<"push_server_type">> := PushServerType
                       }) -> 
              
             call_push_method(DeviceType, DeviceToken, VoipDeviceToken, 
@@ -519,13 +520,14 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) ->
           Tokens);
         
         not_allow ->
-          lists:map(fun(#{device_type := DeviceType,
-                          device_token := DeviceToken,
-                          voip_device_token := VoipDeviceToken,
-                          mode := Mode,
-                          device_os_version := IOSVersion,
-                          user_type := UserType,
-                          push_server_type := PushServerType
+          lists:map(fun(#{
+                        <<"device_type">> := DeviceType,
+                        <<"device_token">> := DeviceToken,
+                        <<"voip_device_token">> := VoipDeviceToken,
+                        <<"mode">> := Mode,
+                        <<"device_os_version">> := IOSVersion,
+                        <<"user_type">> := UserType,
+                        <<"push_server_type">> := PushServerType
                       }) -> 
                         
               if ChatType =:= <<"poll">> ->
@@ -567,7 +569,7 @@ get_user_details(Host, User, Resource, Codes) ->
         [<<"username = '">>,User,<<"' AND
             device_token <> '' AND device_id <> '' 
             AND device_id NOT IN  ('">>,Resource,<<"')">>];
-      [] ->
+      _ ->
         [<<"username = '">>,User,<<"' AND
             device_token <> '' AND device_id <> '' 
             AND device_id NOT IN  ('">>,Resource,<<"')
