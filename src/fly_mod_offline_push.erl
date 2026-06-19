@@ -586,13 +586,6 @@ check_block(Host, FUser, TUser) ->
   case fly_redis:check_block(TUser) of 
     {ok, [<<"empty">>]} -> 
       allow;
-    {ok, BlockedUsers} ->
-      case lists:member(FUser, BlockedUsers) of 
-        true -> 
-          not_allow;
-        false -> 
-          allow
-      end;
     {ok, []} ->
       % make a db I/O to get all the blocked users 
       % and persist in redis cache to reduce I/O's.
@@ -620,6 +613,13 @@ check_block(Host, FUser, TUser) ->
       fly_redis:store_block(FromJid, JIDs, <<"SADD">>, "blocked"),
 
       case lists:member(FUser, LUserList) of 
+        true -> 
+          not_allow;
+        false -> 
+          allow
+      end;
+    {ok, BlockedUsers} ->
+      case lists:member(FUser, BlockedUsers) of 
         true -> 
           not_allow;
         false -> 
