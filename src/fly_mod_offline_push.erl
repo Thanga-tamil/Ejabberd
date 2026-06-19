@@ -563,11 +563,11 @@ get_user_details(Host, User, Resource, Codes) ->
     Where = 
     case Codes of 
       false -> 
-        [<<"WHERE username = '">>,User,<<"' AND
+        [<<"username = '">>,User,<<"' AND
             device_token <> '' AND device_id <> '' 
             AND device_id NOT IN  ('">>,Resource,<<"')">>];
       [] ->
-        [<<"WHERE username = '">>,User,<<"' AND
+        [<<"username = '">>,User,<<"' AND
             device_token <> '' AND device_id <> '' 
             AND device_id NOT IN  ('">>,Resource,<<"')
             AND (country_code NOT IN ">>,Codes,<<" OR country_code IS NULL)">>]
