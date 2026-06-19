@@ -597,6 +597,7 @@ check_block(Host, FUser, TUser) ->
       LUserList = 
       case BlockedUserList of 
         {selected, _, []} -> 
+            fly_redis:set_empty(TUser),
             [];
         {selected, _, BUsers} ->
             JIDs = 
