@@ -493,11 +493,12 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) ->
   ?LOG_INFO("DeviceDetails: ~p", [DeviceDetails]),
 
   case catch DeviceDetails of
-    {selected, _, []} -> 
+    [] -> 
       ?LOG_INFO("~p device detail not found", [TUser]),
       device_token_is_empty;
     
-    {selected, _, Tokens} ->
+    Tokens ->
+      
       TimestampValue = finalize_timestamp(Packet, ChatType),
 
       case check_block(Server, FUser, TUser) of 
