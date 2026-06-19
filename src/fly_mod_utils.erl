@@ -236,41 +236,52 @@
 %%% Purpose : Check whether the user is exist or not in the particular server
 %%%================================================================================
 
-store_in_redis(FromUser, JIDs, Type, Msg) -> 
+% block
+store_in_redis(FromUser, JIDs, <<"SADD">>, Msg) -> 
 
   FUser = FromUser#jid.luser,
 
   Key = <<"user:", FUser/binary, ":block">>,
 
-  case Type of 
-    <<"SADD">> -> 
-      BlockedUsers =
-        [BlockedUser || {BlockedUser, _, _} <- JIDs],
+  BlockedUsers = [BlockedUser || {BlockedUser, _, _} <- JIDs],
 
-      ejabberd_redis:q([<<"SREM">>, Key, <<"empty">>]),
-      Res = ejabberd_redis:q([<<"SADD">>, Key] ++ BlockedUsers),
+  ejabberd_redis:q([<<"SREM">>, Key, <<"empty">>]),
+  Res = ejabberd_redis:q([<<"SADD">>, Key] ++ BlockedUsers),
 
-      logger:info("user:: ~p " ++ Msg ++ " user/s:: ~p "
-          "result:: ~p", [FUser, BlockedUsers, Res]);
-    <<"SREM">> -> 
-      BlockedUsers =
-        [BlockedUser || {BlockedUser, _, _} <- JIDs],
+  logger:info("user:: ~p " ++ Msg ++ " user/s:: ~p "
+      "result:: ~p", [FUser, BlockedUsers, Res]);
 
-      ejabberd_redis:q([<<"SREM">>, Key] ++ BlockedUsers),
+% unblock
+store_in_redis(FromUser, JIDs, <<"SREM">>, Msg) -> 
 
-      case ejabberd_redis:q([<<"SCARD">>, Key]) of
-        {ok, <<"0">>} ->
-          ejabberd_redis:q([<<"SADD">>, Key, <<"empty">>]);
-        _ ->
-          ok
-      end;
-    <<"DEL">> ->
-      Res = ejabberd_redis:q([Type, Key]),
-      ejabberd_redis:q([<<"SADD">>, Key, <<"empty">>]),
-      logger:info("user:: ~p " ++ Msg ++ " result:: ~p",
-                  [FUser, Res])
-    end.
+  FUser = FromUser#jid.luser,
 
+  Key = <<"user:", FUser/binary, ":block">>,
+
+  BlockedUsers = [BlockedUser || {BlockedUser, _, _} <- JIDs],
+
+  Res = ejabberd_redis:q([<<"SREM">>, Key] ++ BlockedUsers),
+
+  case ejabberd_redis:q([<<"SCARD">>, Key]) of
+    {ok, <<"0">>} ->
+      ejabberd_redis:q([<<"SADD">>, Key, <<"empty">>]);
+    _ ->
+      ok
+  end,
+  logger:info("user:: ~p " ++ Msg ++ " result:: ~p",
+            [FUser, Res]);
+
+% unblock all 
+store_in_redis(FromUser, _, <<"DEL">>, Msg) -> 
+
+  FUser = FromUser#jid.luser,
+
+  Key = <<"user:", FUser/binary, ":block">>,
+
+  Res = ejabberd_redis:q([<<"DEL">>, Key]),
+  ejabberd_redis:q([<<"SADD">>, Key, <<"empty">>]),
+  logger:info("user:: ~p " ++ Msg ++ " result:: ~p",
+              [FUser, Res]).
 
 -spec is_carbon_copy(stanza()) -> boolean().
 is_carbon_copy(#message{meta = #{carbon_copy := true}}) ->
