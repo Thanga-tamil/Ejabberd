@@ -98,7 +98,7 @@ process_iq_set(#iq{lang = Lang, from = From, sub_els = [SubEl]} = IQ) ->
 		    FromUser =  FromJid
 	    end,
 	    fly_mod_user_activities:send_block_list(FromUser, JIDs, <<"block_user">>),
-	    fly_mod_utils:store_in_redis(FromUser, JIDs, <<"SADD">>, "blocked"),
+	    fly_redis:store_block(FromUser, JIDs, <<"SADD">>, "blocked"),
 	    process_block(IQ, FromUser, JIDs);
 	#unblock{items = []} ->
 	    process_unblock_all(IQ);
@@ -113,7 +113,7 @@ process_iq_set(#iq{lang = Lang, from = From, sub_els = [SubEl]} = IQ) ->
 			FromUser =  FromJid
 		end,
 		fly_mod_user_activities:send_block_list(FromUser, JIDs, <<"unblock_user">>),
-		fly_mod_utils:store_in_redis(FromUser, JIDs, <<"SREM">>, "unblocked"),
+		fly_redis:store_block(FromUser, JIDs, <<"SREM">>, "unblocked"),
 		process_unblock(IQ, FromUser, JIDs);
 	_ ->
 	    Txt = ?T("No module is handling this query"),
@@ -215,7 +215,7 @@ process_unblock_all(#iq{from = From} = IQ) ->
 		ok ->
 		    mod_privacy:push_list_update(From, Name),
 		    broadcast_event(From, #unblock{}),
-		    fly_mod_utils:store_in_redis(From, [], <<"DEL">>, "unblock all"),
+		    fly_redis:store_block(From, [], <<"DEL">>, "unblock all"),
 		    xmpp:make_iq_result(IQ);
 		{error, _} ->
 		    err_db_failure(IQ)
