@@ -587,12 +587,37 @@ check_block(Host, FUser, TUser) ->
           allow
       end;
     {ok, []} ->
+      % make a db I/O to get all the blocked users 
+      % and persist in redis cache to reduce I/O's.
+
       BlockedUserList = fly_mod_utils:get_blocked_users(Host, TUser),
 
       logger:info("BlockedUserList from db:: ~p", [BlockedUserList]),
-      % make a db I/O to get all the blocked users 
-      % persist in redis cache to reduce I/O's.
-      false
+
+      {JIDs, LUserList} = 
+      case BlockedUserList of 
+        {selected, _, BUsers} ->
+            {[jid:tolower(JID) || 
+             [B] <- BUsers, JID <- [jid:from_string(B)], 
+             JID =/= error],
+             
+            [LUser || [B] <- BUsers, 
+             JID <- [jid:from_string(B)], 
+             JID =/= error, {LUser, _, _} 
+             <- [jid:tolower(JID)]]};
+        _ -> 
+          {[], []}
+      end,
+
+      FromJid = jid:make(FUser, Host),
+      fly_redis:store_block(FromJid, JIDs, <<"SADD">>, "blocked"),
+
+      case lists:member(FUser, LUserList) of 
+        true -> 
+          not_allow;
+        false -> 
+          allow
+      end
   end.
 
 finalize_timestamp(Packet, ChatType) ->
