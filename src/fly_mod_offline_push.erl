@@ -573,7 +573,7 @@ get_user_details(Host, User, Resource, Codes) ->
             AND (country_code NOT IN ">>,Codes,<<" OR country_code IS NULL)">>]
     end,
 
-    fly_sql:get_map(Host, Table, Selects, Where).
+    fly_sql:get_maps(Host, Table, Selects, Where).
 
 check_block(Host, FUser, TUser) -> 
   case fly_redis:check_block(TUser) of 
