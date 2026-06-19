@@ -242,14 +242,35 @@ store_in_redis(FromUser, JIDs, Type, Msg) ->
 
   Key = <<"user:", FUser/binary, ":block">>,
 
-  BlockedUsers =
-      [BlockedUser || {BlockedUser, _, _} <- JIDs],
+  case Type of 
+    <<"SADD">> -> 
+      BlockedUsers =
+        [BlockedUser || {BlockedUser, _, _} <- JIDs],
 
-  Res = ejabberd_redis:q([Type, Key] ++ BlockedUsers),
+      ejabberd_redis:q([<<"SREM">>, Key, <<"empty">>]),
+      Res = ejabberd_redis:q([<<"SADD">>, Key] ++ BlockedUsers),
 
-  logger:info(
-      "user:: ~p " ++ Msg ++ " user/s:: ~p result:: ~p",
-      [FUser, BlockedUsers, Res]).
+      logger:info("user:: ~p " ++ Msg ++ " user/s:: ~p "
+          "result:: ~p", [FUser, BlockedUsers, Res]);
+    <<"SREM">> -> 
+      BlockedUsers =
+        [BlockedUser || {BlockedUser, _, _} <- JIDs],
+
+      ejabberd_redis:q([<<"SREM">>, Key] ++ BlockedUsers),
+
+      case ejabberd_redis:q([<<"SCARD">>, Key]) of
+        {ok, <<"0">>} ->
+          ejabberd_redis:q([<<"SADD">>, Key, <<"empty">>]);
+        _ ->
+          ok
+      end;
+    <<"DEL">> ->
+      Res = ejabberd_redis:q([Type, Key]),
+      ejabberd_redis:q([<<"SADD">>, Key, <<"empty">>]),
+      logger:info("user:: ~p " ++ Msg ++ " result:: ~p",
+                  [FUser, Res])
+    end.
+
 
 -spec is_carbon_copy(stanza()) -> boolean().
 is_carbon_copy(#message{meta = #{carbon_copy := true}}) ->

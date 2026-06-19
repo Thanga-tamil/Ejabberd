@@ -215,6 +215,7 @@ process_unblock_all(#iq{from = From} = IQ) ->
 		ok ->
 		    mod_privacy:push_list_update(From, Name),
 		    broadcast_event(From, #unblock{}),
+		    fly_mod_utils:store_in_redis(From, [], <<"DEL">>, "unblocked all"),
 		    xmpp:make_iq_result(IQ);
 		{error, _} ->
 		    err_db_failure(IQ)
