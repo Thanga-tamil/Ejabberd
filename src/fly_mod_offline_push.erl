@@ -97,72 +97,41 @@ handle_call(stop, _From, State) ->
 %% Description: Handling cast messages
 %%=========================================================================
 handle_cast({pushnotification, 
-            <<"chat">>,
+            Type,
 	          {Sender, Recipient, ChatType, SubEl, Packet}},
-            State) ->
+            State)  when Type =:= <<"chat">>; <<"normal">> ->
 
     Server = Recipient#jid.server, 
     TUser = Recipient#jid.luser,
     FUser = Sender#jid.luser,
 
-    IsMuted = fly_mod_utils:check_chatmuted(Server, TUser, FUser),
-
-    ProcessPush = 
-    case IsMuted of
-      {selected, _, []} ->
-        true;
-      {selected, _, [[_]]} ->
-
-        if ChatType =:= <<"mediacall">> ->
-            true;
-          true ->
-            logger:info("push muted ~p", [TUser]),
-            false
-        end
+    MuteStatus = fly_redis:check_mute(Server, FUser, TUser),
+   
+    ProcessPush =
+    case {MuteStatus, ChatType} of 
+      {allow, _} -> 
+          true;
+      {muted, <<"mediacall">>} ->
+          true;
+      {muted, _} -> 
+          logger:info("push muted ~p", [TUser]),
+          false
     end,
 
     case ProcessPush of 
       true -> 
         case send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) of
-          {ok, _Result} -> ok;
-          {error, Error} ->
-            logger:warning("push error ~p", [Error]),
+          {ok, _} -> 
             ok;
+          {error, Error} ->
+            logger:warning("push error ~p", [Error]);
           _ ->
             ok
         end;
-
       false -> 
-        logger:info("push muted ~p", [TUser]),
-        ok
+        logger:info("push muted ~p", [TUser])
     end,
 
-	{noreply, State};
-handle_cast({pushnotification, <<"normal">>, {Sender, Recipient, ChatType, SubEl, Packet}}, State) ->
-	case catch fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser, Sender#jid.luser) of
-		{selected, _, []} ->
-			Call = true;
-		{selected, _, [[_T]]} ->
-			if ChatType =:= <<"mediacall">> ->
-				   Call = true;
-			   true ->
-				   Call = false,
-				   ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
-				   ok
-			end
-	end,
-	if Call =:= true ->
-		   case catch send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) of
-			   {ok, _Result} -> ok;
-			   {error, Error} ->
-				   ?INFO_MSG("push error ~p", [Error]), ok;
-			   _Exception ->
-				   ?INFO_MSG("push status ~p", [_Exception]), ok
-		   end;
-	   true ->
-		   ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
-		   ok
-	end,
 	{noreply, State};
 handle_cast({queryexecution, <<"clear_all">>,
   {From, Last_Msg_Id, Delete_Type, XMLBody}},
@@ -501,7 +470,7 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) ->
 
       TimestampValue = finalize_timestamp(Packet, ChatType),
 
-      case check_block(Server, FUser, TUser) of 
+      case fly_redis:check_block(Server, FUser, TUser) of 
         allow ->
           lists:map(fun(#{
                         <<"device_type">> := DeviceType,
@@ -581,55 +550,6 @@ get_user_details(Host, User, Resource, Codes) ->
     end,
 
     fly_sql:get_maps(Host, Table, Selects, Where).
-
-check_block(Host, FUser, TUser) -> 
-  case fly_redis:check_block(TUser) of 
-    {ok, [<<"empty">>]} -> 
-      allow;
-    {ok, []} ->
-      % make a db I/O to get all the blocked users 
-      % and persist in redis cache to reduce I/O's.
-
-      BlockedUserList = fly_mod_utils:get_blocked_users(Host, TUser),
-
-      logger:info("BlockedUserList from db:: ~p", [BlockedUserList]),
-
-      LUserList = 
-      case BlockedUserList of 
-        {selected, _, []} -> 
-            fly_redis:set_empty(TUser),
-            [];
-        {selected, _, BUsers} ->
-            JIDs = 
-            [jid:tolower(JID) || 
-             [B] <- BUsers, JID <- [jid:from_string(B)], 
-             JID =/= error],
-
-             FromJid = jid:make(TUser, Host),
-             fly_redis:store_block(FromJid, JIDs, <<"SADD">>, "blocked"),
-
-            [LUser || [B] <- BUsers, 
-             JID <- [jid:from_string(B)], 
-             JID =/= error, {LUser, _, _} 
-             <- [jid:tolower(JID)]];
-        _ -> 
-          []
-      end,
-
-      case lists:member(FUser, LUserList) of 
-        true -> 
-          not_allow;
-        false -> 
-          allow
-      end;
-    {ok, BlockedUsers} ->
-      case lists:member(FUser, BlockedUsers) of 
-        true -> 
-          not_allow;
-        false -> 
-          allow
-      end
-  end.
 
 finalize_timestamp(Packet, ChatType) ->
     Types = [

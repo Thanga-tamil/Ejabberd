@@ -220,7 +220,7 @@
   get_hide_profile_privacy/2, update_mix_participant/3, batch_remove_spool/4, is_session_exists/2,is_group_admin/3, get_spool_seq/4,
   update_story_view/3, update_story_like/3,
   get_message_chat_info/2, get_all_group_participants/2, update_call_session_reminder_status/2, update_call_session_schedule/9,
-  delete_story_like/3, validate_datetime/1, get_blocked_users/2]).
+  delete_story_like/3, validate_datetime/1, get_blocked_users/2, get_muted_chats/2]).
 
 -include("logger.hrl").
 
@@ -934,6 +934,18 @@ get_blocked_users(Host, User) ->
   Q = [<<"select `value` from privacy_list_data as pd
           join privacy_list as pl on pl.id = pd.id
           where username = '">>,User,<<"';">>],
+
+  ejabberd_sql:sql_query(Host, Q).
+
+get_muted_chats(Host, User) -> 
+  
+  Q = [<<"SELECT chat_id FROM muted_chats 
+          WHERE username = '">>,User,<<"'
+          
+          UNION 
+
+          SELECT username FROM users WHERE 
+          username = '">>,User,<<"' AND is_muted = 1;">>],
 
   ejabberd_sql:sql_query(Host, Q).
 
