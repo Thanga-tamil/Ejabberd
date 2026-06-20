@@ -80,6 +80,8 @@ mod_options(_Host) ->
 %% gen_serve callbacks %%
 
 init([Host | _]) ->
+    process_flag(trap_exit, true),
+    
     ModOptions = gen_mod:get_module_opts(Host, ?MODULE),
     RabbitMQH = maps:get(rabbitmq_host, ModOptions),
     RabbitMQU = maps:get(rabbitmq_username, ModOptions),
