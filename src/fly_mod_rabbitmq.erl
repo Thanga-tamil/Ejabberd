@@ -182,7 +182,7 @@ listen(Q) ->
                with consumer tag: ~ts", [Q, Tag]),
     {Channel, MonitorRef, Tag}.
 
-listen(down, Host, _OldChannel) ->
+listen(down, Host) ->
     Proc = gen_mod:get_module_proc(Host, ?MODULE),
     NewChannel = gen_server:call(Proc, {channel, subscription, undefined}),
 
@@ -262,24 +262,42 @@ handle_info(#'basic.cancel_ok'{}, State) ->
     {noreply, State};
 
 handle_info({'DOWN', _Ref, process, OldChannel, Reason}, State) ->
-    logger:error("RabbitMQ subscription channel ~p down, reason: ~p", 
+    logger:error("RabbitMQ subscription channel ~p down, reason: ~p",
                  [OldChannel, Reason]),
+
+    % Safe close
     catch amqp_channel:close(OldChannel),
 
     Key = channel_name(subscription),
     Channels = maps:remove(Key, State#state.channels),
 
-    {NewChannel, MonitorRef, Tags} = listen(down, State#state.host, OldChannel),
-
-    NewChannels = Channels#{Key => NewChannel},
-    NewMonitors = (State#state.monitor)#{NewChannel => MonitorRef},
+    % Recover channel **asynchronously** to avoid nested call
+    self() ! {recover_subscription_channel, State#state.host},
 
     {noreply, State#state{
-        channels = NewChannels,
-        monitor = NewMonitors,
-        tag = Tags
+        channels = Channels,
+        tag = #{}
     }};
 
+handle_info({recover_subscription_channel, Host}, State) ->
+    try
+        {NewChannel, MonitorRef, Tags} = listen(down, Host),
+
+        NewChannels = (State#state.channels)#{channel_name(subscription) => NewChannel},
+        NewMonitors = (State#state.monitor)#{NewChannel => MonitorRef},
+
+        {noreply, State#state{
+            channels = NewChannels,
+            monitor = NewMonitors,
+            tag = Tags
+        }}
+    catch
+        Class:Reason:Stack ->
+            logger:error("Failed to recover subscription channel: ~p:~p~n~p",
+                        [Class, Reason, Stack]),
+            {noreply, State}
+    end;
+    
 handle_info(Msg, State) ->
     logger:warning("Unexpected message in RabbitMQ handler: ~p", [Msg]),
     {noreply, State}.
