@@ -13,7 +13,7 @@
 -export([init/1, handle_call/3, handle_cast/2, 
          handle_info/2, terminate/2, code_change/3]).
 
--export([publish/3, is_channel_alive/3, create_channel/2]).
+-export([publish/3]).
 
 -define(Q_DATA, <<"data">>).
 -define(Q_API_DATA, <<"api_data">>).
@@ -126,76 +126,101 @@ init_state(Connection, RabbitMQE, Host, false, _) ->
                 ex = RabbitMQE, 
                 channels = Channels}}.
 
-listen(Qs) when is_list(Qs) -> 
+listen(Qs) when is_list(Qs) ->
     Key = channel_name(subscription),
-    [[Channel]] = ets:match(rabbitmq, {Key, '$1'}),
-    MonitorRef = erlang:monitor(process, Channel),
-    
-    Tags =
-    lists:foldl(
-        fun(Q, Acc) ->
-            #'basic.consume_ok'{consumer_tag = Tag} =
-            amqp_channel:call(
-                Channel,
-                #'basic.consume'{queue = Q, no_ack = true}
-            ),
-            logger:info("subscribed to queue: ~ts", [Q]),
+    [{_, Channel}] = ets:lookup(rabbitmq, Key),
 
-            Acc#{Tag => Q}
-        end, 
-      #{}, Qs),
-    
+    MonitorRef = erlang:monitor(process, Channel),
+
+    amqp_selective_consumer:register_default_consumer(Channel, self()),
+
+    Tags = lists:foldl(fun(Q, Acc) ->
+        %% Use explicit consumer_tag + register the consumer
+        ConsumerTag = list_to_binary("ejb_" ++ binary_to_list(Q)),
+
+        #'basic.consume_ok'{consumer_tag = Tag} =
+            amqp_channel:subscribe(
+                Channel,
+                #'basic.consume'{
+                    queue       = Q,
+                    no_ack      = true,
+                    consumer_tag = ConsumerTag,
+                    exclusive   = false
+                },
+                self()
+            ),
+
+        logger:info("Subscribed to queue '~ts' with tag '~ts'", [Q, Tag]),
+        Acc#{Tag => Q}
+    end, #{}, Qs),
+
     {Channel, MonitorRef, Tags};
 
 listen(Q) -> 
     Key = channel_name(subscription),
-    [[Channel]] = ets:match(rabbitmq, {Key, '$1'}),
+    [{_, Channel}] = ets:lookup(rabbitmq, Key),
     MonitorRef = erlang:monitor(process, Channel),
     
+    amqp_selective_consumer:register_default_consumer(Channel, self()),
+
+    %% Use explicit consumer_tag + register the consumer
+    ConsumerTag = list_to_binary("ejb_" ++ binary_to_list(Q)),
+
     #'basic.consume_ok'{consumer_tag = Tag} =
-    amqp_channel:call(Channel, 
-                #'basic.consume'{queue = Q, no_ack = true}),
+        amqp_channel:subscribe(
+            Channel,
+            #'basic.consume'{
+                queue       = Q,
+                no_ack      = true,
+                consumer_tag = ConsumerTag,
+                exclusive   = false
+            },
+            self()
+        ),
 
     logger:info("subscribed to queue: ~ts 
                with consumer tag: ~ts", [Q, Tag]),
     {Channel, MonitorRef, Tag}.
 
-listen(down, Host, OldChannel) -> 
-
+listen(down, Host, _OldChannel) ->
     Proc = gen_mod:get_module_proc(Host, ?MODULE),
-    NewChannel = gen_server:call(Proc, 
-                    {channel, subscription, OldChannel}),
+    NewChannel = gen_server:call(Proc, {channel, subscription, undefined}),
+
+    ok = amqp_selective_consumer:register_default_consumer(NewChannel, self()),
+
     MonitorRef = erlang:monitor(process, NewChannel),
 
     ModOptions = gen_mod:get_module_opts(Host, ?MODULE),
-    Queues = maps:get(queues, ModOptions),
+    Queues = maps:get(queues, ModOptions, []),
 
-    Tags =
-    lists:foldl(
-        fun(Q, Acc) ->
-            #'basic.consume_ok'{consumer_tag = Tag} =
-            amqp_channel:call(
-                NewChannel,
-                #'basic.consume'{queue = Q, no_ack = true}
-            ),
-            logger:info("re-subscribed to queue: ~ts", [Q]),
+    Tags = lists:foldl(fun(Q, Acc) ->
+        ConsumerTag = list_to_binary("ejb_" ++ binary_to_list(Q)),
 
-            Acc#{Tag => Q}
-        end, 
-      #{}, Queues),
+        #'basic.consume_ok'{consumer_tag = Tag} =
+            amqp_channel:subscribe(NewChannel,
+                #'basic.consume'{
+                    queue        = Q,
+                    no_ack       = true,
+                    consumer_tag = ConsumerTag,
+                    exclusive    = false
+                }, self()),
+
+        logger:info("Re-subscribed to queue: ~ts (tag: ~ts)", [Q, Tag]),
+        Acc#{Tag => Q}
+    end, #{}, Queues),
 
     {NewChannel, MonitorRef, Tags}.
 
-handle_call({channel, Type, OldChannel}, _From, State) ->
-    close_channels(OldChannel),
+handle_call({channel, Type, _OldChannel}, _From, State) ->
+    catch close_channels(_OldChannel),   % safe close
+
     ChannelName = channel_name(Type),
-    case create_channel(State#state.connection, Type) of 
-        #{ChannelName := ChannelVal} -> 
-            Channels = maps:put(ChannelName, ChannelVal, 
-                                State#state.channels),
-            {reply, ChannelVal, State#state{channels = Channels}};
-        #{} ->
-            {noreply, State}
+    case create_channel(State#state.connection, Type) of
+        #{ChannelName := ChannelVal} ->
+            NewChannels = (State#state.channels)#{ChannelName => ChannelVal},
+            {reply, ChannelVal, State#state{channels = NewChannels}};
+        _ ->
+            {reply, undefined, State}
     end;
 handle_call(Key, _From, State) ->
     ChannelKey = channel_name(Key),
@@ -214,34 +239,49 @@ handle_cast({Type, Arg, PayPac}, State) ->
 handle_cast(_, State) -> 
     {noreply, State}.
 
-handle_info({#'basic.deliver'{consumer_tag = Tag},
-            #amqp_msg{payload = Payload}}, State) ->
+handle_info({#'basic.deliver'{consumer_tag = Tag, delivery_tag = _DeliveryTag}, 
+             #amqp_msg{payload = Payload}}, State) ->
+
+    logger:debug("Received message from tag ~p", [Tag]),
 
     try
-        Tags = State#state.tag,
-        Host = State#state.host,
-        consumer_info(Payload, Host, maps:get(Tag, Tags)),
+        QueueName = maps:get(Tag, State#state.tag, unknown),
+        consumer_info(Payload, State#state.host, QueueName),
         {noreply, State}
     catch
-        error:{_, invalid_json} = Error ->
-            logger:error("invalid json payload => ~p " 
-                         "error => ~p", [Payload, Error]),
-        {noreply, State}
+        Class:Reason:Stack ->
+            logger:error("Error processing message from ~p: ~p:~p~n~p", 
+                        [Tag, Class, Reason, Stack]),
+            {noreply, State}
     end;
-handle_info({'basic.consume_ok', _Tag}, State) ->
+
+handle_info(#'basic.consume_ok'{}, State) ->
+    {noreply, State};
+
+handle_info(#'basic.cancel_ok'{}, State) ->
     {noreply, State};
 
 handle_info({'DOWN', _Ref, process, OldChannel, Reason}, State) ->
-    logger:error("rabbbit mq channel down => ~p "
-                 "reason => ~p", [OldChannel, Reason]),
+    logger:error("RabbitMQ subscription channel ~p down, reason: ~p", 
+                 [OldChannel, Reason]),
+    catch amqp_channel:close(OldChannel),
 
-    Map = maps:remove(OldChannel, State#state.channels),
-    {NewChannel, MonitorRef, Tags} = listen(down,
-                                        State#state.host, 
-                                        OldChannel),
-    NewMap = maps:put(NewChannel, MonitorRef, Map),
-    {noreply, State#state{channels = NewMap, tag = Tags}};
-handle_info(_, State) ->
+    Key = channel_name(subscription),
+    Channels = maps:remove(Key, State#state.channels),
+
+    {NewChannel, MonitorRef, Tags} = listen(down, State#state.host, OldChannel),
+
+    NewChannels = Channels#{Key => NewChannel},
+    NewMonitors = (State#state.monitor)#{NewChannel => MonitorRef},
+
+    {noreply, State#state{
+        channels = NewChannels,
+        monitor = NewMonitors,
+        tag = Tags
+    }};
+
+handle_info(Msg, State) ->
+    logger:warning("Unexpected message in RabbitMQ handler: ~p", [Msg]),
     {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -256,11 +296,8 @@ terminate(Reason, State) ->
 % Functions to create | check alive | close rabbit-mq channels % 
 % ------------------------------------------------------------ %
 create_channel(Connection, Types) when is_list(Types) ->
-    ets:new(rabbitmq, 
-            [set, public, 
-            named_table, 
-            {read_concurrency, true}, 
-            {write_concurrency, true}]),
+
+    rabbitmq_ets(),
 
     lists:foldl(
         fun(Type, Acc) ->
@@ -269,10 +306,14 @@ create_channel(Connection, Types) when is_list(Types) ->
                 {ok, Channel} ->
                     ets:insert(rabbitmq, {ChannelName, Channel}),
                     Acc#{ChannelName => Channel};
-                {error, _} ->
+                {error, Reason} ->
+                    ?LOG_ERROR("Failed to open AMQP channel: ~p", [Reason]),
                     Acc
             end
-        end, #{}, Types);
+        end,
+        #{},
+        Types
+    );
 create_channel(Connection, Type) when is_atom(Type) ->
     ChannelName = channel_name(Type),
     case amqp_connection:open_channel(Connection) of
@@ -283,6 +324,21 @@ create_channel(Connection, Type) when is_atom(Type) ->
     end;
 create_channel(_, _) ->
     #{}.
+
+rabbitmq_ets() ->
+    case ets:info(rabbitmq) of
+        undefined ->
+            ets:new(rabbitmq, [
+                set,
+                public,
+                named_table,
+                {read_concurrency, true},
+                {write_concurrency, true}
+            ]),
+            ok;
+        _ ->
+            ok
+    end.
 
 is_channel_alive(Host, Channel, Type) ->
   case {is_pid(Channel), is_process_alive(Channel)} of
