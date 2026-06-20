@@ -184,7 +184,9 @@ listen(Q) ->
 
 listen(down, Host) ->
     Proc = gen_mod:get_module_proc(Host, ?MODULE),
-    NewChannel = gen_server:call(Proc, {channel, subscription, undefined}),
+    
+    % Use safe call with timeout
+    NewChannel = gen_server:call(Proc, {channel, subscription, undefined}, 10000),
 
     ok = amqp_selective_consumer:register_default_consumer(NewChannel, self()),
 
@@ -195,7 +197,6 @@ listen(down, Host) ->
 
     Tags = lists:foldl(fun(Q, Acc) ->
         ConsumerTag = list_to_binary("ejb_" ++ binary_to_list(Q)),
-
         #'basic.consume_ok'{consumer_tag = Tag} =
             amqp_channel:subscribe(NewChannel,
                 #'basic.consume'{
@@ -262,17 +263,16 @@ handle_info(#'basic.cancel_ok'{}, State) ->
     {noreply, State};
 
 handle_info({'DOWN', _Ref, process, OldChannel, Reason}, State) ->
-    logger:error("RabbitMQ subscription channel ~p down, reason: ~p",
+    logger:error("RabbitMQ subscription channel ~p down, reason: ~p", 
                  [OldChannel, Reason]),
 
-    % Safe close
     catch amqp_channel:close(OldChannel),
 
     Key = channel_name(subscription),
     Channels = maps:remove(Key, State#state.channels),
 
-    % Recover channel **asynchronously** to avoid nested call
-    self() ! {recover_subscription_channel, State#state.host},
+    % Trigger recovery with a small delay to let current message finish
+    erlang:send_after(100, self(), {recover_subscription_channel, State#state.host}),
 
     {noreply, State#state{
         channels = Channels,
@@ -286,6 +286,7 @@ handle_info({recover_subscription_channel, Host}, State) ->
         NewChannels = (State#state.channels)#{channel_name(subscription) => NewChannel},
         NewMonitors = (State#state.monitor)#{NewChannel => MonitorRef},
 
+        logger:info("Successfully recovered subscription channel: ~p", [NewChannel]),
         {noreply, State#state{
             channels = NewChannels,
             monitor = NewMonitors,
@@ -293,8 +294,10 @@ handle_info({recover_subscription_channel, Host}, State) ->
         }}
     catch
         Class:Reason:Stack ->
-            logger:error("Failed to recover subscription channel: ~p:~p~n~p",
+            logger:error("Failed to recover subscription channel: ~p:~p~n~p", 
                         [Class, Reason, Stack]),
+            % Optional: retry once after delay
+            erlang:send_after(2000, self(), {recover_subscription_channel, Host}),
             {noreply, State}
     end;
     
@@ -306,8 +309,13 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 terminate(Reason, State) ->
-    close_connection(State#state.connection),
-    logger:warning("~p mod ~p terminated", [?MODULE, Reason]),
+    logger:warning("~p terminating with reason: ~p", [?MODULE, Reason]),
+    
+    % Never let cleanup crash the process
+    catch close_channels(maps:values(State#state.channels)),
+    catch close_connection(State#state.connection),
+    catch ets:delete(rabbitmq),
+
     ok.
 
 % ------------------------------------------------------------ %
