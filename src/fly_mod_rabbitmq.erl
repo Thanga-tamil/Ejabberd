@@ -183,39 +183,6 @@ listen(Q) ->
                with consumer tag: ~ts", [Q, Tag]),
     {Channel, MonitorRef, Tag}.
 
-listen(down, Host) ->
-    Proc = gen_mod:get_module_proc(Host, ?MODULE),
-    try
-        NewChannel = gen_server:call(Proc, {channel, subscription, undefined}, 8000),
-
-        ok = amqp_selective_consumer:register_default_consumer(NewChannel, self()),
-
-        MonitorRef = erlang:monitor(process, NewChannel),
-
-        ModOptions = gen_mod:get_module_opts(Host, ?MODULE),
-        Queues = maps:get(queues, ModOptions, []),
-
-        Tags = lists:foldl(fun(Q, Acc) ->
-            ConsumerTag = list_to_binary("ejb_" ++ binary_to_list(Q)),
-            #'basic.consume_ok'{consumer_tag = Tag} =
-                amqp_channel:subscribe(NewChannel,
-                    #'basic.consume'{
-                        queue = Q,
-                        no_ack = true,
-                        consumer_tag = ConsumerTag,
-                        exclusive = false
-                    }, self()),
-            logger:info("Re-subscribed to queue: ~ts (tag: ~ts)", [Q, Tag]),
-            Acc#{Tag => Q}
-        end, #{}, Queues),
-
-        {NewChannel, MonitorRef, Tags}
-    catch
-        Class:Reason:Stack ->
-            logger:error("listen(down) failed: ~p:~p", [Class, Reason]),
-            erlang:error({channel_recovery_failed, Reason})
-    end.
-
 handle_call({channel, Type, _OldChannel}, _From, State) ->
     catch close_channels(_OldChannel),   % safe close
 
@@ -266,43 +233,21 @@ handle_info(#'basic.consume_ok'{}, State) ->
 handle_info(#'basic.cancel_ok'{}, State) ->
     {noreply, State};
 
+% re-subscribing to a channel would cause
+% race condition because monitor connection will 
+% close the connection as well sequentially.
+
+% any rabbit-mq failure → restart mod
 handle_info({'DOWN', _Ref, process, Pid, Reason}, State) ->
+
     if Pid =:= State#state.connection ->
-            logger:error("RabbitMQ CONNECTION died: ~p", [Reason]),
-            {stop, {connection_died, Reason}, State};
-       true ->
-            logger:error("RabbitMQ subscription channel ~p down, reason: ~p", 
-                         [Pid, Reason]),
-            catch amqp_channel:close(Pid),
+        logger:error("rabbit-mq CONNECTION died: ~p", [Reason]);
+    true ->
+        logger:error("rabbit-mq subscription channel ~p down: ~p", [Pid, Reason])
+    end,
 
-            Key = channel_name(subscription),
-            Channels = maps:remove(Key, State#state.channels),
-
-            erlang:send_after(300, self(), {recover_subscription_channel, State#state.host}),
-            {noreply, State#state{channels = Channels, tag = #{}}}
-    end;
-
-handle_info({recover_subscription_channel, Host}, State) ->
-    try
-        {NewChannel, MonitorRef, Tags} = listen(down, Host),
-
-        NewChannels = (State#state.channels)#{channel_name(subscription) => NewChannel},
-        NewMonitors = (State#state.monitor)#{NewChannel => MonitorRef},
-
-        logger:info("Successfully recovered subscription channel: ~p", [NewChannel]),
-        {noreply, State#state{
-            channels = NewChannels,
-            monitor = NewMonitors,
-            tag = Tags
-        }}
-    catch
-        Class:Reason:Stack ->
-            logger:error("Failed to recover subscription channel: ~p:~p~n~p", 
-                        [Class, Reason, Stack]),
-            % Optional: retry once after delay
-            erlang:send_after(2000, self(), {recover_subscription_channel, Host}),
-            {noreply, State}
-    end;
+    % supervisor restart %
+    {stop, {rabbitmq_down, Reason}, State};
     
 handle_info(Msg, State) ->
     logger:warning("Unexpected message in RabbitMQ handler: ~p", [Msg]),
@@ -314,7 +259,7 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, State) ->
     logger:warning("~p terminating with reason: ~p", [?MODULE, Reason]),
     
-    % Never let cleanup crash the process
+    % dont let cleanup crash the process %
     catch close_channels(maps:values(State#state.channels)),
     catch close_connection(State#state.connection),
     catch ets:delete(rabbitmq),
