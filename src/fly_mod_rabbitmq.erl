@@ -29,12 +29,13 @@
 -include_lib("xmpp/include/xmpp.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--record(state, {host :: binary(),
+-record(state, {
+                host :: binary(),
                 connection :: pid(),
                 ex :: binary(),
                 tag = #{} :: #{any() => atom()},
-                channels = #{} :: #{atom() => pid()},
-                monitor = #{} :: #{pid() => reference()}}).
+                channels = #{} :: #{atom() => pid()}
+               }).
 
 %% gen_mod callbacks %%
 
@@ -81,7 +82,7 @@ mod_options(_Host) ->
 
 init([Host | _]) ->
     process_flag(trap_exit, true),
-    
+
     ModOptions = gen_mod:get_module_opts(Host, ?MODULE),
     RabbitMQH = maps:get(rabbitmq_host, ModOptions),
     RabbitMQU = maps:get(rabbitmq_username, ModOptions),
@@ -115,13 +116,12 @@ init([Host | _]) ->
 
 init_state(Connection, RabbitMQE, Host, true, Qs) ->
     Channels = create_channel(Connection, [subscription, publication]),
-    {Channel, MonitorRef, Tags} = listen(Qs),
+    Tag = listen(Qs),
     {ok, #state{host = Host,
                 connection = Connection,
                 ex = RabbitMQE,
-                tag = Tags,
-                channels = Channels,
-                monitor = #{Channel => MonitorRef}}};
+                tag = Tag,
+                channels = Channels}};
 init_state(Connection, RabbitMQE, Host, false, _) ->
     Channels = create_channel(Connection, publication),
     {ok, #state{host = Host, 
@@ -133,7 +133,7 @@ listen(Qs) when is_list(Qs) ->
     Key = channel_name(subscription),
     [{_, Channel}] = ets:lookup(rabbitmq, Key),
 
-    MonitorRef = erlang:monitor(process, Channel),
+    erlang:monitor(process, Channel),
 
     amqp_selective_consumer:register_default_consumer(Channel, self()),
 
@@ -157,12 +157,12 @@ listen(Qs) when is_list(Qs) ->
         Acc#{Tag => Q}
     end, #{}, Qs),
 
-    {Channel, MonitorRef, Tags};
+    Tags;
 
 listen(Q) -> 
     Key = channel_name(subscription),
     [{_, Channel}] = ets:lookup(rabbitmq, Key),
-    MonitorRef = erlang:monitor(process, Channel),
+    erlang:monitor(process, Channel),
     
     amqp_selective_consumer:register_default_consumer(Channel, self()),
 
@@ -183,7 +183,7 @@ listen(Q) ->
 
     logger:info("subscribed to queue: ~ts 
                with consumer tag: ~ts", [Q, Tag]),
-    {Channel, MonitorRef, Tag}.
+    Tag.
 
 handle_call({channel, Type, _OldChannel}, _From, State) ->
     catch close_channels(_OldChannel),   % safe close
