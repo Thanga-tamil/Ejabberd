@@ -105,7 +105,7 @@ handle_cast({pushnotification,
     TUser = Recipient#jid.luser,
     FUser = Sender#jid.luser,
 
-    MuteStatus = fly_redis:check_mute(Server, FUser, TUser),
+    MuteStatus = fly_redis:mute_lookup(Server, FUser, TUser),
    
     ProcessPush =
     case {MuteStatus, ChatType} of 
@@ -469,7 +469,7 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) ->
 
       TimestampValue = finalize_timestamp(Packet, ChatType),
 
-      case fly_redis:check_block(Server, FUser, TUser) of 
+      case fly_redis:blocking_lookup(Server, FUser, TUser) of 
         allow ->
           lists:map(fun(#{
                         <<"device_type">> := DeviceType,

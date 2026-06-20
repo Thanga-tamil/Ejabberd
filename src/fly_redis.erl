@@ -4,10 +4,10 @@
 
 -include_lib("xmpp/include/xmpp.hrl").
 
--export([store_block/4, check_block/3, check_mute/3]).
+-export([store_blocking/4, blocking_lookup/3, mute_lookup/3]).
 
 % block
-store_block(FromUser, JIDs, <<"SADD">>, Msg) -> 
+store_blocking(FromUser, JIDs, <<"SADD">>, Msg) -> 
 
   FUser = FromUser#jid.luser,
   Key = <<"user:", FUser/binary, ":block">>,
@@ -20,7 +20,7 @@ store_block(FromUser, JIDs, <<"SADD">>, Msg) ->
       "result:: ~p", [FUser, BlockedUsers, Res]);
 
 % unblock
-store_block(FromUser, JIDs, <<"SREM">>, Msg) -> 
+store_blocking(FromUser, JIDs, <<"SREM">>, Msg) -> 
 
   FUser = FromUser#jid.luser,
   Key = <<"user:", FUser/binary, ":block">>,
@@ -34,7 +34,7 @@ store_block(FromUser, JIDs, <<"SREM">>, Msg) ->
             [FUser, Res]);
 
 % unblock all 
-store_block(FromUser, _, <<"DEL">>, Msg) -> 
+store_blocking(FromUser, _, <<"DEL">>, Msg) -> 
 
   FUser = FromUser#jid.luser,
   Key = <<"user:", FUser/binary, ":block">>,
@@ -45,7 +45,7 @@ store_block(FromUser, _, <<"DEL">>, Msg) ->
   logger:info("user:: ~p " ++ Msg ++ " result:: ~p",
               [FUser, Res]).
 
-check_block(Host, FUser, TUser) -> 
+blocking_lookup(Host, FUser, TUser) -> 
 
   Key = <<"user:", TUser/binary, ":block">>,
   Res = exec([<<"SMEMBERS">>, Key]),
@@ -76,7 +76,7 @@ check_block(Host, FUser, TUser) ->
              JID =/= error],
 
              FromJid = jid:make(TUser, Host),
-             store_block(FromJid, JIDs, <<"SADD">>, "blocked"),
+             store_blocking(FromJid, JIDs, <<"SADD">>, "blocked"),
 
             [LUser || [B] <- BUsers, 
              JID <- [jid:from_string(B)], 
@@ -113,7 +113,7 @@ set_empty(User, Type) ->
       ok
   end.
 
-check_mute(Host, FUser, TUser) ->
+mute_lookup(Host, FUser, TUser) ->
   Key = <<"user:", TUser/binary, ":mute">>,
 
   Res = exec([<<"SMEMBERS">>, Key]),

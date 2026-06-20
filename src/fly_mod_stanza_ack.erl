@@ -158,7 +158,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
               {_,_,_,_, MessageType,Topicid, MetaData, EditMsgid,MentionList, DisappearAt , _} = ContentAcknowledge
           end,
            ?INFO_MSG("on_user_send_packet ~p",[EditMsgid]),
-           case fly_redis:check_block(FServer, FUser, TUser) of 
+           case fly_redis:blocking_lookup(FServer, FUser, TUser) of 
                   allow ->
                     BlockUser = <<"0">>;
                   not_allow ->
