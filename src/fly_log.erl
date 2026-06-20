@@ -20,17 +20,20 @@ log(Mod, Fun, Line, Pkt, Msg) ->
         #message{id = Id, 
                  from = From, 
                  to = To, 
-                 type = Type} ->
+                 type = Type,
+                 sub_els = SubEls} ->
                     
            {FUser, _, FRes} = jid:tolower(From),
            {TUser, _, TRes} = jid:tolower(To),
+           Tags = [Tag || #xmlel{name = Tag} <- SubEls],
 
            % use -E grep with 'from' and 'to' 
            % to trace the message flow 
 
             logger:info("[~p:~p:~p] "
                         "from=~p "
-                        "to=~p ~s~n ~s", 
+                        "to=~p ~s~n ~s~n"
+                        "sub_els:: ~p",
                         [Mod, Fun, Line, 
                          binary_to_list(FUser),
                          binary_to_list(TUser), 
@@ -42,7 +45,8 @@ log(Mod, Fun, Line, Pkt, Msg) ->
                                   from_resource => FRes,
                                   to_userid => TUser,
                                   to_resource => TRes}
-                            )
+                            ),
+                         Tags
                         ]);
         _ ->
            ok
