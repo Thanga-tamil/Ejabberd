@@ -10,13 +10,11 @@
 store_block(FromUser, JIDs, <<"SADD">>, Msg) -> 
 
   FUser = FromUser#jid.luser,
-
   Key = <<"user:", FUser/binary, ":block">>,
-
   BlockedUsers = [BlockedUser || {BlockedUser, _, _} <- JIDs],
 
-  ejabberd_redis:q([<<"SREM">>, Key, <<"empty">>]),
-  Res = ejabberd_redis:q([<<"SADD">>, Key] ++ BlockedUsers),
+  exec([<<"SREM">>, Key, <<"empty">>]),
+  Res = exec([<<"SADD">>, Key] ++ BlockedUsers),
 
   logger:info("user:: ~p " ++ Msg ++ " user/s:: ~p "
       "result:: ~p", [FUser, BlockedUsers, Res]);
@@ -25,12 +23,10 @@ store_block(FromUser, JIDs, <<"SADD">>, Msg) ->
 store_block(FromUser, JIDs, <<"SREM">>, Msg) -> 
 
   FUser = FromUser#jid.luser,
-
   Key = <<"user:", FUser/binary, ":block">>,
-
   BlockedUsers = [BlockedUser || {BlockedUser, _, _} <- JIDs],
 
-  Res = ejabberd_redis:q([<<"SREM">>, Key] ++ BlockedUsers),
+  Res = exec([<<"SREM">>, Key] ++ BlockedUsers),
 
   set_empty(FUser, <<":block">>),
 
@@ -41,19 +37,18 @@ store_block(FromUser, JIDs, <<"SREM">>, Msg) ->
 store_block(FromUser, _, <<"DEL">>, Msg) -> 
 
   FUser = FromUser#jid.luser,
-
   Key = <<"user:", FUser/binary, ":block">>,
 
-  Res = ejabberd_redis:q([<<"DEL">>, Key]),
-  ejabberd_redis:q([<<"SADD">>, Key, <<"empty">>]),
+  Res = exec([<<"DEL">>, Key]),
+  exec([<<"SADD">>, Key, <<"empty">>]),
+
   logger:info("user:: ~p " ++ Msg ++ " result:: ~p",
               [FUser, Res]).
 
 check_block(Host, FUser, TUser) -> 
 
   Key = <<"user:", TUser/binary, ":block">>,
-
-  Res = ejabberd_redis:q([<<"SMEMBERS">>, Key]),
+  Res = exec([<<"SMEMBERS">>, Key]),
 
   case Res of 
     {ok, [<<"empty">>]} ->
@@ -111,9 +106,9 @@ set_empty(User, Type) ->
   
   Key = <<"user:", User/binary, Type/binary>>,
 
-  case ejabberd_redis:q([<<"SCARD">>, Key]) of
+  case exec([<<"SCARD">>, Key]) of
     {ok, <<"0">>} ->
-      ejabberd_redis:q([<<"SADD">>, Key, <<"empty">>]);
+      exec([<<"SADD">>, Key, <<"empty">>]);
     _ ->
       ok
   end.
@@ -121,7 +116,7 @@ set_empty(User, Type) ->
 check_mute(Host, FUser, TUser) ->
   Key = <<"user:", TUser/binary, ":mute">>,
 
-  Res = ejabberd_redis:q([<<"SMEMBERS">>, Key]),
+  Res = exec([<<"SMEMBERS">>, Key]),
 
   case Res of 
     {ok, [<<"empty">>]} -> 
@@ -164,12 +159,15 @@ check_mute(Host, FUser, TUser) ->
 store_mute(User, Mutes, Msg) -> 
 
   Key = <<"user:", User/binary, ":mute">>,
-
-
-  ejabberd_redis:q([<<"SREM">>, Key, <<"empty">>]),
-  Res = ejabberd_redis:q([<<"SADD">>, Key] ++ Mutes),
+  
+  exec([<<"SREM">>, Key, <<"empty">>]),
+  Res = exec([<<"SADD">>, Key] ++ Mutes),
 
   logger:info("user:: ~p " ++ Msg ++ " user/s:: ~p "
       "result:: ~p", [User, Res]),
   
   Mutes.
+
+
+exec(Arg) ->
+ ejabberd_redis:q(Arg).
