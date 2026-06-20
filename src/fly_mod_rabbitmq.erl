@@ -102,6 +102,7 @@ init([Host | _]) ->
         {ok, Connection} ->
              logger:info("rabbitMQ connection established: ~p", 
                        [Connection]),
+            erlang:monitor(process, Connection),
             init_state(Connection, RabbitMQE, 
                     Host, AmqpListner, Queues);
         Error ->
@@ -184,33 +185,36 @@ listen(Q) ->
 
 listen(down, Host) ->
     Proc = gen_mod:get_module_proc(Host, ?MODULE),
-    
-    % Use safe call with timeout
-    NewChannel = gen_server:call(Proc, {channel, subscription, undefined}, 10000),
+    try
+        NewChannel = gen_server:call(Proc, {channel, subscription, undefined}, 8000),
 
-    ok = amqp_selective_consumer:register_default_consumer(NewChannel, self()),
+        ok = amqp_selective_consumer:register_default_consumer(NewChannel, self()),
 
-    MonitorRef = erlang:monitor(process, NewChannel),
+        MonitorRef = erlang:monitor(process, NewChannel),
 
-    ModOptions = gen_mod:get_module_opts(Host, ?MODULE),
-    Queues = maps:get(queues, ModOptions, []),
+        ModOptions = gen_mod:get_module_opts(Host, ?MODULE),
+        Queues = maps:get(queues, ModOptions, []),
 
-    Tags = lists:foldl(fun(Q, Acc) ->
-        ConsumerTag = list_to_binary("ejb_" ++ binary_to_list(Q)),
-        #'basic.consume_ok'{consumer_tag = Tag} =
-            amqp_channel:subscribe(NewChannel,
-                #'basic.consume'{
-                    queue        = Q,
-                    no_ack       = true,
-                    consumer_tag = ConsumerTag,
-                    exclusive    = false
-                }, self()),
+        Tags = lists:foldl(fun(Q, Acc) ->
+            ConsumerTag = list_to_binary("ejb_" ++ binary_to_list(Q)),
+            #'basic.consume_ok'{consumer_tag = Tag} =
+                amqp_channel:subscribe(NewChannel,
+                    #'basic.consume'{
+                        queue = Q,
+                        no_ack = true,
+                        consumer_tag = ConsumerTag,
+                        exclusive = false
+                    }, self()),
+            logger:info("Re-subscribed to queue: ~ts (tag: ~ts)", [Q, Tag]),
+            Acc#{Tag => Q}
+        end, #{}, Queues),
 
-        logger:info("Re-subscribed to queue: ~ts (tag: ~ts)", [Q, Tag]),
-        Acc#{Tag => Q}
-    end, #{}, Queues),
-
-    {NewChannel, MonitorRef, Tags}.
+        {NewChannel, MonitorRef, Tags}
+    catch
+        Class:Reason:Stack ->
+            logger:error("listen(down) failed: ~p:~p", [Class, Reason]),
+            erlang:error({channel_recovery_failed, Reason})
+    end.
 
 handle_call({channel, Type, _OldChannel}, _From, State) ->
     catch close_channels(_OldChannel),   % safe close
@@ -262,22 +266,21 @@ handle_info(#'basic.consume_ok'{}, State) ->
 handle_info(#'basic.cancel_ok'{}, State) ->
     {noreply, State};
 
-handle_info({'DOWN', _Ref, process, OldChannel, Reason}, State) ->
-    logger:error("RabbitMQ subscription channel ~p down, reason: ~p", 
-                 [OldChannel, Reason]),
+handle_info({'DOWN', _Ref, process, Pid, Reason}, State) ->
+    if Pid =:= State#state.connection ->
+            logger:error("RabbitMQ CONNECTION died: ~p", [Reason]),
+            {stop, {connection_died, Reason}, State};
+       true ->
+            logger:error("RabbitMQ subscription channel ~p down, reason: ~p", 
+                         [Pid, Reason]),
+            catch amqp_channel:close(Pid),
 
-    catch amqp_channel:close(OldChannel),
+            Key = channel_name(subscription),
+            Channels = maps:remove(Key, State#state.channels),
 
-    Key = channel_name(subscription),
-    Channels = maps:remove(Key, State#state.channels),
-
-    % Trigger recovery with a small delay to let current message finish
-    erlang:send_after(100, self(), {recover_subscription_channel, State#state.host}),
-
-    {noreply, State#state{
-        channels = Channels,
-        tag = #{}
-    }};
+            erlang:send_after(300, self(), {recover_subscription_channel, State#state.host}),
+            {noreply, State#state{channels = Channels, tag = #{}}}
+    end;
 
 handle_info({recover_subscription_channel, Host}, State) ->
     try
@@ -322,36 +325,38 @@ terminate(Reason, State) ->
 % Functions to create | check alive | close rabbit-mq channels % 
 % ------------------------------------------------------------ %
 create_channel(Connection, Types) when is_list(Types) ->
+    ensure_rabbitmq_ets(),
+    lists:foldl(fun(Type, Acc) ->
+        ChannelName = channel_name(Type),
+        case amqp_connection:open_channel(Connection) of
+            {ok, Channel} ->
+                ets:insert(rabbitmq, {ChannelName, Channel}),
+                Acc#{ChannelName => Channel};
+            {error, Reason} ->
+                logger:error("Failed to open ~p channel: ~p", [Type, Reason]),
+                Acc
+        end
+    end, #{}, Types);
 
-    rabbitmq_ets(),
-
-    lists:foldl(
-        fun(Type, Acc) ->
+create_channel(Connection, Type) when is_atom(Type) ->
+    ensure_rabbitmq_ets(),
+    case is_process_alive(Connection) of
+        true ->
             ChannelName = channel_name(Type),
             case amqp_connection:open_channel(Connection) of
                 {ok, Channel} ->
                     ets:insert(rabbitmq, {ChannelName, Channel}),
-                    Acc#{ChannelName => Channel};
+                    #{ChannelName => Channel};
                 {error, Reason} ->
-                    ?LOG_ERROR("Failed to open AMQP channel: ~p", [Reason]),
-                    Acc
-            end
-        end,
-        #{},
-        Types
-    );
-create_channel(Connection, Type) when is_atom(Type) ->
-    ChannelName = channel_name(Type),
-    case amqp_connection:open_channel(Connection) of
-        {ok, Channel} ->
-            #{ChannelName => Channel};
-        {error, _} ->
+                    logger:error("Failed to open ~p channel: ~p", [Type, Reason]),
+                    #{}
+            end;
+        false ->
+            logger:error("Cannot create channel - connection is dead"),
             #{}
-    end;
-create_channel(_, _) ->
-    #{}.
+    end.
 
-rabbitmq_ets() ->
+ensure_rabbitmq_ets() ->
     case ets:info(rabbitmq) of
         undefined ->
             ets:new(rabbitmq, [
@@ -384,30 +389,18 @@ channel_name(Type) when is_atom(Type) ->
     BinType = atom_to_binary(Type),
     binary_to_atom(<<BinType/binary, "_", "channel">>).
 
-
-close_connection({pid, Pid}) ->
-    amqp_connection:close(Pid),
-    ok;
 close_connection(Pid) when is_pid(Pid) ->
-    amqp_connection:close(Pid),
-    ok;    
-close_connection(_) ->
-    bad_return.
+    try amqp_connection:close(Pid, 3000) catch _:_ -> ok end;
+close_connection(_) -> ok.
 
-close_channels(Channels) when is_list(Channels) -> 
-    lists:foreach(
-        fun({_Mod, Channel}) -> 
-            amqp_channel:close(Channel)
-        end, Channels),
-    ok;
-close_channels(Channel) when is_pid(Channel) -> 
-    amqp_channel:close(Channel),
-    ok;
-close_channels({_Mod, Channel}) when is_pid(Channel) -> 
-    amqp_channel:close(Channel),
-    ok;
-close_channels(_) ->
-    bad_return.
+close_channels(Channels) when is_list(Channels) ->
+    lists:foreach(fun close_channel/1, Channels);
+close_channels(Channel) -> 
+    close_channel(Channel).
+
+close_channel(Pid) when is_pid(Pid) ->
+    try amqp_channel:close(Pid) catch _:_ -> ok end;
+close_channel(_) -> ok.
 
 %% publication handlers starts %%
 
