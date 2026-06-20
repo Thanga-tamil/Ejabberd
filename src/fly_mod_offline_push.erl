@@ -114,7 +114,6 @@ handle_cast({pushnotification,
       {muted, <<"mediacall">>} ->
           true;
       {muted, _} -> 
-          logger:info("push muted ~p", [TUser]),
           false
     end,
 
