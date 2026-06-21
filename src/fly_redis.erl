@@ -62,7 +62,7 @@ blocking_lookup(Host, FUser, TUser) ->
 
       BlockedUserList = fly_mod_utils:get_blocked_users(Host, TUser),
 
-      logger:info("blocked users list  from db:: ~p", [BlockedUserList]),
+      logger:info("blocked users list from db:: ~p", [BlockedUserList]),
 
       LUserList = 
       case BlockedUserList of 

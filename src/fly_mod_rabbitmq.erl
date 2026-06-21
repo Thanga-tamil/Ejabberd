@@ -271,6 +271,7 @@ terminate(Reason, State) ->
 % ------------------------------------------------------------ %
 % Functions to create | check alive | close rabbit-mq channels % 
 % ------------------------------------------------------------ %
+
 create_channel(Connection, Types) when is_list(Types) ->
     ensure_rabbitmq_ets(),
     lists:foldl(fun(Type, Acc) ->
@@ -307,10 +308,8 @@ ensure_rabbitmq_ets() ->
     case ets:info(rabbitmq) of
         undefined ->
             ets:new(rabbitmq, [
-                set,
-                public,
-                named_table,
-                {read_concurrency, true},
+                set, public, named_table, 
+                {read_concurrency, true}, 
                 {write_concurrency, true}
             ]),
             ok;
@@ -330,7 +329,6 @@ is_channel_alive(Host, Channel, Type) ->
       Proc = gen_mod:get_module_proc(Host, ?MODULE),
       gen_server:call(Proc, {channel, Type, Channel})
   end.
-
 
 channel_name(Type) when is_atom(Type) ->
     BinType = atom_to_binary(Type),
@@ -387,73 +385,59 @@ publication({Host, RoutingKey},
 
 %% subscription handlers starts %%
 
-consumer_info(Payload, Host, Q) when Q =:= ?Q_API_DATA ->
+consumer_info(Payload, Host, Q) 
+                when Q =:= ?Q_DATA;
+                     Q =:= ?Q_API_DATA; 
+                     Q =:= ?Q_API_CALL;
+                     Q =:= ?Q_API_MESSAGE ->
+
     logger:info("Q :: ~p consumed :: ~p", [Q, Payload]),
 
     Map = jiffy:decode(Payload, [return_maps]),
     logger:info("decoded Map :: ~p", [Map]),
-    Type = maps:get(<<"type">>, Map),
 
-    if Type =:= false -> 
-        ok;
-    true ->
-        subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
-            [Type, Map, Host])
-    end;
-consumer_info(Payload, Host, Q) when Q =:= ?Q_DATA ->
-    logger:info("Q :: ~p consumed :: ~p", [Q, Payload]),
+    case Q of 
+        ?Q_DATA -> 
+            LicenseData = maps:get(<<"data">>, Map),
+            subscription(?LISTENER_MOD, ?LISTENER_LICENSE_DATA_FUN,
+                         [LicenseData, Host]);
 
-    Map = jiffy:decode(Payload, [return_maps]),
-    logger:info("decoded Map :: ~p", [Map]),
-    LicenseData = maps:get(<<"data">>, Map),
-
-    subscription(?LISTENER_MOD, ?LISTENER_LICENSE_DATA_FUN,
-        [LicenseData, Host]);
-
-consumer_info(Payload, Host, Q) when Q =:= ?Q_API_MESSAGE ->
-    logger:info("Q :: ~p consumed :: ~p", [Q, Payload]),
-
-    Map = jiffy:decode(Payload, [return_maps]),
-    logger:info("decoded Map :: ~p", [Map]),
-    IsNotification = maps:get(<<"notification">>, Map),
-
-    if IsNotification -> 
-        subscription(?LISTENER_MOD, ?LISTENER_PUSH_FUN,
-            [Map, Host]);
-    true ->
-        subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
-            [<<"message_delivery">>, Map, Host])
-    end;
-
-consumer_info(Payload, Host, Q) when Q =:= ?Q_API_CALL ->
-    logger:info("Q :: ~p consumed :: ~p", [Q, Payload]),
-
-    Map = jiffy:decode(Payload, [return_maps]),
-    logger:info("decoded Map :: ~p", [Map]),
-    Type = maps:get(<<"type">>, Map),
-
-    case Type of 
-        T when 
-        T =:= <<"mediacall">>; 
-        T =:= <<"carbonmediacall">> ->
-
-            subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
-                            [Type, Map, Host]);
+        ?Q_API_MESSAGE -> 
+            IsNotification = maps:get(<<"notification">>, Map),
+            if IsNotification -> 
+                subscription(?LISTENER_MOD, ?LISTENER_PUSH_FUN,
+                             [Map, Host]);
+            true ->
+                subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
+                             [<<"message_delivery">>, Map, Host])
+            end;
         _ ->
-            
-            subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
-                            [<<"call_activity">>, Map, Host])
+            Type = maps:get(<<"type">>, Map),
+            case {Type, Q} of 
+                {false, _} -> 
+                    ok;
+                {T, ?Q_API_CALL} 
+                    when 
+                    T =/= <<"mediacall">>; 
+                    T =/= <<"carbonmediacall">> ->
+                        
+                        subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
+                                     [<<"call_activity">>, Map, Host]);
+                {_, _} ->
+                    subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
+                                 [Type, Map, Host])
+            end
     end;
 
 consumer_info(Payload, _, UnknownTag) ->
-    logger:info("consumed unknown tag :: ~p "
-           "payload :: ~p", [UnknownTag, Payload]),
-    ok.
+    logger:info("consumed unknown tag :: ~p payload :: ~p", 
+                [UnknownTag, Payload]).
 
 subscription(Mod, Fun, Args) ->
     apply(Mod, Fun, Args).
 
 %% subscription handlers ends %%
+
 logger(false, _, _, _) ->
     ok;
 logger(Pkt, Exchange, RoutingKey, Msg) ->
@@ -470,14 +454,10 @@ logger(Pkt, Exchange, RoutingKey, Msg) ->
                     " to=~p~n ~s",
                 [FUser, TUser, 
                     jiffy:encode(#{
-                        message_id => Id,
-                        type => Type,
-                        from_userid => FUser,
-                        from_resource => FRes,
-                        to_userid => TUser,
-                        to_resource => TRes,
-                        exchange => Exchange,
-                        routing_key => RoutingKey
+                        message_id => Id, type => Type,
+                        from_userid => FUser, from_resource => FRes,
+                        to_userid => TUser, to_resource => TRes,
+                        exchange => Exchange, routing_key => RoutingKey
                     })]);
     _ ->
         ok
