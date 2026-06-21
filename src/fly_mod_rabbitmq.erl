@@ -15,16 +15,6 @@
 
 -export([publish/3]).
 
--define(Q_DATA, <<"data">>).
--define(Q_API_DATA, <<"api_data">>).
--define(Q_API_CALL, <<"api_call">>).
--define(Q_API_MESSAGE, <<"api_message">>).
-
--define(LISTENER_MOD, mod_amqp_proc).
--define(LISTENER_PROC_FUN, process_listener_payload).
--define(LISTENER_LICENSE_DATA_FUN, update_license).
--define(LISTENER_PUSH_FUN, process_push).
-
 -include("logger.hrl").
 -include_lib("xmpp/include/xmpp.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
@@ -82,6 +72,13 @@ mod_options(_Host) ->
 
 init([Host | _]) ->
     process_flag(trap_exit, true),
+
+    case whereis(fly_rabbitmq_worker_sup) of
+        undefined ->
+            fly_rabbitmq_worker_sup:start_link();
+        _ ->
+            ok
+    end,
 
     ModOptions = gen_mod:get_module_opts(Host, ?MODULE),
     RabbitMQH = maps:get(rabbitmq_host, ModOptions),
@@ -201,7 +198,9 @@ handle_call(Key, _From, State) ->
     case State#state.channels of 
         #{ChannelKey := ChannelVal} ->
             {reply, ChannelVal, State}
-    end.
+    end;
+handle_call(_, _, State) -> 
+    {noreply, State}.
 
 handle_cast({Type, Arg, PayPac}, State) ->
     Key = channel_name(Type),
@@ -220,7 +219,11 @@ handle_info({#'basic.deliver'{consumer_tag = Tag, delivery_tag = _DeliveryTag},
 
     try
         QueueName = maps:get(Tag, State#state.tag, unknown),
-        consumer_info(Payload, State#state.host, QueueName),
+        fly_rabbitmq_worker:process(
+            Payload,
+            State#state.host,
+            QueueName
+        ),
         {noreply, State}
     catch
         Class:Reason:Stack ->
@@ -381,62 +384,6 @@ publication({Host, RoutingKey},
     end.
 
 %% publication handlers ends %%
-
-
-%% subscription handlers starts %%
-
-consumer_info(Payload, Host, Q) 
-                when Q =:= ?Q_DATA;
-                     Q =:= ?Q_API_DATA; 
-                     Q =:= ?Q_API_CALL;
-                     Q =:= ?Q_API_MESSAGE ->
-
-    logger:info("Q :: ~p consumed :: ~p", [Q, Payload]),
-
-    Map = jiffy:decode(Payload, [return_maps]),
-    logger:info("decoded Map :: ~p", [Map]),
-
-    case Q of 
-        ?Q_DATA -> 
-            LicenseData = maps:get(<<"data">>, Map),
-            subscription(?LISTENER_MOD, ?LISTENER_LICENSE_DATA_FUN,
-                         [LicenseData, Host]);
-
-        ?Q_API_MESSAGE -> 
-            IsNotification = maps:get(<<"notification">>, Map),
-            if IsNotification -> 
-                subscription(?LISTENER_MOD, ?LISTENER_PUSH_FUN,
-                             [Map, Host]);
-            true ->
-                subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
-                             [<<"message_delivery">>, Map, Host])
-            end;
-        _ ->
-            Type = maps:get(<<"type">>, Map),
-            case {Type, Q} of 
-                {false, _} -> 
-                    ok;
-                {T, ?Q_API_CALL} 
-                    when 
-                    T =/= <<"mediacall">>; 
-                    T =/= <<"carbonmediacall">> ->
-                        
-                        subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
-                                     [<<"call_activity">>, Map, Host]);
-                {_, _} ->
-                    subscription(?LISTENER_MOD, ?LISTENER_PROC_FUN,
-                                 [Type, Map, Host])
-            end
-    end;
-
-consumer_info(Payload, _, UnknownTag) ->
-    logger:info("consumed unknown tag :: ~p payload :: ~p", 
-                [UnknownTag, Payload]).
-
-subscription(Mod, Fun, Args) ->
-    apply(Mod, Fun, Args).
-
-%% subscription handlers ends %%
 
 logger(false, _, _, _) ->
     ok;
