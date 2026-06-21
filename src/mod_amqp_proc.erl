@@ -103,6 +103,7 @@ process_push(Payload, Host) ->
             when DeviceType =:= <<"android">> -> 
             
             %% send android push payload to rabbit-mq
+            prep_and_send(Host, Payload, UserDetails, MessageData, android),
             ok;
         {#{<<"device_type">> := DeviceType}, #{}} ->
             logger:warning("unknow deviceType ~p, " 
