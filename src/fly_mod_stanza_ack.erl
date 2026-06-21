@@ -161,7 +161,7 @@ on_user_send_packet({#message{from = From,to = To,type = Type} = Packet, _C2SSta
            case fly_redis:blocking_lookup(FServer, FUser, TUser) of 
                   allow ->
                     BlockUser = <<"0">>;
-                  not_allow ->
+                  blocked ->
                     BlockUser = TUser
            end,
           SUser = case Type of

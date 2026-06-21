@@ -487,7 +487,7 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) ->
             end,
           Tokens);
         
-        not_allow ->
+        blocked ->
           handle_poll(Tokens, Server, ChatType, Sender, 
             Recipient, MsgId, SubEl, Packet, TimestampValue)
         end;

@@ -88,7 +88,7 @@ blocking_lookup(Host, FUser, TUser) ->
 
       case lists:member(FUser, LUserList) of 
         true -> 
-          not_allow;
+          blocked;
         false -> 
           allow
       end;
@@ -96,7 +96,7 @@ blocking_lookup(Host, FUser, TUser) ->
       logger:info("blocking lookup completed in redis;"),
       case lists:member(FUser, BlockedUsers) of 
         true -> 
-          not_allow;
+          blocked;
         false -> 
           allow
       end
