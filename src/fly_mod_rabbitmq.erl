@@ -57,6 +57,8 @@ mod_opt_type(rabbitmq_password) ->
     fun iolist_to_binary/1;
 mod_opt_type(amqp_listener) ->
     fun(B) when is_boolean(B) -> B end;
+mod_opt_type(rabbitmq_work_pool) ->
+    fun(B) when is_integer(B) -> B end;
 mod_opt_type(queues) ->
     econf:list(econf:binary()).
 
@@ -66,6 +68,7 @@ mod_options(_Host) ->
      {rabbitmq_exchange, undefined},
      {rabbitmq_password, undefined},
      {amqp_listener, false},
+     {rabbitmq_work_pool, 20},
      {queues, []}].
 
 %% gen_serve callbacks %%
@@ -73,14 +76,16 @@ mod_options(_Host) ->
 init([Host | _]) ->
     process_flag(trap_exit, true),
 
+    ModOptions = gen_mod:get_module_opts(Host, ?MODULE),
+    RabbitMQWPL = maps:get(rabbitmq_work_pool, ModOptions),
+
     case whereis(fly_rabbitmq_worker_sup) of
         undefined ->
-            fly_rabbitmq_worker_sup:start_link();
+            fly_rabbitmq_worker_sup:start_link(RabbitMQWPL);
         _ ->
             ok
     end,
 
-    ModOptions = gen_mod:get_module_opts(Host, ?MODULE),
     RabbitMQH = maps:get(rabbitmq_host, ModOptions),
     RabbitMQU = maps:get(rabbitmq_username, ModOptions),
     RabbitMQP = maps:get(rabbitmq_password, ModOptions),
