@@ -51,7 +51,7 @@ process_listener_payload(Type, Map, Host) ->
         true ->
             Id = binary:part(base64:encode(crypto:strong_rand_bytes(8)),0,10),
             IQ = handle_payload(Map, Host, Id, Type),
-            ?LOG_INFO("[~p] Iq: ~p", [Type, IQ]),
+            ?DEBUG("[~p] Iq: ~p", [Type, IQ]),
             case lists:member(Type, [?USER_EXIT_GROUP, ?MEDIA_DELETE]) of
                 true -> 
                     ok;
@@ -103,6 +103,7 @@ process_push(Payload, Host) ->
             when DeviceType =:= <<"android">> -> 
             
             %% send android push payload to rabbit-mq
+            prep_and_send(Host, Payload, UserDetails, MessageData, android),
             ok;
         {#{<<"device_type">> := DeviceType}, #{}} ->
             logger:warning("unknow deviceType ~p, " 

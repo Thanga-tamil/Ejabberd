@@ -165,7 +165,7 @@ process_local_iq(#iq{from = From, to = To, type = Type, sub_els = [#user_activit
 %% Set method for the IQ
 process_iq_set(From, _To, RequestType, IQ) ->
   SubEl = fxml:get_subtag_with_xmlns(IQ, <<"query">>, <<"jabber:iq:user_activities">>),
-   ?INFO_MSG ("process_iq_set ~p", [RequestType]),
+  logger:debug("process_iq_set ~p", [RequestType]),
   case RequestType of
     <<"set_web_password">> ->
       set_web_password(From, SubEl, IQ);
@@ -1069,7 +1069,7 @@ acknowledge(From,RequestType,SubEl,IQ) ->
   #jid{user = FUser, lserver = FServer,lresource = LResource} = From,
   MsgId = fxml:get_path_s(SubEl, [{attr, <<"id">>}]),
 
-  ?INFO_MSG("acknowledge called by user=~s server=~s resource=~s msgId=~s", [FUser, FServer, LResource, MsgId]),
+  logger:debug("acknowledge called by user=~s server=~s resource=~s msgId=~s", [FUser, FServer, LResource, MsgId]),
   
   Substring = string:str(binary_to_list(LResource),binary_to_list(<<"Mobile-">>)),
   if Substring =:= 1 ->
@@ -1081,7 +1081,7 @@ acknowledge(From,RequestType,SubEl,IQ) ->
   Seq = fly_mod_utils:get_spool_seq(FServer, FUser, MsgId, MResource),
   Result = fly_mod_utils:batch_remove_spool(FServer, FUser, Seq, MResource),
 
-  ?LOG_INFO("clear spool on acknowledge: 
+  logger:debug("clear spool on acknowledge: 
              user=~s server=~s resource=~s msgId=~s seq=~p result=~p",
              [FUser, FServer, LResource, MsgId, Seq, Result]),
 
@@ -3017,7 +3017,7 @@ set_message_disappear(From, SubEl, IQ) ->
             end,
             
             if NotifyId =/= <<"">> ->
-                MessageId = list_to_binary(fly_mod_utils:generate_uuid_v4()),
+                MessageId = fly_mod_utils:generate_uuid_v4(),
                 fly_mod_utils:single_notify_message(From, ToJid, NotifyId, MessageId, <<"">>, <<"">>, MsgDisappear);
             true ->
                 ok

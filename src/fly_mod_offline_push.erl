@@ -97,72 +97,40 @@ handle_call(stop, _From, State) ->
 %% Description: Handling cast messages
 %%=========================================================================
 handle_cast({pushnotification, 
-            <<"chat">>,
+            Type,
 	          {Sender, Recipient, ChatType, SubEl, Packet}},
-            State) ->
+            State)  when Type =:= <<"chat">>; <<"normal">> ->
 
     Server = Recipient#jid.server, 
     TUser = Recipient#jid.luser,
     FUser = Sender#jid.luser,
 
-    IsMuted = fly_mod_utils:check_chatmuted(Server, TUser, FUser),
-
-    ProcessPush = 
-    case IsMuted of
-      {selected, _, []} ->
-        true;
-      {selected, _, [[_]]} ->
-
-        if ChatType =:= <<"mediacall">> ->
-            true;
-          true ->
-            logger:info("push muted ~p", [TUser]),
-            false
-        end
+    MuteStatus = fly_redis:mute_lookup(Server, FUser, TUser),
+   
+    ProcessPush =
+    case {MuteStatus, ChatType} of 
+      {allow, _} -> 
+          true;
+      {muted, <<"mediacall">>} ->
+          true;
+      {muted, _} -> 
+          false
     end,
 
     case ProcessPush of 
       true -> 
         case send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) of
-          {ok, _Result} -> ok;
-          {error, Error} ->
-            logger:warning("push error ~p", [Error]),
+          {ok, _} -> 
             ok;
+          {error, Error} ->
+            logger:warning("push error ~p", [Error]);
           _ ->
             ok
         end;
-
       false -> 
-        logger:info("push muted ~p", [TUser]),
-        ok
+        logger:info("push muted ~p", [TUser])
     end,
 
-	{noreply, State};
-handle_cast({pushnotification, <<"normal">>, {Sender, Recipient, ChatType, SubEl, Packet}}, State) ->
-	case catch fly_mod_utils:check_chatmuted(Recipient#jid.server, Recipient#jid.luser, Sender#jid.luser) of
-		{selected, _, []} ->
-			Call = true;
-		{selected, _, [[_T]]} ->
-			if ChatType =:= <<"mediacall">> ->
-				   Call = true;
-			   true ->
-				   Call = false,
-				   ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
-				   ok
-			end
-	end,
-	if Call =:= true ->
-		   case catch send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) of
-			   {ok, _Result} -> ok;
-			   {error, Error} ->
-				   ?INFO_MSG("push error ~p", [Error]), ok;
-			   _Exception ->
-				   ?INFO_MSG("push status ~p", [_Exception]), ok
-		   end;
-	   true ->
-		   ?INFO_MSG("push muted ~p", [Recipient#jid.luser]),
-		   ok
-	end,
 	{noreply, State};
 handle_cast({queryexecution, <<"clear_all">>,
   {From, Last_Msg_Id, Delete_Type, XMLBody}},
@@ -464,9 +432,14 @@ group_create_query(From, Participants, Channel, GroupJID,
 %% @param record SubEl
 %% @return atom
 send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) ->
-  MsgId = fxml:get_attr_s(<<"id">>,Packet#xmlel.attrs),
+  Server = Recipient#jid.server,
+  TUser = Recipient#jid.luser,
+  FUser = Sender#jid.luser,
+
+  MsgId = fxml:get_attr_s(<<"id">>, Packet#xmlel.attrs),
+
   Rs = if ChatType == <<"meeting_reminder">> -> "";
-    true -> has_more_resources(Recipient#jid.luser,Recipient#jid.server)
+    true -> has_more_resources(TUser, Server)
   end,
 
   CallMode =
@@ -476,76 +449,120 @@ send_push_notifications(Sender, Recipient, ChatType, SubEl, Packet) ->
         false ->
             <<"">>
     end,
-  Ccodes = gen_mod:get_module_opt(Recipient#jid.server, fly_mod_offline_push, restricted_country_code), 
-  ?LOG_INFO("Ccodes: ~p", [Ccodes]),
+  Ccodes = gen_mod:get_module_opt(Server, fly_mod_offline_push, restricted_country_code), 
 
   DeviceDetails = 
   if CallMode =:= <<"onetoone">> ->
-    fly_mod_utils:get_user_device_exclude_restricted_countries(Recipient#jid.server, Recipient#jid.luser, Rs, fly_mod_media:sql_in(Ccodes));
+      get_user_details(Server, TUser, Rs, fly_mod_media:sql_in(Ccodes));
     true ->
-      fly_mod_utils:get_user_device(Recipient#jid.server, Recipient#jid.luser, Rs)
+      get_user_details(Server, TUser, Rs, false)
   end,
 
   ?LOG_INFO("DeviceDetails: ~p", [DeviceDetails]),
 
   case catch DeviceDetails of
-    {selected, _, []} -> 
-      ?INFO_MSG("~p device detail not found", [Recipient#jid.luser]),
+    [] -> 
+      ?LOG_INFO("~p device detail not found", [TUser]),
       device_token_is_empty;
     
-    {selected, _, Tokens} ->
-      if ChatType == <<"call">> ->
-        TimestampValue = <<"">>;
-      ChatType == <<"recall">> ->
-        TimestampValue = <<"">>;
-      ChatType == <<"ptt">> ->
-        TimestampValue = <<"">>;
-      ChatType == <<"mediacall">> ->
-        TimestampValue = <<"">>;
-      ChatType == <<"adminblock">> ->
-        TimestampValue = <<"">>;
-      ChatType == <<"meeting_reminder">> ->
-        TimestampValue = <<"">>;
-      ChatType == <<"reaction">>; ChatType == <<"group_reaction">> ->
-        TimestampValue = <<"">>;
-      true ->
-        Timestamp = fxml:get_subtag(Packet, <<"timestamp">>),
-        TimestampValue = fxml:get_attr_s(<<"time">>,
-        Timestamp#xmlel.attrs)
-      end,
-      
-      lists:map(fun(G) -> 
-				[DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, _DeviceId, UserType,PushType ] = G,
+    Tokens ->
 
-				case catch fly_mod_utils:check_blockedlist(Recipient#jid.server, Recipient#jid.luser, Sender#jid.luser) of
-					{selected, _, [[_T]]} ->
-						if ChatType == <<"poll">> ->
-							   ElementAcknowledge = xmpp:get_subtag(xmpp:decode(Packet), #poll{}),
-							   {poll,_,_,_,_,Chattype,_,_} = ElementAcknowledge,
-							   if Chattype =:=<<"normal">> ->
-								      call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,
-										       PushType,Sender, Recipient, ChatType, SubEl, Packet,TimestampValue);
-							      true ->
-								      fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
-								      user_blocked
-							   end;
-						   true ->
-							   fly_mod_utils:remove_offline(Recipient#jid.server, MsgId),
-							   user_blocked
-						end;
-					{error,timeout}  ->
-						ok;
-					{selected, _, []} ->
-						call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,Sender, Recipient, ChatType,
-								 SubEl, Packet,TimestampValue)
-				end
+      TimestampValue = finalize_timestamp(Packet, ChatType),
 
-		end,Tokens);
+      case fly_redis:blocking_lookup(Server, FUser, TUser) of 
+        allow ->
+          lists:map(fun(#{
+                        <<"device_type">> := DeviceType,
+                        <<"device_token">> := DeviceToken,
+                        <<"voip_device_token">> := VoipDeviceToken,
+                        <<"mode">> := Mode,
+                        <<"device_os_version">> := IOSVersion,
+                        <<"user_type">> := UserType,
+                        <<"push_server_type">> := PushServerType
+                      }) -> 
+             
+            call_push_method(DeviceType, DeviceToken, VoipDeviceToken, 
+              Mode, IOSVersion, UserType, PushServerType, Sender, Recipient, 
+              ChatType, SubEl, Packet, TimestampValue)
+            end,
+          Tokens);
+        
+        blocked ->
+          handle_poll(Tokens, Server, ChatType, Sender, 
+            Recipient, MsgId, SubEl, Packet, TimestampValue)
+        end;
 
     _Error ->
       ?INFO_MSG("push_message get_user_device_details error is ~p", [_Error]),
       database_error
   end.
+
+handle_poll(Tokens, Server, ChatType, Sender, Recipient, MsgId, SubEl, Packet, TimestampValue) -> 
+
+    lists:map(fun(#{
+                    <<"device_type">> := DeviceType,
+                    <<"device_token">> := DeviceToken,
+                    <<"voip_device_token">> := VoipDeviceToken,
+                    <<"mode">> := Mode,
+                    <<"device_os_version">> := IOSVersion,
+                    <<"user_type">> := UserType,
+                    <<"push_server_type">> := PushServerType
+                  }) -> 
+                        
+        if ChatType =:= <<"poll">> ->
+          case xmpp:get_subtag(xmpp:decode(Packet), #poll{}) of 
+            #poll{chat_type = <<"normal">>} ->
+              call_push_method(DeviceType, DeviceToken, VoipDeviceToken, 
+                  Mode, IOSVersion, UserType, PushServerType, Sender, Recipient, 
+                  ChatType, SubEl, Packet, TimestampValue);
+            _ ->
+              fly_mod_utils:remove_offline(Server, MsgId),
+              user_blocked
+          end;
+        true ->
+            fly_mod_utils:remove_offline(Server, MsgId),
+            user_blocked
+          end
+      end,
+    Tokens).
+
+get_user_details(Host, User, Resource, Codes) ->
+
+    Table = <<"chat_users_details">>,
+
+    Selects = <<"device_type, device_token, voip_device_token,
+                 mode, device_os_version, device_id, user_type,
+                 push_server_type">>,
+
+
+    Where = 
+    case Codes of 
+      false -> 
+        [<<"username = '">>,User,<<"' AND
+            device_token <> '' AND device_id <> '' 
+            AND device_id NOT IN  ('">>,Resource,<<"')">>];
+      _ ->
+        [<<"username = '">>,User,<<"' AND
+            device_token <> '' AND device_id <> '' 
+            AND device_id NOT IN  ('">>,Resource,<<"')
+            AND (country_code NOT IN ">>,Codes,<<" OR country_code IS NULL)">>]
+    end,
+
+    fly_sql:get_maps(Host, Table, Selects, Where).
+
+finalize_timestamp(Packet, ChatType) ->
+    Types = [
+             <<"call">>, <<"recall">>, <<"ptt">>, <<"mediacall">>, 
+             <<"adminblock">>, <<"meeting_reminder">>, <<"reaction">>,
+             <<"group_reaction">>
+            ],
+    case lists:member(ChatType, Types) of
+        true ->
+            <<"">>;
+        false ->
+            Timestamp = fxml:get_subtag(Packet, <<"timestamp">>),
+            fxml:get_attr_s(<<"time">>, Timestamp#xmlel.attrs)
+    end.
 
 call_push_method(DeviceType, DeviceToken, VoipDeviceToken, Mode,IOSVersion, UserType,PushType,
                  Sender, Recipient, ChatType, SubEl, Packet,TimestampValue)->

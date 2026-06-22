@@ -4,7 +4,7 @@
 
 -include("logger.hrl").
 
--export([insert/0, get_map/4, 
+-export([insert/0, get_map/4, get_maps/4, 
          update/0, delete/3]).
 
 insert() ->
@@ -17,6 +17,16 @@ get_map(Host, Table, Selects, Where) ->
 
         {atomic, {selected, _Columns, []}} ->
             #{};
+
+        Error ->
+            Error
+    end.
+
+get_maps(Host, Table, Selects, Where) ->
+    case get(Host, Table, Selects, Where) of
+        {atomic, {selected, Columns, Rows}} ->
+            [maps:from_list(lists:zip(Columns, Row))
+             || Row <- Rows];
 
         Error ->
             Error
